@@ -1,102 +1,74 @@
-🤖 VinsonBot — Verificador de Pagos con IA para Vinson Burgers 🍔
-Bot de WhatsApp que verifica en segundos si un pago llegó realmente a la cuenta de Bancolombia, combinando lectura automática de SMS bancarios con análisis de comprobantes por IA.
+VinsonBot — Verificador de Pagos para Vinson Burgers
+Bot de WhatsApp que verifica si un pago llegó realmente a la cuenta de Bancolombia, combinando lectura automática de SMS bancarios con análisis de comprobantes por inteligencia artificial.
 
-🧠 ¿Cómo funciona?
-Cliente compra hamburguesa
+Como funciona
+El empleado recibe la foto del comprobante del cliente y la reenvía al bot de WhatsApp. El bot analiza la imagen con IA y espera la confirmacion del SMS real de Bancolombia antes de dar el visto bueno.
+Cliente paga y manda foto del comprobante
         ↓
-Cliente paga y manda foto del comprobante al empleado por WhatsApp
-        ↓
-Empleado reenvía la foto al bot
+Empleado reenvía la foto al bot de WhatsApp
         ↓
 Bot analiza el comprobante con IA (Claude API)
         ↓
-App Android VinsonBot SMS detecta el SMS real de Bancolombia
+App Android detecta el SMS real de Bancolombia
         ↓
-✅ "Pago verificado — prepara el pedido"
-❌ "Comprobante sospechoso — no prepares nada"
+"Pago verificado, prepara el pedido"
+"Comprobante sospechoso, no prepares nada"
 
-⚡ Arrancar en 15 minutos (modo demo)
-bash# 1. Clonar/descargar el proyecto
-cd vinson-bot
+Arrancar el proyecto
+bash# Clonar el repositorio
+git clone https://github.com/ranskevindevelope/burger-bot.git
+cd burger-bot
 
-# 2. Instalar dependencias
+# Instalar dependencias
 npm install
 
-# 3. Copiar variables de entorno
+# Configurar variables de entorno
 cp .env.example .env
 
-# 4. Arrancar el bot
+# Arrancar el bot
 node index.js
 
-# 5. En otra terminal, exponer al internet
+# En otra terminal, exponer al internet
 npx ngrok http 3000
-El bot funciona en modo demo sin necesidad de credenciales reales.
-Perfecto para probar el flujo completo antes de conectar bancos reales.
+El bot tiene un modo demo que funciona sin credenciales reales, util para probar el flujo antes de conectar los servicios.
 
-📱 Configurar WhatsApp con OpenWA
+Configurar WhatsApp con OpenWA
 
-Instalar dependencias de OpenWA:
+Instalar la dependencia de OpenWA:
 
 bash   npm install @open-wa/wa-automate
 
-Ejecutar el bot — se abre un QR en la terminal
+Ejecutar el bot — aparece un QR en la terminal
 Escanear el QR con el WhatsApp del negocio
 El bot queda conectado y escuchando mensajes
 
 
-📲 App Android — VinsonBot SMS
-La app Android reemplaza la dependencia de APIs bancarias externas.
-Lee los SMS reales de Bancolombia directamente desde el celular y los envía al bot automáticamente.
+App Android — VinsonBot SMS
+La app Android lee los SMS reales de Bancolombia directamente desde el celular y los envia al bot de forma automatica. Esto reemplaza la necesidad de una API bancaria externa.
 Requisitos
 
 Celular Android con la cuenta de Bancolombia activa
 Android 8.0 o superior
-La app debe tener permisos de SMS y notificaciones
+Permisos de SMS, notificaciones y bateria sin restricciones
 
-Permisos necesarios
-xml<uses-permission android:name="android.permission.RECEIVE_SMS"/>
-<uses-permission android:name="android.permission.READ_SMS"/>
-<uses-permission android:name="android.permission.INTERNET"/>
-<uses-permission android:name="android.permission.FOREGROUND_SERVICE"/>
-<uses-permission android:name="android.permission.FOREGROUND_SERVICE_DATA_SYNC"/>
-<uses-permission android:name="android.permission.POST_NOTIFICATIONS"/>
-<uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED"/>
-<uses-permission android:name="android.permission.REQUEST_IGNORE_BATTERY_OPTIMIZATIONS"/>
-Configuración inicial
+Configuracion inicial
 
 Instalar el APK en el celular del negocio
-Abrir la app — aparecen diálogos pidiendo permisos de SMS y notificaciones — aceptar todos
-La app pide desactivar la optimización de batería — aceptar (necesario para funcionar en segundo plano)
-Ingresar la URL del bot en el campo de texto
-Tocar Guardar URL
-El servicio queda activo en segundo plano
+Abrir la app y aceptar todos los permisos que solicita
+Aceptar la solicitud de desactivar optimizacion de bateria
+Ingresar la URL del bot y tocar Guardar
 
-Números de Bancolombia reconocidos
-85540, 87400, 85784, 892445, 87460
-También reconoce mensajes que empiecen con Bancolombia:.
-Funciona con cualquier banco origen
-Dado que la cuenta destino es Bancolombia, el SMS siempre lo genera Bancolombia sin importar si el cliente paga desde:
+Bancos de origen compatibles
+Dado que la cuenta destino es Bancolombia, el SMS siempre lo genera Bancolombia sin importar desde donde pague el cliente:
 
-✅ Nequi
-✅ Daviplata
-✅ Nubank
-✅ Otro banco colombiano
+Nequi
+Daviplata
+Nubank
+Cualquier banco colombiano
 
 Componentes de la app
-ComponenteFunciónSmsForegroundServiceServicio activo en segundo plano, procesa SMS y envía al botSmsReceiverCaptura SMS entrantes y los delega al servicioBootReceiverArranca el servicio automáticamente al reiniciar el celularMainActivityPantalla de configuración de URL del bot
-Flujo técnico del SMS
-SMS de Bancolombia llega al celular
-        ↓
-SmsReceiver.onReceive() lo captura
-        ↓
-Verifica que sea de Bancolombia (número o prefijo)
-        ↓
-Delega al SmsForegroundService vía Intent
-        ↓
-El servicio parsea nombre y monto con Regex
-        ↓
-Envía JSON al bot por HTTP POST
-Formato del JSON enviado al bot
+ComponenteFuncionSmsForegroundServiceServicio activo en segundo plano, procesa SMS y envia al botSmsReceiverCaptura SMS entrantes y los delega al servicioBootReceiverArranca el servicio automaticamente al reiniciar el celularMainActivityPantalla de configuracion de la URL del bot
+JSON que envia la app al bot
 json{
   "nombre": "Juan Perez",
   "monto": "50000",
@@ -107,93 +79,73 @@ Patrones de SMS reconocidos
 "recibiste una transferencia de [nombre] por $[monto]"
 "recibiste un pago de [nombre] por $[monto]"
 "Recibiste $[monto] de [nombre]"
-Botón de prueba (sin transferencia real)
-La app incluye un botón "Simular pago de prueba" que envía un SMS falso al bot para probar sin hacer transferencias reales.
+La app incluye un boton de simulacion para hacer pruebas sin necesidad de transferencias reales.
 
-🔍 Verificación con IA (Claude API)
+Verificacion con IA
 
-Ir a platform.anthropic.com
-Crear una API Key
-Agregar al .env:
+Crear cuenta en platform.anthropic.com
+Generar una API Key
+Agregarla al archivo .env:
 
    ANTHROPIC_API_KEY=tu_api_key
 Sin API key el bot usa modo demo con datos simulados.
 
-📁 Estructura del proyecto
-vinson-bot/
-├── index.js              ← Servidor principal + bot WhatsApp (OpenWA)
-├── ocr.js                ← Analiza comprobantes con Claude API
-├── verificador.js        ← Lógica de verificación de pagos
-├── .env.example          ← Variables de entorno (copiar a .env)
+Estructura del proyecto
+burger-bot/
+├── index.js          — Servidor principal y bot de WhatsApp
+├── ocr.js            — Analisis de comprobantes con Claude API
+├── verificador.js    — Logica de verificacion de pagos
+├── .env.example      — Variables de entorno de ejemplo
 ├── package.json
-└── android-app/          ← App Android VinsonBot SMS
+└── android-app/
     ├── SmsForegroundService.kt
     ├── SmsReceiver.kt
     ├── BootReceiver.kt
     └── MainActivity.kt
 
-💬 Cómo lo usan los empleados
-Cliente paga → manda foto del comprobante al empleado
-Empleado reenvía la foto al número del bot de WhatsApp
+Como lo usan los empleados
+Cliente paga y manda foto del comprobante al empleado
+Empleado reenvía la foto al numero del bot
 
-Bot responde en segundos:
+Bot responde:
 
-✅ PAGO VERIFICADO
-💵 Monto: $50.000
-👤 De: Juan Perez
-📅 Fecha: 28/05/2026 12:55
-🏦 Confirmado por SMS de Bancolombia
+Pago verificado
+Monto: $50.000
+De: Juan Perez
+Fecha: 28/05/2026 12:55
+Confirmado por SMS de Bancolombia
 
-✅ Puedes preparar el pedido.
+Puedes preparar el pedido.
 
-🚨 Alertas automáticas al dueño
-Si detecta un comprobante falso o duplicado, el bot avisa
-automáticamente por WhatsApp al número configurado en MY_WHATSAPP.
+Estado del proyecto
+Completado
 
-🛣️ Hoja de ruta
-✅ Completado
+Bot de WhatsApp con OpenWA
+Analisis de comprobantes con Claude API
+App Android que lee SMS de Bancolombia en tiempo real
+Servicio en segundo plano con ForegroundService
+Arranque automatico al reiniciar el celular
 
- Bot WhatsApp con OpenWA
- Análisis de comprobantes con Claude API
- App Android que lee SMS de Bancolombia en tiempo real
- Servicio en segundo plano (ForegroundService)
- Arranque automático al reiniciar el celular
+En progreso
 
-🔄 En progreso
+Estabilidad en segundo plano en dispositivos Infinix
+Documentacion tecnica completa
 
- Estabilidad en segundo plano en dispositivos Infinix/XOS
- Documentación completa
+Pendiente
 
-📋 Pendiente
-
- Base de datos (Supabase) — historial de pagos
- Dashboard web — ver pagos en tiempo real
- Detección de pagos duplicados
- Multi-sede (varias sucursales)
- Autenticación por negocio
- Reportes automáticos diarios por WhatsApp
- Integración con Prometeo/Belvo (verificación bancaria directa) (pendiente acceso API)
- Pruebas de carga y seguridad
+Base de datos con historial de pagos (Supabase)
+Dashboard web para ver pagos en tiempo real
+Deteccion de pagos duplicados
+Multi-sede para varias sucursales
+Reportes automaticos diarios
+Integracion con API bancaria directa (Prometeo/Belvo)
+Pruebas de carga y seguridad
 
 
-🔮 Integración futura con Prometeo/Belvo
-Cuando esté disponible el acceso a la API bancaria, el flujo de verificación será:
-SMS llega → App Android captura → Bot notifica (verificación rápida)
-        ↓
-Prometeo/Belvo consulta directo al banco (verificación definitiva)
-        ↓
-✅ Pago 100% confirmado desde la fuente bancaria
-Esto permitirá doble verificación:
-SMS de Bancolombia + consulta directa a la cuenta bancaria.
+Nota sobre dispositivos Infinix
+Los dispositivos Infinix con XOS tienen una gestion de bateria agresiva que puede interferir con el servicio en segundo plano. Para garantizar el funcionamiento correcto ir a Ajustes, Aplicaciones, VinsonBot SMS, Bateria y seleccionar Sin restricciones. La app solicita este permiso automaticamente al instalarse.
 
-⚠️ Nota importante — Dispositivos Infinix/XOS
-Los dispositivos Infinix con XOS tienen gestión de batería agresiva.
-Para garantizar que la app funcione en segundo plano:
+Integracion futura con API bancaria
+Cuando este disponible el acceso a Prometeo o Belvo, el sistema hara doble verificacion: el SMS de Bancolombia como confirmacion rapida y la consulta directa al banco como verificacion definitiva.
 
-Ir a Ajustes → Aplicaciones → VinsonBot SMS → Batería
-Seleccionar Sin restricciones
-
-La app también lo pide automáticamente al instalarse por primera vez.
-
-
-NOTA: Este proyecto está en fase de desarrollo activo como proyecto aplicado para una empresa real. Actualmente en pruebas con el negocio Vinson Burgers.
+Este proyecto esta en desarrollo activo como practica profesional aplicada a una empresa real.
