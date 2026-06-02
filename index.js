@@ -222,14 +222,38 @@ const pagosRecibidos = new Map();
 // Endpoint que recibe pagos desde la app Android
 app.post('/pago-recibido', (req, res) => {
   res.sendStatus(200);
-  const { nombre, monto, fecha } = req.body;
+  
+  let nombre, monto, fecha;
+
+  if (req.body.sms_completo) {
+    // Viene de MacroDroid
+    const sms = req.body.sms_completo;
+    const match = 
+      sms.match(/de (.+?) por \$([0-9,.]+)/i) ||
+      sms.match(/Recibiste \$([0-9,.]+) de (.+?)[\.,]/i);
+    
+    if (!match) {
+      console.log('[SMS] No se pudo parsear el SMS:', sms);
+      return;
+    }
+
+    if (sms.match(/Recibiste \$/i)) {
+      monto = match[1].replace(/[,.]/g, '');
+      nombre = match[2].trim();
+    } else {
+      nombre = match[1].trim();
+      monto = match[2].replace(/[,.]/g, '');
+    }
+    fecha = new Date().toLocaleString('es-CO');
+
+  } else {
+    // Viene de la app Android
+    ({ nombre, monto, fecha } = req.body);
+  }
+
   if (!monto) return;
+
   const key = `${monto}-${new Date().toLocaleDateString('es-CO')}`;
   pagosRecibidos.set(key, { nombre, monto, fecha, hora: new Date().toLocaleTimeString('es-CO') });
   console.log(`[SMS] ✅ Pago recibido: $${monto} de ${nombre}`);
-});
-app.listen(PORT, () => {
-  console.log(`\n🍔 Bot ${NEGOCIO} corriendo en puerto ${PORT}`);
-  console.log(`📱 Webhook: POST http://localhost:${PORT}/webhook`);
-  console.log(`🔗 Configura OpenWA Dashboard para apuntar a este webhook\n`);
 });
