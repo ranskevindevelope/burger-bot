@@ -224,15 +224,31 @@ function Dashboard({ onLogout }) {
   }));
 
   if (cargando) {
-    return (
-      <div className="loading">
-        <div className="loading-icon-container">
-          <img src="/logo.png" alt="FlashPago" style={{ width: 60, height: 60, animation: 'pulse 1.5s infinite' }} />
-        </div>
-        <p>Cargando datos...</p>
+  return (
+    <div style={{
+      display: 'flex', flexDirection: 'column', alignItems: 'center',
+      justifyContent: 'center', height: '100vh',
+      background: 'linear-gradient(135deg, #1A1A2E 0%, #16213E 100%)'
+    }}>
+      <img src="/logo.png" alt="FlashPago"
+        style={{ width: 80, height: 80, animation: 'pulse 1.5s infinite', marginBottom: '1.5rem' }}
+      />
+      <h2 style={{ color: '#F57C00', fontFamily: "'Space Grotesk',sans-serif", fontSize: '1.5rem', marginBottom: '0.5rem' }}>
+        FlashPago
+      </h2>
+      <p style={{ color: '#b0b0c8', fontSize: '0.9rem' }}>Cargando panel...</p>
+      <div style={{
+        width: 200, height: 4, background: 'rgba(255,255,255,0.1)',
+        borderRadius: 4, marginTop: '1.5rem', overflow: 'hidden'
+      }}>
+        <div style={{
+          width: '40%', height: '100%', background: '#F57C00',
+          borderRadius: 4, animation: 'loadingBar 1.5s infinite ease-in-out'
+        }} />
       </div>
-    );
-  }
+    </div>
+  );
+}
 
   const menuItems = [
   { id: 'panel', icon: <LayoutDashboard size={18} />, label: 'Panel' },
