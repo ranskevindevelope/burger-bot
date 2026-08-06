@@ -141,7 +141,7 @@ for (const numero of numerosReporte) {
   }
 }
 
-// ─── Verificación nocturna de pagos pendientes ────────────
+// ─── Verificación asincronica (noche) de pagos pendientes ────────────
 async function verificacionNocturna(revision) {
   if (pagosPendientes.length === 0) {
     console.log('[asincronica] No hay pagos pendientes');
@@ -426,6 +426,19 @@ if (datos.referencia) {
       `💵 Monto: $${duplicado.monto.toLocaleString('es-CO')}\n\n` +
       `No puedes usarlo de nuevo.`
     );
+    await guardarPago({
+      monto: montoNum,
+      referencia: datos.referencia,
+      banco: datos.banco || null,
+      fecha: new Date().toLocaleDateString('es-CO'),
+      hora: new Date().toLocaleTimeString('es-CO'),
+      estado: 'DUPLICADO',
+      fuente: 'duplicado',
+      nombre_cliente: null,
+      verificado_por: from,
+      negocio_id: 1,
+      foto: null,
+    });
     return;
   }
 }
@@ -808,6 +821,24 @@ app.get('/api/dashboard/totales', async (req, res) => {
       dia: { total: dia.total, cantidad: dia.cantidad },
       mes: { total: mes.total, cantidad: mes.cantidad }
     });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.get('/api/dashboard/duplicados', async (req, res) => {
+  try {
+    const { db } = require('./db.js');
+    db.all(
+      `SELECT referencia, monto, banco, fecha, hora, verificado_por, creado_en
+       FROM pagos WHERE estado = 'DUPLICADO'
+       ORDER BY id DESC LIMIT 20`,
+      [],
+      (err, filas) => {
+        if (err) return res.status(500).json({ error: err.message });
+        res.json(filas);
+      }
+    );
   } catch (err) {
     res.status(500).json({ error: err.message });
   }

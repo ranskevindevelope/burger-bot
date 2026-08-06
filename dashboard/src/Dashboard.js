@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid } from 'recharts';
-import { LayoutDashboard, CreditCard, TrendingUp, Search, Download, LogOut, DollarSign, Calendar, CheckCircle, Shield, Trophy, BarChart3, Eye, X, Moon, Mail, Menu, Users, UserPlus, UserX, UserCheck, Edit, Trash2, Save, XCircle } from 'lucide-react';
+import { LayoutDashboard, CreditCard, TrendingUp, Search, Download, LogOut, DollarSign, Calendar, CheckCircle, Shield, Trophy, BarChart3, Eye, X, Moon, Mail, Menu, Users, UserPlus, UserX, UserCheck, Edit, Trash2, Save, XCircle, AlertTriangle } from 'lucide-react';
 
 function Dashboard({ onLogout }) {
   const [diasGrafica, setDiasGrafica] = useState(30);
@@ -8,6 +8,7 @@ function Dashboard({ onLogout }) {
   const userGuardado = JSON.parse(localStorage.getItem('fp_user') || '{}');
   const esAdmin = userGuardado.rol === 'admin';
   const [pagos, setPagos] = useState([]);
+  const [duplicados, setDuplicados] = useState([]);
   const [stats, setStats] = useState([]);
   const [busqueda, setBusqueda] = useState('');
   const [resultados, setResultados] = useState(null);
@@ -27,6 +28,15 @@ function Dashboard({ onLogout }) {
 
   const token = localStorage.getItem('fp_token');
   const headers = { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' };
+
+  useEffect(() => {
+  if (seccionActiva === 'duplicados') {
+    fetch('/api/dashboard/duplicados', { headers })
+      .then(res => res.json())
+      .then(data => setDuplicados(data))
+      .catch(err => console.error(err));
+  }
+}, [seccionActiva]);
 
   useEffect(() => {
     cargarDatos();
@@ -230,6 +240,7 @@ function Dashboard({ onLogout }) {
   { id: 'estadisticas', icon: <TrendingUp size={18} />, label: 'Estadísticas' },
   { id: 'buscar', icon: <Search size={18} />, label: 'Buscar' },
   { id: 'exportar', icon: <Download size={18} />, label: 'Exportar' },
+  { id: 'duplicados', icon: <AlertTriangle size={18} />, label: 'Duplicados' },
   ...(esAdmin ? [{ id: 'usuarios', icon: <Users size={18} />, label: 'Usuarios' }] : []),
 ];
 
@@ -288,6 +299,7 @@ function Dashboard({ onLogout }) {
             {seccionActiva === 'estadisticas' && <><TrendingUp size={18} /> Estadísticas</>}
             {seccionActiva === 'buscar' && <><Search size={18} /> Buscar cliente</>}
             {seccionActiva === 'exportar' && <><Download size={18} /> Exportar datos</>}
+            {seccionActiva === 'duplicados' && <><AlertTriangle size={18} /> Duplicados detectados</>}
             {seccionActiva === 'usuarios' && <><Users size={18} /> Gestión de usuarios</>}
           </h1>
           <span className="topbar-fecha">
@@ -296,6 +308,39 @@ function Dashboard({ onLogout }) {
         </header>
 
         <div className="main-body">
+        {seccionActiva === 'duplicados' && (
+  <div className="seccion">
+    <h2 className="seccion-titulo"><AlertTriangle size={18} /> Intentos de duplicado</h2>
+    {duplicados.length === 0 ? (
+      <p style={{ textAlign: 'center', padding: '3rem', color: '#888' }}>
+        No se han detectado duplicados. ¡Todo limpio!
+      </p>
+    ) : (
+      <div className="tabla-container">
+        <table className="tabla-pagos">
+          <thead>
+            <tr><th>Referencia</th><th>Monto</th><th>Banco</th><th>Fecha</th><th>Hora</th><th>Empleado</th></tr>
+          </thead>
+          <tbody>
+            {duplicados.map((d, i) => {
+              const banco = getBancoBadge(d.banco);
+              return (
+                <tr key={i}>
+                  <td style={{ fontFamily: 'monospace', fontSize: '0.85rem' }}>{d.referencia}</td>
+                  <td className="td-monto">{formatearMonto(d.monto)}</td>
+                  <td><span className={`banco-badge ${banco.clase}`}>{banco.nombre}</span></td>
+                  <td>{d.fecha}</td>
+                  <td>{d.hora}</td>
+                  <td style={{ fontSize: '0.8rem' }}>{d.verificado_por || '-'}</td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+      </div>
+    )}
+  </div>
+)}
 
           {/* ─── PANEL GENERAL ────────────────────── */}
           {seccionActiva === 'panel' && (

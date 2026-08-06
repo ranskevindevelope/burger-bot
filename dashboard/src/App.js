@@ -5,7 +5,15 @@ import Dashboard from './Dashboard';
 import './App.css';
 
 function App() {
-  const [vista, setVista] = useState('landing');
+  const [vista, setVista] = useState(
+    localStorage.getItem('fp_token') ? 'dashboard' : 'landing'
+  );
+
+  const handleLogout = () => {
+    localStorage.removeItem('fp_token');
+    localStorage.removeItem('fp_user');
+    setVista('landing');
+  };
 
   if (vista === 'landing') {
     return <FlashPagoLanding onLogin={() => setVista('login')} />;
@@ -15,7 +23,7 @@ function App() {
     return <Login onLogin={() => setVista('dashboard')} />;
   }
 
-  return <Dashboard onLogout={() => setVista('landing')} />;
+  return <Dashboard onLogout={handleLogout} />;
 }
 
 export default App;
