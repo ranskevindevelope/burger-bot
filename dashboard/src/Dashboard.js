@@ -423,7 +423,7 @@ function Dashboard({ onLogout }) {
                           <td>{pago.hora || '-'}</td>
                           <td>
                             <span className={`fuente-badge ${pago.fuente === 'gmail_nocturna' ? 'fuente-nocturna' : 'fuente-gmail'}`}>
-                              {pago.fuente === 'gmail_nocturna' ? <><Moon size={11} /> Nocturna</> : <><Mail size={11} /> Gmail</>}
+                              {pago.fuente === 'gmail_nocturna' ? <><Moon size={11} /> asincronica</> : <><Mail size={11} /> Gmail</>}
                             </span>
                           </td>
                           <td>
