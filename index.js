@@ -920,6 +920,10 @@ app.delete('/api/usuarios/:id', (req, res) => {
   });
 });
 
+app.use(express.static(path.join(__dirname, 'dashboard/build')));
+app.get('/panel', (req, res) => {
+  res.sendFile(path.join(__dirname, 'dashboard/build', 'index.html'));
+});
 
 // ─── Health check ─────────────────────────────────────────
 app.get('/', (req, res) => {
