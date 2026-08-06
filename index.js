@@ -144,11 +144,11 @@ for (const numero of numerosReporte) {
 // ─── Verificación nocturna de pagos pendientes ────────────
 async function verificacionNocturna(revision) {
   if (pagosPendientes.length === 0) {
-    console.log('[Nocturna] No hay pagos pendientes');
+    console.log('[asincronica] No hay pagos pendientes');
     return;
   }
 
-  console.log(`[Nocturna] Revisión ${revision}: verificando ${pagosPendientes.length} pago(s) pendiente(s)...`);
+  console.log(`[asincronica] Revisión ${revision}: verificando ${pagosPendientes.length} pago(s) pendiente(s)...`);
 
   const verificados = [];
   const noEncontrados = [];
@@ -180,12 +180,12 @@ async function verificacionNocturna(revision) {
         });
 
         pagosPendientes.splice(i, 1);
-        console.log(`[Nocturna] ✅ Pago de $${pago.monto} verificado`);
+        console.log(`[asincronica] ✅ Pago de $${pago.monto} verificado`);
       } else {
         noEncontrados.push(pago);
       }
     } catch (err) {
-      console.error(`[Nocturna] Error verificando $${pago.monto}:`, err.message);
+      console.error(`[asincronica] Error verificando $${pago.monto}:`, err.message);
     }
   }
 
@@ -228,10 +228,10 @@ async function verificacionNocturna(revision) {
     }
 
     pagosPendientes.length = 0;
-    console.log('[Nocturna] Pendientes limpiados');
+    console.log('[asincronica] Pendientes limpiados');
   }
 
-  console.log(`[Nocturna] Revisión ${revision} completada. Verificados: ${verificados.length}, Pendientes: ${pagosPendientes.length}`);
+  console.log(`[asincronica] Revisión ${revision} completada. Verificados: ${verificados.length}, Pendientes: ${pagosPendientes.length}`);
 }
 
 // ─── Formatear resultado de verificación ─────────────────
@@ -947,13 +947,13 @@ setInterval(async () => {
 
   // Verificación nocturna - 1ra revisión a las 21:00
   if (hora === 21 && minuto === 0) {
-    console.log('[Nocturna] Ejecutando 1ra revisión...');
+    console.log('[asincronica] Ejecutando 1ra revisión...');
     await verificacionNocturna(1);
   }
 
   // Verificación nocturna - 2da revisión a las 22:00
   if (hora === 22 && minuto === 0) {
-    console.log('[Nocturna] Ejecutando 2da revisión...');
+    console.log('[asincronica] Ejecutando 2da revisión...');
     await verificacionNocturna(2);
   }
 
