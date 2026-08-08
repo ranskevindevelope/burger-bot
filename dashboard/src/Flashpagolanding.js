@@ -55,32 +55,30 @@ function Nav({ onLogin }) {
       </a>
 
       <ul className="nav-links-list" style={{
-      display: "flex", flexDirection: "row", gap: "1.5rem", listStyle: "none", alignItems: "center", margin: 0, padding: 0,
-      ...(menuOpen ? { flexDirection: "column", position: "absolute", top: "100%", left: 0, right: 0, background: "rgba(26,26,46,0.98)", padding: "1.5rem 2rem", zIndex: 200 } : {}),
+        gap: "1.5rem", listStyle: "none", alignItems: "center", margin: 0, padding: 0,
+        ...(menuOpen ? { display: "flex", flexDirection: "column", position: "absolute", top: "100%", left: 0, right: 0, background: "rgba(26,26,46,0.98)", padding: "1.5rem 2rem", zIndex: 200 } : {}),
       }}>
         {[["#como-funciona", "Cómo funciona"], ["#beneficios", "Beneficios"], ["#planes", "Planes"]].map(([href, label]) => (
           <li key={href}>
             <a href={href} onClick={() => setMenuOpen(false)} style={{ color: "#b0b0c8", textDecoration: "none", fontSize: "0.9rem", fontWeight: 500 }}>{label}</a>
           </li>
         ))}
-        <li>
-          <button onClick={onLogin} style={{ background: "transparent", border: "2px solid rgba(255,255,255,0.2)", color: COLORS.blanco, padding: "0.45rem 1.1rem", borderRadius: 8, cursor: "pointer", fontWeight: 600, fontSize: "0.9rem", display: "flex", alignItems: "center", gap: 6 }}>
-            <Lock size={15} /> Iniciar sesión
-          </button>
-        </li>
-        <li>
-          <a href="#contacto" onClick={() => setMenuOpen(false)} style={{ background: COLORS.naranja, color: "white", padding: "0.55rem 1.2rem", borderRadius: 8, textDecoration: "none", fontWeight: 600, fontSize: "0.9rem" }}>
-            Contactar
-          </a>
-        </li>
       </ul>
 
-      <button className="menu-toggle-btn" onClick={() => setMenuOpen(!menuOpen)}
-        style={{ display: "none", background: "none", border: "none", cursor: "pointer", flexDirection: "column", gap: 5 }}>
-        <span style={{ width: 25, height: 3, background: COLORS.blanco, borderRadius: 2, display: "block" }} />
-        <span style={{ width: 25, height: 3, background: COLORS.blanco, borderRadius: 2, display: "block" }} />
-        <span style={{ width: 25, height: 3, background: COLORS.blanco, borderRadius: 2, display: "block" }} />
-      </button>
+      <div style={{ display: "flex", gap: "0.5rem", alignItems: "center" }}>
+        <button onClick={onLogin} style={{ background: "transparent", border: "2px solid rgba(255,255,255,0.2)", color: COLORS.blanco, padding: "0.45rem 1.1rem", borderRadius: 8, cursor: "pointer", fontWeight: 600, fontSize: "0.85rem", display: "flex", alignItems: "center", gap: 6 }}>
+          <Lock size={15} /> Iniciar sesión
+        </button>
+        <a href="#contacto" style={{ background: COLORS.naranja, color: "white", padding: "0.5rem 1.1rem", borderRadius: 8, textDecoration: "none", fontWeight: 600, fontSize: "0.85rem" }}>
+          Contactar
+        </a>
+        <button className="menu-toggle-btn" onClick={() => setMenuOpen(!menuOpen)}
+          style={{ display: "none", background: "none", border: "none", cursor: "pointer", flexDirection: "column", gap: 5, marginLeft: 8 }}>
+          <span style={{ width: 25, height: 3, background: COLORS.blanco, borderRadius: 2, display: "block" }} />
+          <span style={{ width: 25, height: 3, background: COLORS.blanco, borderRadius: 2, display: "block" }} />
+          <span style={{ width: 25, height: 3, background: COLORS.blanco, borderRadius: 2, display: "block" }} />
+        </button>
+      </div>
     </nav>
   );
 }
@@ -274,6 +272,7 @@ export default function FlashPagoLanding({ onLogin }) {
         @import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=Inter:wght@400;500;600&display=swap');
         html { scroll-behavior: smooth; }
         body { margin: 0; }
+        .nav-links-list { display: flex; flex-direction: row; }
         @keyframes typingDot { 0%,60%,100%{opacity:.3;transform:scale(.8)} 30%{opacity:1;transform:scale(1.1)} }
         @keyframes popIn { 0%{transform:scale(0);opacity:0} 70%{transform:scale(1.2)} 100%{transform:scale(1);opacity:1} }
         @keyframes fadeIn { from{opacity:0} to{opacity:1} }
@@ -284,7 +283,7 @@ export default function FlashPagoLanding({ onLogin }) {
     }
   @media(max-width:768px) {
   .menu-toggle-btn { display:flex !important; }
-  .nav-links-list { display:none !important; }
+  .nav-links-list { display:none; }
   .hero-grid { grid-template-columns:1fr !important; text-align:center; }
   .hero-visual-wrap { order:-1; }
   .hero-h1 { font-size:2.2rem !important; }
