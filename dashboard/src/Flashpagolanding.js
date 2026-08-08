@@ -55,8 +55,8 @@ function Nav({ onLogin }) {
       </a>
 
       <ul className="nav-links-list" style={{
-        display: "flex", gap: "1.5rem", listStyle: "none", alignItems: "center", margin: 0, padding: 0,
-        ...(menuOpen ? { display: "flex", flexDirection: "column", position: "absolute", top: "100%", left: 0, right: 0, background: "rgba(26,26,46,0.98)", padding: "1.5rem 2rem" } : {}),
+      display: "flex", flexDirection: "row", gap: "1.5rem", listStyle: "none", alignItems: "center", margin: 0, padding: 0,
+      ...(menuOpen ? { flexDirection: "column", position: "absolute", top: "100%", left: 0, right: 0, background: "rgba(26,26,46,0.98)", padding: "1.5rem 2rem", zIndex: 200 } : {}),
       }}>
         {[["#como-funciona", "Cómo funciona"], ["#beneficios", "Beneficios"], ["#planes", "Planes"]].map(([href, label]) => (
           <li key={href}>
@@ -108,7 +108,7 @@ function PhoneMockup() {
   const visible = { opacity: 1, transform: "translateY(0)" };
 
   return (
-    <div style={{ background: COLORS.oscuro, border: "2px solid rgba(255,255,255,0.1)", borderRadius: 32, padding: "1.5rem", width: 320, boxShadow: "0 20px 60px rgba(0,0,0,0.4)", boxSizing: "border-box" }}>
+    <div style={{ background: COLORS.oscuro, border: "2px solid rgba(255,255,255,0.1)", borderRadius: 32, padding: "1.5rem", width: "100%", maxWidth: 320, boxShadow: "0 20px 60px rgba(0,0,0,0.4)", boxSizing: "border-box" }}>
       <div style={{ display: "flex", alignItems: "center", gap: "0.75rem", paddingBottom: "1rem", borderBottom: "1px solid rgba(255,255,255,0.08)", marginBottom: "1rem" }}>
         <div style={{ width: 40, height: 40, background: COLORS.naranja, borderRadius: "50%", display: "flex", alignItems: "center", justifyContent: "center" }}>
           <Zap size={20} color="white" fill="white" />
@@ -277,19 +277,28 @@ export default function FlashPagoLanding({ onLogin }) {
         @keyframes typingDot { 0%,60%,100%{opacity:.3;transform:scale(.8)} 30%{opacity:1;transform:scale(1.1)} }
         @keyframes popIn { 0%{transform:scale(0);opacity:0} 70%{transform:scale(1.2)} 100%{transform:scale(1);opacity:1} }
         @keyframes fadeIn { from{opacity:0} to{opacity:1} }
-        @media(max-width:768px) {
-          .menu-toggle-btn { display:flex !important; }
-          .nav-links-list { display:none; }
-          .hero-grid { grid-template-columns:1fr !important; text-align:center; }
-          .hero-visual-wrap { order:-1; }
-          .hero-h1 { font-size:2.2rem !important; }
-          .hero-buttons-wrap { justify-content:center; }
-          .hero-stats-wrap { justify-content:center; }
-          .grid-3 { grid-template-columns:1fr !important; }
-          .grid-2 { grid-template-columns:1fr !important; }
-          .planes-grid-wrap { grid-template-columns:1fr !important; max-width:400px; margin:1rem auto 0; }
-          .cta-h2 { font-size:1.8rem !important; }
-        }
+        @media(max-width:1024px) {
+       .hero-grid { gap:2rem !important; }
+       .grid-3 { grid-template-columns:repeat(2,1fr) !important; }
+       .planes-grid-wrap { grid-template-columns:repeat(2,1fr) !important; }
+    }
+  @media(max-width:768px) {
+  .menu-toggle-btn { display:flex !important; }
+  .nav-links-list { display:none !important; }
+  .hero-grid { grid-template-columns:1fr !important; text-align:center; }
+  .hero-visual-wrap { order:-1; }
+  .hero-h1 { font-size:2.2rem !important; }
+  .hero-buttons-wrap { justify-content:center; }
+  .hero-stats-wrap { justify-content:center; }
+  .grid-3 { grid-template-columns:1fr !important; }
+  .grid-2 { grid-template-columns:1fr !important; }
+  .planes-grid-wrap { grid-template-columns:1fr !important; max-width:400px; margin:1rem auto 0; }
+  .cta-h2 { font-size:1.8rem !important; }
+}
+@media(max-width:480px) {
+  .hero-h1 { font-size:1.8rem !important; }
+  .cta-h2 { font-size:1.5rem !important; }
+}
       `}</style>
 
       <Nav onLogin={handleLogin} />
