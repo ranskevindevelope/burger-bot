@@ -25,8 +25,8 @@ function Login({ onLogin }) {
       localStorage.setItem('fp_user', JSON.stringify(data.user));
       onLogin(); 
     } 
-    {
-        setError('Usuario o contraseña incorrectos');
+    else {
+        setError(data.error || 'Usuario o contraseña incorrectos');
       }
     } catch (err) {
       setError('Error conectando al servidor');

@@ -133,7 +133,7 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-
 .main-body { padding: 1.5rem; flex: 1; }
 
 /* ─── TARJETAS ───────────────────────────────── */
-.tarjetas-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 1rem; margin-bottom: 1.5rem; }
+.tarjetas-grid { display: grid; grid-template-columns: repeat(5, 1fr); gap: 1rem; margin-bottom: 1.5rem; }
 .tarjeta { background: var(--blanco); border-radius: 14px; padding: 1.25rem; display: flex; align-items: flex-start; gap: 1rem; box-shadow: 0 1px 3px rgba(0,0,0,0.04); transition: transform 0.2s; }
 .tarjeta:hover { transform: translateY(-2px); }
 .tarjeta-accent { border-left: 4px solid var(--naranja); }
@@ -221,7 +221,7 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-
 }
 
 @media (max-width: 480px) {
-  .tarjetas-grid { grid-template-columns: 1fr; }
+  .tarjetas-grid { grid-template-columns: repeat(2, 1fr); }
   .main-body { padding: 1rem; }
 }
 

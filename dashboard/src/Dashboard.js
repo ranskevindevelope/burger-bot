@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid } from 'recharts';
-import { LayoutDashboard, CreditCard, TrendingUp, Search, Download, LogOut, DollarSign, Calendar, CheckCircle, Shield, Trophy, BarChart3, Eye, X, Moon, Mail, Menu, Users, UserPlus, UserX, UserCheck, Edit, Trash2, Save, XCircle, AlertTriangle } from 'lucide-react';
+import { LayoutDashboard, CreditCard, TrendingUp, Search, Download, LogOut, DollarSign, Calendar, CheckCircle, Shield, Trophy, BarChart3, Eye, X, Moon, Mail, Menu, Users, UserPlus, UserX, UserCheck, Edit, Trash2, Save, XCircle, AlertTriangle, Clock} from 'lucide-react';
 
 function Dashboard({ onLogout }) {
   const [diasGrafica, setDiasGrafica] = useState(30);
@@ -9,6 +9,7 @@ function Dashboard({ onLogout }) {
   const esAdmin = userGuardado.rol === 'admin';
   const [pagos, setPagos] = useState([]);
   const [duplicados, setDuplicados] = useState([]);
+  const [pendientes, setPendientes] = useState({ cantidad: 0, total: 0 });
   const [stats, setStats] = useState([]);
   const [busqueda, setBusqueda] = useState('');
   const [resultados, setResultados] = useState(null);
@@ -54,14 +55,16 @@ function Dashboard({ onLogout }) {
 
   const cargarDatos = async () => {
     try {
-      const [resTotales, resPagos, resStats] = await Promise.all([
+      const [resTotales, resPagos, resStats, resPendientes] = await Promise.all([
         fetch('/api/dashboard/totales', { headers }),
         fetch('/api/dashboard/pagos?limite=20', { headers }),
         fetch(`/api/dashboard/stats?dias=${diasGrafica}`, { headers }),
+        fetch('/api/dashboard/pendientes', { headers }),
       ]);
       setTotales(await resTotales.json());
       setPagos(await resPagos.json());
       setStats(await resStats.json());
+      setPendientes(await resPendientes.json());
       setCargando(false);
     } catch (err) {
       console.error('Error cargando datos:', err);
@@ -223,6 +226,7 @@ function Dashboard({ onLogout }) {
     totalK: Math.round(s.total / 1000),
   }));
 
+  /////// BARRA CARGANDO SPLASH/////
   if (cargando) {
   return (
     <div style={{
@@ -370,6 +374,7 @@ function Dashboard({ onLogout }) {
                     <span className="tarjeta-sub">{totales.dia.cantidad} pagos verificados</span>
                   </div>
                 </div>
+
                 <div className="tarjeta">
                   <div className="tarjeta-icon-box tarjeta-icon-azul"><Calendar size={22} /></div>
                   <div className="tarjeta-info">
@@ -386,6 +391,7 @@ function Dashboard({ onLogout }) {
                     <span className="tarjeta-sub">Tasa de éxito: 94%</span>
                   </div>
                 </div>
+
                 <div className="tarjeta">
                   <div className="tarjeta-icon-box tarjeta-icon-morado"><Shield size={22} /></div>
                   <div className="tarjeta-info">
@@ -396,7 +402,23 @@ function Dashboard({ onLogout }) {
                     <span className="tarjeta-sub">Promedio por pago</span>
                   </div>
                 </div>
-              </div>
+
+               <div className="tarjeta" style={pendientes.cantidad > 0 ? { borderLeft: '3px solid #E53935' } : {}}>
+                  <div className="tarjeta-icon-box tarjeta-icon-naranja" style={pendientes.cantidad > 0 ? { background: '#FFEBEE' } : {}}>
+                    <Clock size={22} color={pendientes.cantidad > 0 ? '#E53935' : '#F57C00'} />
+                  </div>
+                  <div className="tarjeta-info">
+                    <span className="tarjeta-label">Pendientes</span>
+                    <span className="tarjeta-valor" style={pendientes.cantidad > 0 ? { color: '#E53935' } : {}}>
+                      {pendientes.cantidad}
+                    </span>
+                    <span className="tarjeta-sub">
+                      {pendientes.cantidad > 0 ? `${formatearMonto(pendientes.total)} por verificar` : 'Todo verificado'}
+                    </span>
+                  </div>
+                </div>
+                </div>
+                
 
               <div className="seccion">
              <div className="seccion-header">
@@ -467,7 +489,17 @@ function Dashboard({ onLogout }) {
             <div className="seccion">
               <div className="seccion-header">
                 <h2 className="seccion-titulo">Todos los pagos</h2>
-                <a href="/exportar/flashpago2026" className="exportar-btn" target="_blank" rel="noopener noreferrer"><Download size={14} /> Exportar Excel</a>
+                <button className="exportar-btn" onClick={async () => {
+               const res = await fetch('/exportar', { headers });
+               const blob = await res.blob();
+               const url = window.URL.createObjectURL(blob);
+               const a = document.createElement('a');
+              a.href = url;
+              a.download = 'pagos.csv';
+              a.click();
+              }}>
+  <Download size={14} /> Exportar Excel
+</button>
               </div>
               <div className="tabla-container">
                 <table className="tabla-pagos">
@@ -541,8 +573,11 @@ function Dashboard({ onLogout }) {
                       {totales.mes.cantidad > 0 ? formatearMonto(Math.round(totales.mes.total / totales.mes.cantidad)) : '$0'}
                     </span>
                     <span className="tarjeta-sub">Por transacción</span>
+                   
                   </div>
                 </div>
+  
+
               </div>
               <div className="seccion">
                 <h2 className="seccion-titulo"><TrendingUp size={18} /> Tendencia de ventas (30 días)</h2>
@@ -617,9 +652,18 @@ function Dashboard({ onLogout }) {
                 <div className="exportar-icon-box"><Download size={32} color="#F57C00" /></div>
                 <h2>Exportar pagos a Excel</h2>
                 <p>Descarga un archivo con todos los pagos de los últimos 30 días. Se abre en Excel, Google Sheets o cualquier programa de hojas de cálculo.</p>
-                <a href="/exportar/flashpago2026" className="exportar-btn-grande" target="_blank" rel="noopener noreferrer">
-                  <Download size={18} /> Descargar archivo Excel
-                </a>
+                <button className="exportar-btn" onClick={async () => {
+               const res = await fetch('/exportar', { headers });
+               const blob = await res.blob();
+               const url = window.URL.createObjectURL(blob);
+               const a = document.createElement('a');
+               a.href = url;
+               a.download = 'pagos.csv';
+               a.click();
+              }}>
+             <Download size={14} /> Exportar Excel
+            </button>
+
               </div>
             </div>
           )}
@@ -820,7 +864,7 @@ function Dashboard({ onLogout }) {
         <div className="modal-overlay" onClick={() => setFotoActiva(null)}>
           <div className="modal-content" onClick={(e) => e.stopPropagation()}>
             <button className="modal-close" onClick={() => setFotoActiva(null)}><X size={16} /></button>
-            <img src={`/comprobantes/${fotoActiva}`} alt="Comprobante" />
+            <img src={`/api/comprobantes/${fotoActiva}?token=${localStorage.getItem('fp_token')}`} alt="Comprobante" />
           </div>
         </div>
       )}

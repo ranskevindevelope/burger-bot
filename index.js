@@ -5,6 +5,9 @@
 require('dotenv').config();
 const express = require('express');
 const fetch = require('node-fetch');
+const jwt = require('jsonwebtoken');
+const crypto = require('crypto');
+const JWT_SECRET = process.env.JWT_SECRET || '';
 const pagosPendientes = [];
 const { leerComprobante } = require('./ocr');
 const { verificarPago, comprobantesUsados } = require('./verificador');
@@ -13,9 +16,36 @@ const fs = require('fs');
 const path = require('path');
 const { guardarPago, buscarDuplicadoReciente, totalDelDia, buscarPorCliente, resumenDelDia, totalUltimos30Dias, obtenerPagosExportables } = require('./db.js');
 const app = express();
+// Headers de seguridad
+app.use((req, res, next) => {
+  res.setHeader('X-Content-Type-Options', 'nosniff');
+  res.setHeader('X-Frame-Options', 'DENY');
+  res.setHeader('X-XSS-Protection', '0');
+  res.setHeader('Referrer-Policy', 'strict-origin-when-cross-origin');
+  res.removeHeader('X-Powered-By');
+  next();
+});
+
+// CORS
+app.use((req, res, next) => {
+  const originsPermitidos = [
+    'http://localhost:3000',
+    'http://localhost:3001',
+    'http://45.77.82.77:3000'
+  ];
+  const origin = req.headers.origin;
+  if (originsPermitidos.includes(origin)) {
+    res.setHeader('Access-Control-Allow-Origin', origin);
+  }
+  res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
+  if (req.method === 'OPTIONS') return res.sendStatus(204);
+  next();
+
+});
 app.use(express.json({ limit: '50mb' }));
 app.use(express.urlencoded({ limit: '50mb', extended: false }));
-app.use('/comprobantes', express.static(path.join(__dirname, 'comprobantes'))); // para ver los comprobantes
+
 
 const NEGOCIO = process.env.NEGOCIO_NOMBRE || 'VINSON PAGOS IA';
 
@@ -306,12 +336,8 @@ app.post('/pago-recibido', (req, res) => {
   console.log(`[SMS] ✅ Pago recibido: $${monto} de ${nombre}`);
 });
 // ─── Ruta para descargar el Excel (CSV) ───────────────────
-app.get('/exportar/:token', async (req, res) => {
+app.get('/exportar', verificarToken, soloAdmin, async (req, res) => {
   try {
-    if (req.params.token !== 'flashpago2026') {
-      return res.status(403).send('No autorizado');
-    }
-
     const pagos = await obtenerPagosExportables();
 
     let csv = 'ID,Monto,Referencia,Banco,Fecha,Hora,Estado,Fuente,Cliente,Verificado Por,Creado\n';
@@ -328,7 +354,6 @@ app.get('/exportar/:token', async (req, res) => {
     console.error('[Exportar] Error:', err.message);
     res.status(500).send('Error generando el archivo');
   }
-
 });
 
 // ─── Webhook — OpenWA envía los mensajes aquí ─────────────
@@ -787,33 +812,100 @@ await enviarMensaje(from, MENSAJES.sinFoto);
 );
 
 // ─── API para el Dashboard ────────────────────────────────
-app.post('/api/login', (req, res) => {
+app.post('/api/login', limitarLogin, (req, res) => {
   const { usuario, password } = req.body;
-  if (!usuario || !password) return res.status(400).json({ ok: false });
+  if (!usuario || !password) return res.status(400).json({ ok: false, error: 'Faltan datos' });
 
-  const crypto = require('crypto');
   const { db } = require('./db.js');
-
   db.get('SELECT * FROM usuarios WHERE usuario = ? AND activo = 1', [usuario.trim().toLowerCase()], (err, user) => {
     if (err) return res.status(500).json({ ok: false, error: 'Error del servidor' });
     if (!user) return res.status(401).json({ ok: false, error: 'Usuario o contraseña incorrectos' });
 
     const hash = crypto.pbkdf2Sync(password, user.salt, 10000, 64, 'sha512').toString('hex');
     if (hash !== user.password_hash) {
-      return res.status(401).json({ ok: false, error: 'Usuario o contraseña incorrectos' });
+      const msg = res.locals.advertencia 
+        ? `Usuario o contraseña incorrectos. ${res.locals.advertencia}`
+        : 'Usuario o contraseña incorrectos';
+      return res.status(401).json({ ok: false, error: msg });
     }
 
     db.run('UPDATE usuarios SET ultimo_login = datetime("now","localtime") WHERE id = ?', [user.id]);
 
+    const token = jwt.sign(
+      { id: user.id, usuario: user.usuario, rol: user.rol },
+      JWT_SECRET,
+      { expiresIn: '24h' }
+    );
+
     res.json({
       ok: true,
-      token: 'fp_' + Date.now(),
+      token,
       user: { id: user.id, nombre: user.nombre, rol: user.rol }
     });
   });
+  
 });
 
-app.get('/api/dashboard/totales', async (req, res) => {
+function verificarToken(req, res, next) {
+  let token = null;
+  const header = req.headers.authorization;
+  if (header && header.startsWith('Bearer ')) {
+    token = header.split(' ')[1];
+  } else if (req.query.token) {
+    token = req.query.token;
+  }
+  if (!token) return res.status(401).json({ ok: false, error: 'No autorizado' });
+  try {
+    req.user = jwt.verify(token, JWT_SECRET);
+    next();
+  } catch (err) {
+    return res.status(401).json({ ok: false, error: 'Token inválido o expirado' });
+  }
+}
+
+function soloAdmin(req, res, next) {
+  if (req.user.rol !== 'admin') {
+    return res.status(403).json({ ok: false, error: 'Solo administradores' });
+  }
+  next();
+}
+
+// Rate limiter para login
+const loginIntentos = new Map();
+function limitarLogin(req, res, next) {
+  const ip = req.ip;
+  const ahora = Date.now();
+  const datos = loginIntentos.get(ip);
+  
+  if (datos && ahora - datos.inicio < 60000 && datos.intentos >= 5) {
+    const segundosRestantes = Math.ceil((60000 - (ahora - datos.inicio)) / 1000);
+    return res.status(429).json({ ok: false, error: `Demasiados intentos. Espera ${segundosRestantes} segundos.` });
+  }
+  
+  if (!datos || ahora - datos.inicio > 60000) {
+    loginIntentos.set(ip, { intentos: 1, inicio: ahora });
+  } else {
+    datos.intentos++;
+  }
+
+  const restantes = 5 - (loginIntentos.get(ip).intentos);
+  if (restantes <= 2 && restantes > 0) {
+    res.locals.advertencia = `Te quedan ${restantes} intento(s)`;
+  }
+  next();
+}
+
+// Limpiar cada 5 minutos
+setInterval(() => {
+  const ahora = Date.now();
+  for (const [ip, datos] of loginIntentos) {
+    if (ahora - datos.inicio > 300000) loginIntentos.delete(ip);
+  }
+}, 300000);
+
+
+app.get('/api/dashboard/totales', verificarToken, async (req, res) => {
+
   try {
     const dia = await totalDelDia();
     const mes = await totalUltimos30Dias();
@@ -826,7 +918,17 @@ app.get('/api/dashboard/totales', async (req, res) => {
   }
 });
 
-app.get('/api/dashboard/duplicados', async (req, res) => {
+app.get('/api/comprobantes/:foto', verificarToken, (req, res) => {
+  const foto = req.params.foto.replace(/[^a-zA-Z0-9._-]/g, '');
+  const ruta = path.join(__dirname, 'comprobantes', foto);
+  if (fs.existsSync(ruta)) {
+    res.sendFile(ruta);
+  } else {
+    res.status(404).json({ ok: false, error: 'Foto no encontrada' });
+  }
+});
+
+app.get('/api/dashboard/duplicados', verificarToken, async (req, res) => {
   try {
     const { db } = require('./db.js');
     db.all(
@@ -844,7 +946,24 @@ app.get('/api/dashboard/duplicados', async (req, res) => {
   }
 });
 
-app.get('/api/dashboard/pagos', async (req, res) => {
+app.get('/api/dashboard/pendientes', verificarToken, async (req, res) => {
+  try {
+    const { db } = require('./db.js');
+    db.get(
+      `SELECT COUNT(*) as cantidad, COALESCE(SUM(monto),0) as total 
+       FROM pagos WHERE estado = 'NO_ENCONTRADO' AND date(creado_en) = date('now', 'localtime')`,
+      [],
+      (err, row) => {
+        if (err) return res.status(500).json({ error: err.message });
+        res.json(row);
+      }
+    );
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.get('/api/dashboard/pagos', verificarToken, async (req, res) => {
   try {
     const { db } = require('./db.js');
     const limite = parseInt(req.query.limite) || 20;
@@ -861,15 +980,16 @@ app.get('/api/dashboard/pagos', async (req, res) => {
   }
 });
 
-app.get('/api/dashboard/stats', async (req, res) => {
+app.get('/api/dashboard/stats', verificarToken, async (req, res) => {
   try {
     const { db } = require('./db.js');
     const dias = parseInt(req.query.dias) || 30;
     db.all(
-      `SELECT fecha, COUNT(*) as cantidad, SUM(monto) as total 
-       FROM pagos WHERE estado = 'REAL' 
-       AND creado_en >= datetime('now', '-${dias} days', 'localtime')
-       GROUP BY fecha ORDER BY fecha ASC`,
+  `SELECT fecha, COUNT(*) as cantidad, SUM(monto) as total 
+   FROM pagos WHERE estado = 'REAL' 
+   AND creado_en >= datetime('now', '-' || ? || ' days', 'localtime')
+   GROUP BY fecha ORDER BY fecha ASC`,
+  [Math.min(parseInt(dias) || 30, 365)],
       [],
       (err, filas) => {
         if (err) return res.status(500).json({ error: err.message });
@@ -881,7 +1001,7 @@ app.get('/api/dashboard/stats', async (req, res) => {
   }
 });
 
-app.get('/api/dashboard/buscar/:nombre', async (req, res) => {
+app.get('/api/dashboard/buscar/:nombre', verificarToken, async (req, res) => {
   try {
     const pagos = await buscarPorCliente(req.params.nombre);
     res.json(pagos);
@@ -890,7 +1010,7 @@ app.get('/api/dashboard/buscar/:nombre', async (req, res) => {
   }
 });
 // ─── API Usuarios ─────────────────────────────────────────
-app.get('/api/usuarios', (req, res) => {
+app.get('/api/usuarios', verificarToken, soloAdmin, (req, res) => {
   const { db } = require('./db.js');
   db.all('SELECT id, usuario, nombre, rol, whatsapp, activo, ultimo_login, creado_en FROM usuarios ORDER BY id', [], (err, filas) => {
     if (err) return res.status(500).json({ ok: false, error: err.message });
@@ -898,7 +1018,7 @@ app.get('/api/usuarios', (req, res) => {
   });
 });
 
-app.post('/api/usuarios', (req, res) => {
+app.post('/api/usuarios', verificarToken, soloAdmin, (req, res) => {
   const { usuario, password, nombre, rol, whatsapp } = req.body;
   if (!usuario || !password || !nombre) return res.status(400).json({ ok: false, error: 'Faltan campos' });
   if (password.length < 6) return res.status(400).json({ ok: false, error: 'Contraseña mínimo 6 caracteres' });
@@ -921,7 +1041,7 @@ app.post('/api/usuarios', (req, res) => {
   );
 });
 
-app.put('/api/usuarios/:id', (req, res) => {
+app.put('/api/usuarios/:id', verificarToken, soloAdmin, (req, res) => {
   const { nombre, rol, whatsapp, activo, password } = req.body;
   const sets = []; const vals = [];
   if (nombre) { sets.push('nombre=?'); vals.push(nombre); }
@@ -943,7 +1063,7 @@ app.put('/api/usuarios/:id', (req, res) => {
   });
 });
 
-app.delete('/api/usuarios/:id', (req, res) => {
+app.delete('/api/usuarios/:id', verificarToken, soloAdmin, (req, res) => {
   const { db } = require('./db.js');
   db.run('UPDATE usuarios SET activo=0 WHERE id=?', [req.params.id], function(err) {
     if (err) return res.status(500).json({ ok: false, error: err.message });
