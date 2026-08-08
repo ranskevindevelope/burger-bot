@@ -56,7 +56,38 @@ async function leerComprobante(urlImagen, base64Data) {
               { type: 'image', source: { type: 'base64', media_type: mediaType, data: imageBase64 } },
               {
                 type: 'text',
-                text: `Analiza este comprobante de pago colombiano y responde SOLO en JSON sin texto adicional:\n{"banco":"nequi/bancolombia/daviplata/otro","monto":"45000","referencia":"ABC123","fecha":"14/05/2026","parece_falso":false}`,
+                text: `Eres un experto en comprobantes de pago colombianos. Analiza esta imagen y extrae los datos.
+
+IDENTIFICACIÓN DEL BANCO - usa estas pistas:
+- NEQUI: QR con letra "N" en el centro, dice "Pago realizado", campo "¿Cuánto?", "Llave", referencia empieza con "M"
+- BANCOLOMBIA: dice "¡Transferencia exitosa!", "Comprobante No.", secciones con fondo oscuro negro
+- DAVIPLATA: logo "DAVI bank" rojo, dice "Pagaste", sello circular "TRANSACCIÓN EXITOSA"
+- AVVILLAS: tema rojo, dice "AVVillas", "Tu pago se realizó con éxito", icono pulgar azul, menciona "Bre-B"
+- TRANSFIYA: icono de celular con check azul, dice "¡Envío exitoso!", "Cuenta origen", "ID Transacción", referencia empieza con "APIU"
+- NU: logo "nu" morado, dice "Comprobante de transferencia", entidad "Nu C.F.", NIT 901.658.107-2
+
+EXTRACCIÓN DEL MONTO - MUY IMPORTANTE:
+- En Colombia el PUNTO separa miles (25.900 = veinticinco mil novecientos)
+- Si hay "Monto total" Y "Monto" por separado, USA SOLO el campo "Monto" SIN impuesto (el "Monto total" incluye impuesto 4x1000 y NO es lo que llega a la cuenta)
+- Ignora centavos (.00 o ,00 o ,20)
+- Busca en campos: "Valor", "¿Cuánto?", "Pagaste", "Valor de la transferencia", "Monto"
+- Devuelve SOLO el número entero sin puntos ni comas (ejemplo: 99800 no 99.800,00)
+
+EXTRACCIÓN DE REFERENCIA:
+- Nequi: campo "Referencia" (empieza con M)
+- Bancolombia: "Comprobante No."
+- Daviplata: "Número de transacción" (código hexadecimal largo)
+- AV Villas: "No. de autorización"
+- Transfiya: "Número de transacción" (empieza con APIU)
+- Nu: "Número de comprobante" (número largo) o "Referencia interna"
+
+FECHA: devuelve siempre en formato DD/MM/AAAA
+
+Responde SOLO en JSON puro sin backticks ni texto adicional:
+{"banco":"nequi/bancolombia/daviplata/avvillas/transfiya/nu/otro","monto":"99800","referencia":"ABC123","fecha":"07/08/2026","parece_falso":false}
+
+parece_falso = true si la imagen está borrosa, editada, cortada o los datos no son coherentes.`,
+
               }
             ]
           }]
