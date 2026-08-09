@@ -62,15 +62,16 @@ IDENTIFICACIÓN DEL BANCO - usa estas pistas:
 - NEQUI: QR con letra "N" en el centro, dice "Pago realizado", campo "¿Cuánto?", "Llave", referencia empieza con "M"
 - BANCOLOMBIA: dice "¡Transferencia exitosa!", "Comprobante No.", secciones con fondo oscuro negro
 - DAVIPLATA: logo "DAVI bank" rojo, dice "Pagaste", sello circular "TRANSACCIÓN EXITOSA"
-- AVVILLAS: tema rojo, dice "AVVillas", "Tu pago se realizó con éxito", icono pulgar azul, menciona "Bre-B"
+- AVVILLAS: tema rojo, dice "AVVillas", "Tu pago se realizó con éxito", icono pulgar azul
 - TRANSFIYA: icono de celular con check azul, dice "¡Envío exitoso!", "Cuenta origen", "ID Transacción", referencia empieza con "APIU"
 - NU: logo "nu" morado, dice "Comprobante de transferencia", entidad "Nu C.F.", NIT 901.658.107-2
+- BRE-B: logo "Bre-B" arriba, fondo oscuro gris/negro, dice "¡Pago exitoso!", "Código de negocio", "Punto de venta", check verde. Es una plataforma multi-banco, NO es AV Villas.
 
 EXTRACCIÓN DEL MONTO - MUY IMPORTANTE:
 - En Colombia el PUNTO separa miles (25.900 = veinticinco mil novecientos)
 - Si hay "Monto total" Y "Monto" por separado, USA SOLO el campo "Monto" SIN impuesto (el "Monto total" incluye impuesto 4x1000 y NO es lo que llega a la cuenta)
 - Ignora centavos (.00 o ,00 o ,20)
-- Busca en campos: "Valor", "¿Cuánto?", "Pagaste", "Valor de la transferencia", "Monto"
+- Busca en campos: "Valor", "Valor del pago", "¿Cuánto?", "Pagaste", "Valor de la transferencia", "Monto"
 - Devuelve SOLO el número entero sin puntos ni comas (ejemplo: 99800 no 99.800,00)
 
 EXTRACCIÓN DE REFERENCIA:
@@ -80,11 +81,12 @@ EXTRACCIÓN DE REFERENCIA:
 - AV Villas: "No. de autorización"
 - Transfiya: "Número de transacción" (empieza con APIU)
 - Nu: "Número de comprobante" (número largo) o "Referencia interna"
+- Bre-B: "Comprobante No." (código alfanumérico)
 
 FECHA: devuelve siempre en formato DD/MM/AAAA
 
 Responde SOLO en JSON puro sin backticks ni texto adicional:
-{"banco":"nequi/bancolombia/daviplata/avvillas/transfiya/nu/otro","monto":"99800","referencia":"ABC123","fecha":"07/08/2026","parece_falso":false}
+{"banco":"nequi/bancolombia/daviplata/avvillas/transfiya/nu/breb/otro","monto":"99800","referencia":"ABC123","fecha":"07/08/2026","parece_falso":false}
 
 parece_falso = true si la imagen está borrosa, editada, cortada o los datos no son coherentes.`,
 

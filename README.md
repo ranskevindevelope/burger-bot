@@ -1,150 +1,259 @@
-# VINSON PAGOS IA — Verificador de Pagos
+# Burger Bot OpenWA
 
-Bot de WhatsApp para Vinson Burgers que verifica si un pago llegó realmente a la cuenta de Bancolombia antes de que el empleado entregue el pedido. Combina lectura de SMS, lectura de correo y análisis de comprobantes con IA.
+Sistema de verificacion de pagos para Vinson Burgers. El proyecto recibe
+comprobantes por WhatsApp mediante OpenWA, extrae sus datos con Claude,
+comprueba el pago mediante Gmail y registra el resultado en SQLite. Tambien
+incluye un dashboard web con login, reportes y administracion de usuarios.
 
-La idea nació de un problema real del negocio: comprobantes falsos o editados que algunos clientes mandaban para que les entregaran el pedido sin haber pagado y tambien debido a los retrasos que conlleva verificar las transferencias de manera manual.
+## Flujo principal
 
-## Cómo funciona
+1. Un empleado reenvia al bot la imagen del comprobante por WhatsApp.
+2. OpenWA envia el evento a `POST /webhook`.
+3. El servidor valida el secreto del webhook y que el remitente este autorizado.
+4. Claude extrae banco, monto, referencia y fecha del comprobante.
+5. Gmail busca una notificacion reciente de Bancolombia con el mismo monto.
+6. Si Gmail no confirma el pago, se usa el verificador bancario configurado.
+7. El resultado se guarda en la tabla `pagos` y se responde por WhatsApp.
 
-1. El cliente paga y manda la foto del comprobante
-2. El empleado reenvía esa foto al bot por WhatsApp
-3. El bot lee el comprobante con Claude (OCR + análisis)
-4. En paralelo, busca si ese pago realmente llegó:
-   - Primero revisa si llegó el SMS de Bancolombia (vía app Android)
-   - Si no llegó el SMS, revisa el correo de notificaciones de Bancolombia (Gmail API)
-   - Si ninguno confirma, intenta con la API bancaria (actualmente en modo demo, pendiente credenciales de producción)
-5. Responde al empleado con el resultado
+La comprobacion de Gmail usa el monto exacto. El verificador bancario de
+Prometeo puede usar coincidencia por referencia o una diferencia maxima de
+100 pesos, segun la configuracion actual de `verificador.js`.
 
+## Funcionalidades
+
+- Bot de WhatsApp integrado con OpenWA.
+- Lectura de comprobantes con Claude API o modo local de demostracion.
+- Verificacion de pagos por Gmail API.
+- Verificacion opcional con Prometeo en sandbox o produccion.
+- Deteccion de comprobantes duplicados durante los ultimos siete dias.
+- Registro de pagos y comprobantes en SQLite.
+- Login del dashboard con JWT.
+- Contraseñas de usuarios almacenadas con PBKDF2 y salt aleatorio.
+- Roles `admin` y `empleado`.
+- Dashboard React servido por el mismo servidor Express.
+- Totales diarios, estadisticas, pagos pendientes y duplicados.
+- Busqueda de pagos por nombre del cliente.
+- Exportacion CSV de los ultimos treinta dias.
+- Gestion de usuarios para administradores.
+- Reportes automaticos por WhatsApp segun el horario configurado en `index.js`.
+
+## Estructura
+
+```text
+burger-bot-openwa/
+├── index.js              # Servidor Express, webhook, API y bot
+├── db.js                 # Conexion SQLite, esquema y consultas
+├── ocr.js                # Extraccion de datos con Claude o patrones locales
+├── gmail.js              # Busqueda y confirmacion por Gmail API
+├── verificador.js        # Verificacion Prometeo y modo demo
+├── generar-token.js      # Autorizacion inicial de Gmail
+├── package.json          # Dependencias del backend
+├── vinsonbot.db          # Base SQLite local; no debe subirse al repositorio
+├── comprobantes/         # Imagenes guardadas localmente
+└── dashboard/
+    ├── src/              # Aplicacion React
+    ├── public/
+    └── package.json      # Dependencias y scripts del frontend
 ```
-Cliente paga y manda foto del comprobante
-        ↓
-Empleado reenvía la foto al bot de WhatsApp
-        ↓
-Bot analiza el comprobante con IA (Claude API)
-        ↓
-Busca confirmación real: SMS → Gmail → API bancaria
-        ↓
-"Pago verificado, puedes finalizar el pedido"
-"No pude verificar este pago, revisa al final del turno"
-```
 
-La verificación es por **monto exacto**, sin tolerancia. Si el comprobante dice $150 y el banco confirmó $105, no hace match — son pagos distintos y así se tratan.
+## Requisitos
 
-## Por qué dos fuentes de verificación (SMS + Gmail)
+- Node.js 20 o una version compatible con las dependencias instaladas.
+- Una instancia de OpenWA accesible desde el backend.
+- Una cuenta de Gmail con las notificaciones bancarias, si se usa Gmail.
+- Una clave de Claude, si se desea OCR con IA.
+- Credenciales de Prometeo, si se desea verificacion bancaria real.
 
-El SMS de Bancolombia no siempre llega a tiempo al celular — depende de señal, y en algunos dispositivos android y ultimas versiones el sistema mata la app en segundo plano y se pierden notificaciones. El correo de Bancolombia es más confiable porque no depende de la red celular ni de que el celular esté encendido. Por eso el bot intenta primero por SMS (es casi instantáneo) y si no lo encuentra, recurre al correo como respaldo.
+## Instalacion
 
-## Arrancar el proyecto
+Desde la raiz:
 
 ```bash
-git clone https://github.com/ranskevindevelope/burger-bot.git
-cd burger-bot
 npm install
-cp .env.example .env
+cd dashboard
+npm install
+npm run build
+cd ..
 node index.js
 ```
 
-En otra terminal, si necesitas exponerlo a internet para pruebas:
-```bash
-npx ngrok http 3000
-```
-
-Sin credenciales reales el bot corre en modo demo — útil para probar el flujo de mensajes sin tener todo conectado.
-
-## WhatsApp (OpenWA)
+El backend sirve el dashboard compilado desde `dashboard/build`. En desarrollo
+del frontend se puede usar:
 
 ```bash
-npm install @open-wa/wa-automate
+cd dashboard
+npm start
 ```
 
-Al correr el bot aparece un QR en la terminal. Se escanea con el WhatsApp del negocio y queda conectado escuchando mensajes en `/webhook`.
+El proxy del dashboard apunta a `http://localhost:3000`.
 
-## Verificación por Gmail
+## Configuracion `.env`
 
-Para que el bot pueda leer las notificaciones de Bancolombia desde el correo:
+Crea un archivo `.env` en la raiz. Nunca subas sus valores al repositorio.
 
-1. Crear un proyecto en [Google Cloud Console](https://console.cloud.google.com) con el mismo correo donde llegan las notificaciones del banco
-2. Habilitar la Gmail API
-3. Crear credenciales OAuth (tipo "Aplicación de escritorio") y descargar `credentials.json` en la raíz del proyecto
-4. Correr una sola vez:
+```env
+# Servidor y negocio
+PORT=3000
+NEGOCIO_NOMBRE=VINSON PAGOS IA
+
+# OpenWA
+OPENWA_URL=http://localhost:2785
+OPENWA_API_KEY=tu_clave_de_openwa
+OPENWA_SESSION=tu_sesion
+
+# Seguridad del dashboard
+JWT_SECRET=un_secreto_largo_y_aleatorio
+DASHBOARD_USER=admin
+DASHBOARD_PASS=tu_contraseña_inicial
+
+# Seguridad de entradas de OpenWA
+INBOUND_WEBHOOK_SECRET=otro_secreto_largo_y_aleatorio
+
+# Integraciones opcionales
+CLAUDE_API_KEY=tu_clave_de_claude
+PROMETEO_ENV=sandbox
+PROMETEO_API_KEY=tu_clave_de_prometeo
+MY_WHATSAPP=573000000000@c.us
+```
+
+`JWT_SECRET` es obligatorio: el servidor no inicia sin el. Aunque
+`DASHBOARD_USER` y `DASHBOARD_PASS` existen en la configuracion local, el
+login actual valida los usuarios almacenados en la tabla `usuarios`.
+
+## Configurar Gmail
+
+1. Habilita Gmail API en Google Cloud.
+2. Crea credenciales OAuth de tipo aplicacion de escritorio.
+3. Guarda el archivo descargado como `credentials.json` en la raiz.
+4. Ejecuta una sola vez:
+
    ```bash
    node generar-token.js
    ```
-   Esto abre una URL para autenticarte con el correo del negocio y genera `token.json`
-5. Listo — `gmail.js` ya queda funcionando como respaldo automático
 
-El filtro busca correos de `alertasynotificaciones@an.notificacionesbancolombia.com` — si el banco cambia ese remitente en algún momento, hay que actualizarlo en `gmail.js`.
+5. Completa el flujo de autorizacion. Se generara `token.json`.
 
-**Nota:** el token actual tiene permisos de leer los correos y marcarlos (`gmail.modify`), si modifica y marca correos como leídos. como conclusion final se dejo que lea los correos y marque el leido  ,dado que es prueba cada 7 dias hay que regenerar el token con el scope `gmail.modify`.
+El filtro actual busca mensajes no leidos recientes de dominios de
+Bancolombia. Cuando encuentra una coincidencia, marca el correo como leido.
+`credentials.json` y `token.json` contienen material sensible y estan
+excluidos por `.gitignore`.
 
-## App Android — SMS de Bancolombia
+## Configurar OpenWA
 
-La app lee los SMS reales de Bancolombia desde el celular del negocio y los manda al bot apenas llegan. Como la cuenta destino es Bancolombia, el SMS siempre lo manda Bancolombia sin importar si el cliente pagó desde Nequi, Daviplata, Nubank o cualquier otro banco — por eso no hace falta soportar cada banco por separado.
+Configura OpenWA para enviar los eventos a:
 
-**Requisitos:**
-- Android 8.0 o superior
-- Permisos de SMS, notificaciones y batería sin restricciones
-
-**Configuración:**
-1. Instalar el APK en el celular del negocio
-2. Aceptar todos los permisos
-3. Desactivar la optimización de batería para la app (se lo pide automáticamente al instalar)
-4. Ingresar la URL del bot y guardar
-
-en algunos dispositivo la app en android no puede funcionar efectivamente ya que traen restrincciones agresivas de bateria asi que si no funciona bien se opta por verificar GMAIL o API bancaria".
-
-## Verificación con IA (Claude)
-
-```env
-ANTHROPIC_API_KEY=tu_api_key
+```text
+POST http://localhost:3000/webhook
 ```
 
-Sin esa clave el bot usa datos simulados (modo demo). Claude analiza la imagen del comprobante y extrae banco, monto, referencia y fecha, además de marcar si la imagen parece editada o sospechosa — aunque esa bandera (`parece_falso`) es informativa, la decisión final depende de si el banco confirmó el pago, no de cómo se vea el comprobante.
+Cada solicitud debe incluir:
 
-## Estructura del proyecto
-
-```
-burger-bot/
-├── index.js              — servidor principal y lógica del bot
-├── gmail.js               — verificación de pagos vía correo de Bancolombia
-├── ocr.js                 — análisis de comprobantes con Claude API
-├── verificador.js          — verificación con API bancaria (pendiente) + modo demo
-├── generar-token.js        — script de autenticación de Gmail (se corre una sola vez)
-├── .env.example
-├── package.json
-└── android-app/
-    ├── SmsForegroundService.kt
-    ├── SmsReceiver.kt
-    ├── BootReceiver.kt
-    └── MainActivity.kt
+```text
+X-Webhook-Secret: el_mismo_valor_de_INBOUND_WEBHOOK_SECRET
 ```
 
-## Estado del proyecto
+El webhook tambien aplica una lista de numeros autorizados definida en
+`index.js`. Los eventos de remitentes que no esten en esa lista se ignoran.
+El endpoint legado `/pago-recibido` esta retirado y responde `410 Gone`; ya no
+se usan MacroDroid, SMS ni una aplicacion Android para recibir pagos.
 
-**Funcionando:**
-- Bot de WhatsApp con OpenWA
-- Análisis de comprobantes con Claude
-- App Android leyendo SMS de Bancolombia en tiempo real
-- Verificación por Gmail Principal respaldo SMS app android
-- comparacion de montos exacta 
-- base de datos local con SQLITE
+## Dashboard y API
 
-**En progreso:**
-- Estabilidad del servicio en segundo plano en algunos dispositivos
-- Acceso a API bancaria de producción (evaluando Prometeo, Belvo y Passport Fintech para Bre-B)
+Con el servidor iniciado, abre:
 
-**Pendiente:**
-- usar API gmail en produccion (lleva costos)
-- pasar la base de datos local SQLITE a produccion con PostgreSQL (subirla al a nube costos)
-- Base de datos para cada negocio (ya teniendo varios clientes pagando)
-- Dashboard web para ver el historial de pagos - generar recibos -
-revisar lista de clientes - (lleva dominio hosting costos)
-- Despliegue en VPS para que corra 24/7 sin depender del PC local (llevas costos)
+```text
+http://localhost:3000/panel
+```
 
+El dashboard ofrece:
 
+- Inicio de sesion.
+- Resumen diario y mensual.
+- Grafica de pagos por dias.
+- Lista de pagos reales.
+- Pagos duplicados y pendientes.
+- Busqueda por cliente.
+- Descarga CSV.
+- Gestion de usuarios para administradores.
 
----
+Rutas principales:
 
-Proyecto en desarrollo activo como etapa productiva (ADSO — SENA), aplicado directamente a las necesidades reales de Vinson Burgers.
+| Metodo | Ruta | Acceso |
+| --- | --- | --- |
+| POST | `/api/login` | Publico |
+| GET | `/api/dashboard/totales` | JWT |
+| GET | `/api/dashboard/pagos` | JWT |
+| GET | `/api/dashboard/stats` | JWT |
+| GET | `/api/dashboard/duplicados` | JWT |
+| GET | `/api/dashboard/pendientes` | JWT |
+| GET | `/api/dashboard/buscar/:nombre` | JWT |
+| GET | `/exportar` | Solo administrador |
+| GET/POST/PUT/DELETE | `/api/usuarios` | Solo administrador |
+| GET | `/api/comprobantes/:foto` | JWT |
+| POST | `/webhook` | Secreto de webhook |
+| POST | `/pago-recibido` | Retirado, responde 410 |
 
-producto final- sera un software para comercializar.
+Las rutas protegidas reciben el token como `Authorization: Bearer <token>`.
+
+## Base de datos
+
+La aplicacion crea automaticamente `vinsonbot.db` y las tablas:
+
+- `pagos`: monto, referencia, banco, fecha, estado, fuente, cliente,
+  empleado que verifico y comprobante.
+- `usuarios`: usuario, hash, salt, nombre, rol, WhatsApp, estado y ultimo
+  inicio de sesion.
+
+La base de datos y las imagenes de `comprobantes/` son datos locales de la
+operacion. Realiza copias de seguridad y no las publiques.
+
+## Seguridad
+
+- Usa secretos largos y aleatorios para JWT y el webhook.
+- Rota cualquier clave que haya sido compartida o expuesta.
+- No subas `.env`, `credentials.json`, `token.json`, `vinsonbot.db` ni
+  `comprobantes/`.
+- Expone el webhook solo mediante HTTPS y, si es posible, restringe el acceso
+  por red o proxy.
+- Cambia las credenciales iniciales y crea usuarios desde el dashboard.
+- El modo demo no confirma pagos reales; para produccion configura una
+  integracion bancaria verificable.
+
+## Scripts
+
+Backend:
+
+```bash
+node index.js
+```
+
+Dashboard:
+
+```bash
+npm start
+npm run build
+npm test
+```
+
+El backend actualmente no tiene una suite de pruebas automatizadas configurada
+en `package.json`.
+
+## Estado actual
+
+Implementado:
+
+- Bot OpenWA.
+- OCR de comprobantes.
+- Verificacion Gmail.
+- Verificacion opcional Prometeo.
+- Persistencia SQLite.
+- Login JWT y roles.
+- Dashboard React.
+- Reportes, busqueda, exportacion y gestion de usuarios.
+
+Pendiente o dependiente de despliegue:
+
+- Configurar credenciales de produccion del banco.
+- Desplegar el backend con HTTPS y proceso persistente.
+- Migrar SQLite a una base de datos gestionada si se requiere escalar.
+- Separar datos por negocio para una instalacion multiempresa.

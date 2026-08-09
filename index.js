@@ -54,6 +54,7 @@ const NEGOCIO = process.env.NEGOCIO_NOMBRE || 'VINSON PAGOS IA';
 const OPENWA_URL     = process.env.OPENWA_URL     || 'http://localhost:2785';
 const OPENWA_KEY     = process.env.OPENWA_API_KEY || 'dev-admin-key';
 const OPENWA_SESSION = process.env.OPENWA_SESSION || 'vinson';
+const INBOUND_WEBHOOK_SECRET = process.env.INBOUND_WEBHOOK_SECRET;
 
 // ─── Mensajes del bot ─────────────────────────────────────
 const MENSAJES = {
@@ -64,8 +65,6 @@ const MENSAJES = {
   ayuda: `Comandos disponibles:\n• Escribe *cerrar* para terminar la conversacion\n• Envía una *foto* del comprobante para verificar\n• Escribe *historial* para ver los últimos pagos\n• Escribe *hola* para reiniciar`,
 };
 
-// ─── Base de pagos recibidos por SMS ─────────────────────
-const pagosRecibidos = new Map();
 const historialPagos = [];
 
 // ─── Envia mensaje WhatsApp via OpenWA ───────────────────
@@ -295,46 +294,31 @@ function guardarFoto(base64, referencia) {
   }
 }
 
-// ─── Endpoint que es obsoleto
-app.post('/pago-recibido', (req, res) => {
-  res.sendStatus(200);
+function verificarEntradaExterna(req, res, next) {
+  const recibido = req.get('X-Webhook-Secret');
 
-  let nombre, monto, fecha;
-
-  if (req.body.sms_completo) {
-    // Viene de MacroDroid
-    const sms = req.body.sms_completo;
-    const match =
-      sms.match(/de (.+?) por \$([0-9,.]+)/i) ||
-      sms.match(/Recibiste \$([0-9,.]+) de (.+?)[\.,]/i);
-
-    if (!match) {
-      console.log('[SMS] No se pudo parsear el SMS:', sms);
-      return;
-    }
-
-    if (sms.match(/Recibiste \$/i)) {
-      monto = match[1].replace(/[,.]/g, '');
-      nombre = match[2].trim();
-    } else {
-      nombre = match[1].trim();
-      monto = match[2].replace(/[,.]/g, '');
-    }
-    fecha = new Date().toLocaleString('es-CO');
-
-  } else {
-    // Viene de la app Android
-    ({ nombre, monto, fecha } = req.body);
-    console.log('[DEBUG] Monto recibido de la app:', monto);
-    monto = monto.toString().replace('.00', '').replace(',00', '').replace('.', '').replace(',', '');
-    console.log('[DEBUG] Monto limpio:', monto);
+  if (!INBOUND_WEBHOOK_SECRET) {
+    console.error('[Seguridad] Falta INBOUND_WEBHOOK_SECRET en la configuración');
+    return res.status(503).json({ ok: false, error: 'Integración no configurada' });
   }
 
-  if (!monto) return;
+  if (
+    typeof recibido !== 'string' ||
+    recibido.length !== INBOUND_WEBHOOK_SECRET.length ||
+    !crypto.timingSafeEqual(Buffer.from(recibido), Buffer.from(INBOUND_WEBHOOK_SECRET))
+  ) {
+    return res.status(401).json({ ok: false, error: 'No autorizado' });
+  }
 
-  const key = `${monto}-${new Date().toLocaleDateString('es-CO')}`;
-  pagosRecibidos.set(key, { nombre, monto, fecha, hora: new Date().toLocaleTimeString('es-CO') });
-  console.log(`[SMS] ✅ Pago recibido: $${monto} de ${nombre}`);
+  next();
+}
+
+// ─── Endpoint retirado: MacroDroid y la app Android ya no se usan
+app.post('/pago-recibido', (req, res) => {
+  res.status(410).json({
+    ok: false,
+    error: 'Este endpoint ya no está disponible',
+  });
 });
 // ─── Ruta para descargar el Excel (CSV) ───────────────────
 app.get('/exportar', verificarToken, soloAdmin, async (req, res) => {
@@ -358,8 +342,8 @@ app.get('/exportar', verificarToken, soloAdmin, async (req, res) => {
 });
 
 // ─── Webhook — OpenWA envía los mensajes aquí ─────────────
-app.post('/webhook', async (req, res) => {
-  res.sendStatus(200);
+app.post('/webhook', verificarEntradaExterna, async (req, res) => {
+  res.sendStatus(202);
 
   const evento = req.body;
   console.log('[Webhook] Evento completo:', JSON.stringify(evento).slice(0, 500));
@@ -418,6 +402,12 @@ const NUMEROS_AUTORIZADOS = [...ADMIN, ...EMPLEADOS];
 function esAdmin(numero) {
   return ADMIN.includes(numero);
 }
+
+  if (!NUMEROS_AUTORIZADOS.includes(from)) {
+    console.log('[Webhook] Remitente no autorizado, ignorando:', from);
+    return;
+  }
+
   console.log(`[Bot] Mensaje de ${from}: ${body || '[imagen]'}`);
 
   if (isMedia) {
@@ -469,29 +459,13 @@ if (datos.referencia) {
   }
 }
 
-      // ─── Buscar pago por SMS (match exacto) ────────────
-      let pagoSMS = null;
-      for (const [key, pago] of pagosRecibidos.entries()) {
-        if (parseInt(pago.monto) === montoNum) {
-          pagoSMS = pago;
-          pagosRecibidos.delete(key);
-          break;
-        }
-      }
-
-      // ─── Si no hay SMS, buscar por Gmail ──────────────
-      console.log('[DEBUG] pagoSMS encontrado:', pagoSMS);
-      let pagoGmail = null;
-      if (!pagoSMS) {
-        console.log(`[DEBUG] Verificando en Gmail $${montoNum}...`);
-        pagoGmail = await verificarPorGmail(datos.monto);
-        console.log('[DEBUG] Resultado de Gmail:', pagoGmail);
-      }
+      // ─── Verificar el pago por Gmail ───────────────────
+      console.log(`[DEBUG] Verificando en Gmail $${montoNum}...`);
+      const pagoGmail = await verificarPorGmail(datos.monto);
+      console.log('[DEBUG] Resultado de Gmail:', pagoGmail);
 
       // ─── Determinar resultado final ────────────────────
-      const verificacion = pagoSMS
-        ? { estado: 'REAL', mensaje: `✅ PAGO CONFIRMADO: $${montoNum.toLocaleString('es-CO')} recibido de ${pagoSMS.nombre} a las ${pagoSMS.hora}` } //SMS PAGOS
-        : pagoGmail
+      const verificacion = pagoGmail
         ? { estado: 'REAL', mensaje: `✅ PAGO CONFIRMADO: $${pagoGmail.monto.toLocaleString('es-CO')}  este pago es confirmado en Bancolombia` } //GMAIL PAGOS
         : await verificarPago(datos);
 
@@ -507,7 +481,7 @@ if (datos.referencia) {
           fecha: new Date().toLocaleDateString('es-CO'),
           hora: new Date().toLocaleTimeString('es-CO'),
           estado: 'REAL',
-          fuente: pagoSMS ? 'sms' : (pagoGmail ? 'gmail' : 'otro'),
+          fuente: pagoGmail ? 'gmail' : 'otro',
           nombre_cliente: pagoGmail?.nombre || null,   // el nombre que extrae Gmail
           verificado_por: from,                         // el número del empleado
           negocio_id: 1,                                // id  del negocio
@@ -772,7 +746,7 @@ if (body === 'estado') {
 ⏱️ Uptime: ${uptime} minutos
 🔄 Última verificación: ${ultimaVerificacion}
 🟢 Gmail API: conectado
-📱 SMS: escuchando
+📧 Gmail API: verificando pagos
 ⚡ API OPEN BANK: en proceso...
 
 Todo está funcionando correctamente. 😊
@@ -787,7 +761,6 @@ if (body === 'debug') {
    if (!esAdmin(from)) return;
   const uptime = Math.floor(process.uptime() / 60);
   const memUsage = Math.round(process.memoryUsage().heapUsed / 1024 / 1024);
-  const pagosEnCola = pagosRecibidos.size;
   const comprobantesUnicos = comprobantesUsados.size;
   
   const debug = `
@@ -795,7 +768,6 @@ if (body === 'debug') {
 
 ⏱️ Uptime: ${uptime}m
 💾 Memoria: ${memUsage}MB
-📋 Pagos en cola (SMS): ${pagosEnCola}
 🔐 Comprobantes únicos: ${comprobantesUnicos}
 📊 Total verificados hoy: ${historialPagos.length}
 
