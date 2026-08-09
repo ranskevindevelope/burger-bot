@@ -7,7 +7,8 @@ const express = require('express');
 const fetch = require('node-fetch');
 const jwt = require('jsonwebtoken');
 const crypto = require('crypto');
-const JWT_SECRET = process.env.JWT_SECRET || '';
+const JWT_SECRET = process.env.JWT_SECRET; if (!JWT_SECRET) {throw new Error('Falta JWT_SECRET en el .env');
+}
 const pagosPendientes = [];
 const { leerComprobante } = require('./ocr');
 const { verificarPago, comprobantesUsados } = require('./verificador');

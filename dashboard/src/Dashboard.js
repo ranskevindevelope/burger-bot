@@ -33,8 +33,11 @@ function Dashboard({ onLogout }) {
   useEffect(() => {
   if (seccionActiva === 'duplicados') {
     fetch('/api/dashboard/duplicados', { headers })
-      .then(res => res.json())
-      .then(data => setDuplicados(data))
+      .then(res => {
+        if (res.status === 401) { onLogout(); return []; }
+        return res.json();
+      })
+      .then(data => setDuplicados(Array.isArray(data) ? data : []))
       .catch(err => console.error(err));
   }
 }, [seccionActiva]);
@@ -61,10 +64,22 @@ function Dashboard({ onLogout }) {
         fetch(`/api/dashboard/stats?dias=${diasGrafica}`, { headers }),
         fetch('/api/dashboard/pendientes', { headers }),
       ]);
-      setTotales(await resTotales.json());
-      setPagos(await resPagos.json());
-      setStats(await resStats.json());
-      setPendientes(await resPendientes.json());
+
+      // Si la sesión caducó, cerrar sesión y salir
+      if ([resTotales, resPagos, resStats, resPendientes].some(r => r.status === 401)) {
+        onLogout();
+        return;
+      }
+
+      const totalesData = await resTotales.json();
+      const pagosData = await resPagos.json();
+      const statsData = await resStats.json();
+      const pendientesData = await resPendientes.json();
+
+      setTotales(totalesData || { dia: { total: 0, cantidad: 0 }, mes: { total: 0, cantidad: 0 } });
+      setPagos(Array.isArray(pagosData) ? pagosData : []);
+      setStats(Array.isArray(statsData) ? statsData : []);
+      setPendientes(pendientesData || { cantidad: 0, total: 0 });
       setCargando(false);
     } catch (err) {
       console.error('Error cargando datos:', err);
@@ -89,7 +104,7 @@ function Dashboard({ onLogout }) {
     try {
       const res = await fetch('/api/usuarios', { headers });
       const data = await res.json();
-      if (data.ok) setUsuarios(data.usuarios);
+      if (data.ok) setUsuarios(Array.isArray(data.usuarios) ? data.usuarios : []);
     } catch (err) {
       console.error('Error cargando usuarios:', err);
     }
