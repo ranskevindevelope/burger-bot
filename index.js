@@ -904,11 +904,27 @@ app.get('/api/comprobantes/:foto', verificarToken, (req, res) => {
 app.get('/api/dashboard/duplicados', verificarToken, async (req, res) => {
   try {
     const { db } = require('./db.js');
+    const estado = typeof req.query.estado === 'string' ? req.query.estado.toUpperCase() : 'TODOS';
+    const estadosPermitidos = ['TODOS', 'PENDIENTE', 'DUPLICADO', 'LEGITIMO', 'ARCHIVADO'];
+    if (!estadosPermitidos.includes(estado)) {
+      return res.status(400).json({ ok: false, error: 'Estado de duplicado inválido' });
+    }
+
+    const filtroEstado = estado === 'TODOS' ? '' : 'AND COALESCE(r.estado, \'PENDIENTE\') = ?';
+    const parametros = estado === 'TODOS' ? [] : [estado];
     db.all(
-      `SELECT referencia, monto, banco, fecha, hora, verificado_por, creado_en
-       FROM pagos WHERE estado = 'DUPLICADO'
-       ORDER BY id DESC LIMIT 20`,
-      [],
+      `SELECT p.id, p.referencia, p.monto, p.banco, p.fecha, p.hora,
+              p.verificado_por, p.creado_en, p.foto, p.nombre_cliente,
+              COALESCE(r.estado, 'PENDIENTE') AS revision_estado,
+              r.motivo AS revision_motivo, r.revisado_por, r.revisado_en
+       FROM pagos p
+       LEFT JOIN duplicate_reviews r ON r.id = (
+         SELECT latest.id FROM duplicate_reviews latest
+         WHERE latest.pago_id = p.id ORDER BY latest.id DESC LIMIT 1
+       )
+       WHERE p.estado = 'DUPLICADO' ${filtroEstado}
+       ORDER BY p.id DESC LIMIT 50`,
+      parametros,
       (err, filas) => {
         if (err) return res.status(500).json({ error: err.message });
         res.json(filas);
@@ -917,6 +933,48 @@ app.get('/api/dashboard/duplicados', verificarToken, async (req, res) => {
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
+});
+
+app.post('/api/dashboard/duplicados/:pagoId/revision', verificarToken, soloAdmin, (req, res) => {
+  const pagoId = Number.parseInt(req.params.pagoId, 10);
+  const estado = typeof req.body.estado === 'string' ? req.body.estado.toUpperCase() : '';
+  const motivo = typeof req.body.motivo === 'string' ? req.body.motivo.trim() : '';
+  const estadosPermitidos = ['DUPLICADO', 'LEGITIMO', 'ARCHIVADO'];
+
+  if (!Number.isInteger(pagoId) || pagoId <= 0) {
+    return res.status(400).json({ ok: false, error: 'Pago inválido' });
+  }
+  if (!estadosPermitidos.includes(estado)) {
+    return res.status(400).json({ ok: false, error: 'Decisión inválida' });
+  }
+  if (motivo.length < 3 || motivo.length > 500) {
+    return res.status(400).json({ ok: false, error: 'El motivo debe tener entre 3 y 500 caracteres' });
+  }
+
+  const { db } = require('./db.js');
+  db.get('SELECT id FROM pagos WHERE id = ? AND estado = \'DUPLICADO\'', [pagoId], (findErr, pago) => {
+    if (findErr) return res.status(500).json({ ok: false, error: findErr.message });
+    if (!pago) return res.status(404).json({ ok: false, error: 'Duplicado no encontrado' });
+
+    db.run(
+      `INSERT INTO duplicate_reviews (pago_id, estado, motivo, revisado_por)
+       VALUES (?, ?, ?, ?)`,
+      [pagoId, estado, motivo, req.user.usuario],
+      function (insertErr) {
+        if (insertErr) return res.status(500).json({ ok: false, error: insertErr.message });
+        res.json({
+          ok: true,
+          revision: {
+            id: this.lastID,
+            pago_id: pagoId,
+            estado,
+            motivo,
+            revisado_por: req.user.usuario,
+          },
+        });
+      }
+    );
+  });
 });
 
 app.get('/api/dashboard/pendientes', verificarToken, async (req, res) => {

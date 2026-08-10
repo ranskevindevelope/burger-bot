@@ -20,6 +20,9 @@ function Dashboard({ onLogout }) {
   const [fotoActiva, setFotoActiva] = useState(null);
   const [seccionActiva, setSeccionActiva] = useState('panel');
   const [sidebarAbierto, setSidebarAbierto] = useState(false);
+  const [duplicadoSeleccionado, setDuplicadoSeleccionado] = useState(null);
+  const [motivoRevision, setMotivoRevision] = useState('');
+  const [guardandoRevision, setGuardandoRevision] = useState(false);
 
   // ─── Estado para Usuarios ──────────────────────────────
   const [usuarios, setUsuarios] = useState([]);
@@ -109,6 +112,24 @@ function Dashboard({ onLogout }) {
       window.setTimeout(() => window.URL.revokeObjectURL(url), 0);
     } catch (err) {
       console.error('Error exportando pagos:', err);
+    }
+  };
+
+  const revisarDuplicado = async (estado) => {
+    if (!duplicadoSeleccionado || motivoRevision.trim().length < 3) return;
+    setGuardandoRevision(true);
+    try {
+      await api.request(`/api/dashboard/duplicados/${duplicadoSeleccionado.id}/revision`, {
+        method: 'POST',
+        body: JSON.stringify({ estado, motivo: motivoRevision.trim() }),
+      });
+      setMotivoRevision('');
+      setDuplicadoSeleccionado(null);
+      await cargarDatos();
+    } catch (err) {
+      console.error('Error guardando revisión de duplicado:', err);
+    } finally {
+      setGuardandoRevision(false);
     }
   };
 
@@ -285,38 +306,78 @@ function Dashboard({ onLogout }) {
 
         <div className="main-body">
         {seccionActiva === 'duplicados' && (
-  <div className="seccion">
-    <h2 className="seccion-titulo"><AlertTriangle size={18} /> Intentos de duplicado</h2>
-    {duplicados.length === 0 ? (
-      <p style={{ textAlign: 'center', padding: '3rem', color: '#888' }}>
-        No se han detectado duplicados. ¡Todo limpio!
-      </p>
-    ) : (
-      <div className="tabla-container">
-        <table className="tabla-pagos">
-          <thead>
-            <tr><th>Referencia</th><th>Monto</th><th>Banco</th><th>Fecha</th><th>Hora</th><th>Empleado</th></tr>
-          </thead>
-          <tbody>
-            {duplicados.map((d, i) => {
-              const banco = getBancoBadge(d.banco);
-              return (
-                <tr key={i}>
-                  <td style={{ fontFamily: 'monospace', fontSize: '0.85rem' }}>{d.referencia}</td>
-                  <td className="td-monto">{formatearMonto(d.monto)}</td>
-                  <td><span className={`banco-badge ${banco.clase}`}>{banco.nombre}</span></td>
-                  <td>{d.fecha}</td>
-                  <td>{d.hora}</td>
-                  <td style={{ fontSize: '0.8rem' }}>{d.verificado_por || '-'}</td>
-                </tr>
-              );
-            })}
-          </tbody>
-        </table>
-      </div>
-    )}
-  </div>
-)}
+          <div className="duplicados-layout">
+            <div className="seccion duplicados-lista">
+              <div className="seccion-header">
+                <h2 className="seccion-titulo"><AlertTriangle size={18} /> Casos para revisar</h2>
+                <span className="duplicados-count">{duplicados.length} casos</span>
+              </div>
+              {duplicados.length === 0 ? (
+                <p className="empty-state">No se han detectado duplicados. ¡Todo limpio!</p>
+              ) : (
+                <div className="tabla-container">
+                  <table className="tabla-pagos">
+                    <thead><tr><th>Referencia</th><th>Cliente</th><th>Monto</th><th>Estado</th><th>Acción</th></tr></thead>
+                    <tbody>
+                      {duplicados.map((d) => {
+                        const banco = getBancoBadge(d.banco);
+                        return (
+                          <tr key={d.id} className={duplicadoSeleccionado?.id === d.id ? 'fila-seleccionada' : ''}>
+                            <td style={{ fontFamily: 'monospace', fontSize: '0.8rem' }}>{d.referencia || '-'}</td>
+                            <td>{d.nombre_cliente || 'Sin nombre'}<br /><span className="tabla-subtexto">{banco.nombre}</span></td>
+                            <td className="td-monto">{formatearMonto(d.monto)}</td>
+                            <td><span className={`revision-badge revision-${(d.revision_estado || 'PENDIENTE').toLowerCase()}`}>{d.revision_estado || 'PENDIENTE'}</span></td>
+                            <td><button className="ver-foto-btn" onClick={() => setDuplicadoSeleccionado(d)}>Revisar</button></td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </div>
+            <div className="seccion duplicado-detalle">
+              <div className="seccion-header">
+                <h2 className="seccion-titulo"><Eye size={18} /> Detalle del caso</h2>
+                {duplicadoSeleccionado && <button className="modal-close-inline" onClick={() => setDuplicadoSeleccionado(null)}><X size={15} /></button>}
+              </div>
+              {!duplicadoSeleccionado ? (
+                <p className="empty-state">Selecciona un caso para revisar sus datos.</p>
+              ) : (
+                <>
+                  <div className="duplicado-resumen">
+                    <strong>{duplicadoSeleccionado.referencia || 'Sin referencia'}</strong>
+                    <span>{duplicadoSeleccionado.banco || 'Banco no indicado'} · {formatearMonto(duplicadoSeleccionado.monto)}</span>
+                    <span>{duplicadoSeleccionado.fecha || '-'} {duplicadoSeleccionado.hora || ''}</span>
+                  </div>
+                  {duplicadoSeleccionado.foto && (
+                    <button className="ver-foto-btn" onClick={() => setFotoActiva(duplicadoSeleccionado.foto)}>
+                      <Eye size={14} /> Ver comprobante
+                    </button>
+                  )}
+                  <label className="revision-label" htmlFor="motivo-revision">Motivo de la decisión</label>
+                  <textarea
+                    id="motivo-revision"
+                    className="revision-motivo"
+                    value={motivoRevision}
+                    onChange={(event) => setMotivoRevision(event.target.value)}
+                    placeholder="Explica brevemente la revisión..."
+                    maxLength={500}
+                  />
+                  <div className="revision-acciones">
+                    <button className="revision-btn revision-btn-danger" disabled={!esAdmin || guardandoRevision || motivoRevision.trim().length < 3} onClick={() => revisarDuplicado('DUPLICADO')}>
+                      Confirmar duplicado
+                    </button>
+                    <button className="revision-btn revision-btn-success" disabled={!esAdmin || guardandoRevision || motivoRevision.trim().length < 3} onClick={() => revisarDuplicado('LEGITIMO')}>
+                      Marcar como legítimo
+                    </button>
+                    {!esAdmin && <small>Solo un administrador puede guardar decisiones.</small>}
+                  </div>
+                </>
+              )}
+            </div>
+          </div>
+        )}
 
           {/* ─── PANEL GENERAL ────────────────────── */}
           {seccionActiva === 'panel' && (

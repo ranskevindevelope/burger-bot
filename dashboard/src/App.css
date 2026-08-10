@@ -173,6 +173,31 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-
 .alertas-link:hover { text-decoration: underline; }
 .alertas-link-secondary { display: block; color: var(--gris-texto); margin-top: 0.25rem; }
 
+.duplicados-layout { display: grid; grid-template-columns: minmax(0, 1.8fr) minmax(280px, 0.9fr); gap: 1.25rem; align-items: start; }
+.duplicados-lista, .duplicado-detalle { margin-bottom: 0; }
+.duplicados-count { color: var(--gris-texto); font-size: 0.8rem; }
+.empty-state { text-align: center; padding: 3rem 1rem; color: var(--gris-texto); }
+.fila-seleccionada td { background: #fff8ed; }
+.tabla-subtexto { color: #8b90a5; font-size: 0.7rem; }
+.revision-badge { display: inline-block; padding: 0.2rem 0.55rem; border-radius: 50px; font-size: 0.68rem; font-weight: 700; }
+.revision-pendiente { background: #fff1df; color: #c66b00; }
+.revision-duplicado { background: #ffebee; color: #c62828; }
+.revision-legitimo { background: #e5f8ef; color: #218b5b; }
+.revision-archivado { background: #f0f1f5; color: #686d89; }
+.modal-close-inline { border: none; background: none; color: var(--gris-texto); cursor: pointer; }
+.duplicado-resumen { display: flex; flex-direction: column; gap: 0.35rem; padding: 0.9rem; background: #f7f8fb; border-radius: 10px; margin-bottom: 1rem; }
+.duplicado-resumen strong { color: var(--oscuro); font-family: monospace; }
+.duplicado-resumen span { color: var(--gris-texto); font-size: 0.78rem; }
+.revision-label { display: block; margin-top: 1.2rem; margin-bottom: 0.4rem; color: var(--gris-texto); font-size: 0.78rem; font-weight: 600; }
+.revision-motivo { width: 100%; min-height: 90px; resize: vertical; border: 2px solid var(--borde); border-radius: 9px; padding: 0.7rem; font: inherit; font-size: 0.8rem; outline: none; }
+.revision-motivo:focus { border-color: var(--naranja); }
+.revision-acciones { display: flex; flex-direction: column; gap: 0.6rem; margin-top: 0.9rem; }
+.revision-btn { border: none; border-radius: 8px; padding: 0.7rem 0.8rem; color: #fff; font-size: 0.78rem; font-weight: 700; cursor: pointer; }
+.revision-btn:disabled { opacity: 0.45; cursor: not-allowed; }
+.revision-btn-danger { background: #d64540; }
+.revision-btn-success { background: #2e8b62; }
+.revision-acciones small { color: var(--gris-texto); font-size: 0.7rem; }
+
 .ver-mas-btn { background: none; border: none; color: var(--naranja); font-weight: 600; font-size: 0.85rem; cursor: pointer; }
 .ver-mas-btn:hover { text-decoration: underline; }
 
@@ -244,6 +269,7 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-
   .tarjetas-grid { grid-template-columns: repeat(3, 1fr); }
   .dashboard-overview-grid { grid-template-columns: 1fr; gap: 0; }
   .alertas-card { min-height: auto; }
+  .duplicados-layout { grid-template-columns: 1fr; }
 }
 
 @media (max-width: 480px) {

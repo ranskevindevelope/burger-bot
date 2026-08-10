@@ -113,6 +113,27 @@ db.run(`
   )
 `);
 
+// Historial independiente de revisiones de duplicados. No modifica el estado original del pago.
+db.run(`
+  CREATE TABLE IF NOT EXISTS duplicate_reviews (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    pago_id INTEGER NOT NULL,
+    estado TEXT NOT NULL CHECK (estado IN ('PENDIENTE', 'DUPLICADO', 'LEGITIMO', 'ARCHIVADO')),
+    motivo TEXT,
+    revisado_por TEXT NOT NULL,
+    revisado_en TEXT DEFAULT (datetime('now', 'localtime')),
+    FOREIGN KEY (pago_id) REFERENCES pagos(id)
+  )
+`, (err) => {
+  if (err) {
+    console.error('[DB] Error creando tabla duplicate_reviews:', err.message);
+  } else {
+    db.run('CREATE INDEX IF NOT EXISTS idx_duplicate_reviews_pago ON duplicate_reviews (pago_id, id DESC)', (indexErr) => {
+      if (indexErr) console.error('[DB] Error creando índice duplicate_reviews:', indexErr.message);
+    });
+  }
+});
+
 // ─── Buscar pagos por nombre de cliente ───────────────────
 function buscarPorCliente(nombre) {
   return new Promise((resolve, reject) => {
