@@ -64,10 +64,9 @@ IDENTIFICACIÓN DEL BANCO - revisa en este ORDEN de prioridad:
 1. BRE-B: logo "Bre-B" en la parte superior, fondo oscuro gris/negro, dice "¡Pago exitoso!", "Código de negocio", "Punto de venta", check verde circular. Es una plataforma de pagos multi-banco. Si ves "Bre-B" → banco = "breb"
 2. NEQUI: QR con letra "N" en el centro, dice "Pago realizado", campo "¿Cuánto?", "Llave", referencia empieza con "M"
 3. BANCOLOMBIA: dice "¡Transferencia exitosa!", "Comprobante No.", secciones con fondo oscuro negro
-4. DAVIPLATA: logo "DAVI bank" rojo, dice "Pagaste", sello circular "TRANSACCIÓN EXITOSA"
-5. AVVILLAS: dice TEXTUALMENTE "AVVillas" o "AV Villas" en la pantalla, tema rojo, "Tu pago se realizó con éxito", icono pulgar azul. Solo si dice "AVVillas" explícitamente.
-6. TRANSFIYA: icono de celular con check azul, dice "¡Envío exitoso!", "Cuenta origen", "ID Transacción", referencia empieza con "APIU"
-7. NU: logo "nu" morado, dice "Comprobante de transferencia", entidad "Nu C.F.", NIT 901.658.107-2
+4. AVVILLAS: dice TEXTUALMENTE "AVVillas" o "AV Villas" en la pantalla, tema rojo, "Tu pago se realizó con éxito", icono pulgar azul. Solo si dice "AVVillas" explícitamente.
+5. TRANSFIYA: icono de celular con check azul, dice "¡Envío exitoso!", "Cuenta origen", "ID Transacción", referencia empieza con "APIU"
+6. NU: logo "nu" morado, dice "Comprobante de transferencia", entidad "Nu C.F.", NIT 901.658.107-2
 
 EXTRACCIÓN DEL MONTO - MUY IMPORTANTE:
 - En Colombia el PUNTO separa miles (25.900 = veinticinco mil novecientos)
@@ -80,7 +79,6 @@ EXTRACCIÓN DE REFERENCIA:
 - Nequi: campo "Referencia" (empieza con M)
 - Bancolombia: "Comprobante No."
 - Daviplata: "Número de transacción" (código hexadecimal largo)
-- AV Villas: "No. de autorización"
 - Transfiya: "Número de transacción" (empieza con APIU)
 - Nu: "Número de comprobante" (número largo) o "Referencia interna"
 - Bre-B: "Comprobante No." (código alfanumérico)

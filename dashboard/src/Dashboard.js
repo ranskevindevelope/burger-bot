@@ -1,6 +1,9 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid } from 'recharts';
-import { LayoutDashboard, CreditCard, TrendingUp, Search, Download, LogOut, DollarSign, Calendar, CheckCircle, Shield, Trophy, BarChart3, Eye, X, Moon, Mail, Menu, Users, UserPlus, UserX, UserCheck, Edit, Trash2, Save, XCircle, AlertTriangle, Clock} from 'lucide-react';
+import { CreditCard, TrendingUp, Search, Download, DollarSign, Calendar, CheckCircle, Shield, Trophy, BarChart3, Eye, X, Moon, Mail, Users, UserPlus, UserX, UserCheck, Edit, Trash2, Save, XCircle, AlertTriangle, Clock, Bell, Activity} from 'lucide-react';
+import { createApiClient } from './services/api';
+import Sidebar from './components/Sidebar';
+import DashboardHeader from './components/DashboardHeader';
 
 function Dashboard({ onLogout }) {
   const [diasGrafica, setDiasGrafica] = useState(30);
@@ -27,20 +30,15 @@ function Dashboard({ onLogout }) {
   const [errorUsuario, setErrorUsuario] = useState('');
   const [exitoUsuario, setExitoUsuario] = useState('');
 
-  const token = localStorage.getItem('fp_token');
-  const headers = { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' };
+  const api = useMemo(() => createApiClient(onLogout), [onLogout]);
 
   useEffect(() => {
   if (seccionActiva === 'duplicados') {
-    fetch('/api/dashboard/duplicados', { headers })
-      .then(res => {
-        if (res.status === 401) { onLogout(); return []; }
-        return res.json();
-      })
+    api.request('/api/dashboard/duplicados')
       .then(data => setDuplicados(Array.isArray(data) ? data : []))
       .catch(err => console.error(err));
   }
-}, [seccionActiva]);
+}, [seccionActiva, api]);
 
   useEffect(() => {
     cargarDatos();
@@ -58,28 +56,19 @@ function Dashboard({ onLogout }) {
 
   const cargarDatos = async () => {
     try {
-      const [resTotales, resPagos, resStats, resPendientes] = await Promise.all([
-        fetch('/api/dashboard/totales', { headers }),
-        fetch('/api/dashboard/pagos?limite=20', { headers }),
-        fetch(`/api/dashboard/stats?dias=${diasGrafica}`, { headers }),
-        fetch('/api/dashboard/pendientes', { headers }),
+      const [resTotales, resPagos, resStats, resPendientes, resDuplicados] = await Promise.all([
+        api.request('/api/dashboard/totales'),
+        api.request('/api/dashboard/pagos?limite=20'),
+        api.request(`/api/dashboard/stats?dias=${diasGrafica}`),
+        api.request('/api/dashboard/pendientes'),
+        api.request('/api/dashboard/duplicados'),
       ]);
 
-      // Si la sesión caducó, cerrar sesión y salir
-      if ([resTotales, resPagos, resStats, resPendientes].some(r => r.status === 401)) {
-        onLogout();
-        return;
-      }
-
-      const totalesData = await resTotales.json();
-      const pagosData = await resPagos.json();
-      const statsData = await resStats.json();
-      const pendientesData = await resPendientes.json();
-
-      setTotales(totalesData || { dia: { total: 0, cantidad: 0 }, mes: { total: 0, cantidad: 0 } });
-      setPagos(Array.isArray(pagosData) ? pagosData : []);
-      setStats(Array.isArray(statsData) ? statsData : []);
-      setPendientes(pendientesData || { cantidad: 0, total: 0 });
+      setTotales(resTotales || { dia: { total: 0, cantidad: 0 }, mes: { total: 0, cantidad: 0 } });
+      setPagos(Array.isArray(resPagos) ? resPagos : []);
+      setStats(Array.isArray(resStats) ? resStats : []);
+      setPendientes(resPendientes || { cantidad: 0, total: 0 });
+      setDuplicados(Array.isArray(resDuplicados) ? resDuplicados : []);
       setCargando(false);
     } catch (err) {
       console.error('Error cargando datos:', err);
@@ -90,8 +79,7 @@ function Dashboard({ onLogout }) {
   const buscarCliente = async () => {
     if (!busqueda.trim()) return;
     try {
-      const res = await fetch(`/api/dashboard/buscar/${busqueda}`, { headers });
-      const data = await res.json();
+      const data = await api.request(`/api/dashboard/buscar/${encodeURIComponent(busqueda.trim())}`);
       setResultados(data);
     } catch (err) {
       console.error('Error buscando:', err);
@@ -102,13 +90,26 @@ function Dashboard({ onLogout }) {
   const cargarUsuarios = async () => {
     setCargandoUsuarios(true);
     try {
-      const res = await fetch('/api/usuarios', { headers });
-      const data = await res.json();
+      const data = await api.request('/api/usuarios');
       if (data.ok) setUsuarios(Array.isArray(data.usuarios) ? data.usuarios : []);
     } catch (err) {
       console.error('Error cargando usuarios:', err);
     }
     setCargandoUsuarios(false);
+  };
+
+  const exportarPagos = async () => {
+    try {
+      const blob = await api.download('/exportar');
+      const url = window.URL.createObjectURL(blob);
+      const enlace = document.createElement('a');
+      enlace.href = url;
+      enlace.download = 'pagos.csv';
+      enlace.click();
+      window.setTimeout(() => window.URL.revokeObjectURL(url), 0);
+    } catch (err) {
+      console.error('Error exportando pagos:', err);
+    }
   };
 
   const crearUsuario = async () => {
@@ -125,12 +126,10 @@ function Dashboard({ onLogout }) {
     }
 
     try {
-      const res = await fetch('/api/usuarios', {
+      const data = await api.request('/api/usuarios', {
         method: 'POST',
-        headers,
         body: JSON.stringify(formUsuario),
       });
-      const data = await res.json();
 
       if (data.ok) {
         setExitoUsuario(`Usuario "${formUsuario.usuario}" creado exitosamente`);
@@ -152,12 +151,10 @@ function Dashboard({ onLogout }) {
       const body = { nombre: formUsuario.nombre, rol: formUsuario.rol, whatsapp: formUsuario.whatsapp };
       if (formUsuario.password) body.password = formUsuario.password;
 
-      const res = await fetch(`/api/usuarios/${editandoUsuario}`, {
+      const data = await api.request(`/api/usuarios/${editandoUsuario}`, {
         method: 'PUT',
-        headers,
         body: JSON.stringify(body),
       });
-      const data = await res.json();
 
       if (data.ok) {
         setExitoUsuario('Usuario actualizado');
@@ -177,8 +174,7 @@ function Dashboard({ onLogout }) {
   const desactivarUsuario = async (id, nombre) => {
     if (!window.confirm(`¿Desactivar al usuario "${nombre}"?`)) return;
     try {
-      const res = await fetch(`/api/usuarios/${id}`, { method: 'DELETE', headers });
-      const data = await res.json();
+      const data = await api.request(`/api/usuarios/${id}`, { method: 'DELETE' });
       if (data.ok) {
         setExitoUsuario(`Usuario "${nombre}" desactivado`);
         cargarUsuarios();
@@ -193,12 +189,10 @@ function Dashboard({ onLogout }) {
 
   const reactivarUsuario = async (id) => {
     try {
-      const res = await fetch(`/api/usuarios/${id}`, {
+      const data = await api.request(`/api/usuarios/${id}`, {
         method: 'PUT',
-        headers,
         body: JSON.stringify({ activo: 1 }),
       });
-      const data = await res.json();
       if (data.ok) {
         setExitoUsuario('Usuario reactivado');
         cargarUsuarios();
@@ -269,78 +263,25 @@ function Dashboard({ onLogout }) {
   );
 }
 
-  const menuItems = [
-  { id: 'panel', icon: <LayoutDashboard size={18} />, label: 'Panel' },
-  { id: 'pagos', icon: <CreditCard size={18} />, label: 'Pagos' },
-  { id: 'estadisticas', icon: <TrendingUp size={18} />, label: 'Estadísticas' },
-  { id: 'buscar', icon: <Search size={18} />, label: 'Buscar' },
-  { id: 'exportar', icon: <Download size={18} />, label: 'Exportar' },
-  { id: 'duplicados', icon: <AlertTriangle size={18} />, label: 'Duplicados' },
-  ...(esAdmin ? [{ id: 'usuarios', icon: <Users size={18} />, label: 'Usuarios' }] : []),
-];
+ return (
+   <div className="layout">
+     {sidebarAbierto && <div className="sidebar-overlay" onClick={() => setSidebarAbierto(false)} />}
+     <Sidebar
+       activeSection={seccionActiva}
+       isOpen={sidebarAbierto}
+       isAdmin={esAdmin}
+       paymentCount={totales.dia.cantidad}
+       userCount={usuarios.length}
+       onSectionChange={(section) => { setSeccionActiva(section); setSidebarAbierto(false); }}
+       onLogout={onLogout}
+     />
 
-  return (
-    <div className="layout">
-      {sidebarAbierto && <div className="sidebar-overlay" onClick={() => setSidebarAbierto(false)} />}
-
-      {/* SIDEBAR */}
-      <aside className={`sidebar ${sidebarAbierto ? 'sidebar-open' : ''}`}>
-        <div className="sidebar-header">
-          <div className="sidebar-logo">
-            <div className="sidebar-logo-icon-box">
-              <DollarSign size={20} color="#fff" />
-            </div>
-            <div>
-              <div className="sidebar-logo-text">Flash<span>Pago</span></div>
-              <div className="sidebar-logo-sub">Panel de control</div>
-            </div>
-          </div>
-        </div>
-
-        <nav className="sidebar-nav">
-          <div className="sidebar-section-label">MENÚ</div>
-          {menuItems.map(item => (
-            <button
-              key={item.id}
-              className={`sidebar-item ${seccionActiva === item.id ? 'sidebar-item-active' : ''}`}
-              onClick={() => { setSeccionActiva(item.id); setSidebarAbierto(false); }}
-            >
-              <span className="sidebar-item-icon">{item.icon}</span>
-              <span>{item.label}</span>
-              {item.id === 'pagos' && totales.dia.cantidad > 0 && <span className="sidebar-badge">{totales.dia.cantidad}</span>}
-              {item.id === 'usuarios' && usuarios.length > 0 && <span className="sidebar-badge">{usuarios.length}</span>}
-            </button>
-          ))}
-        </nav>
-
-        <div className="sidebar-footer">
-          <div className="sidebar-section-label">CUENTA</div>
-          <button className="sidebar-item" onClick={onLogout}>
-            <span className="sidebar-item-icon"><LogOut size={18} /></span>
-            <span>Cerrar sesión</span>
-          </button>
-        </div>
-      </aside>
-
-      {/* MAIN CONTENT */}
-      <main className="main-content">
-        <header className="topbar">
-          <button className="menu-toggle" onClick={() => setSidebarAbierto(!sidebarAbierto)}>
-            <Menu size={22} />
-          </button>
-          <h1 className="topbar-title">
-            {seccionActiva === 'panel' && <><LayoutDashboard size={18} /> Panel general</>}
-            {seccionActiva === 'pagos' && <><CreditCard size={18} /> Pagos verificados</>}
-            {seccionActiva === 'estadisticas' && <><TrendingUp size={18} /> Estadísticas</>}
-            {seccionActiva === 'buscar' && <><Search size={18} /> Buscar cliente</>}
-            {seccionActiva === 'exportar' && <><Download size={18} /> Exportar datos</>}
-            {seccionActiva === 'duplicados' && <><AlertTriangle size={18} /> Duplicados detectados</>}
-            {seccionActiva === 'usuarios' && <><Users size={18} /> Gestión de usuarios</>}
-          </h1>
-          <span className="topbar-fecha">
-            {new Date().toLocaleDateString('es-CO', { weekday: 'short', day: 'numeric', month: 'short' })}
-          </span>
-        </header>
+     {/* MAIN CONTENT */}
+     <main className="main-content">
+       <DashboardHeader
+         activeSection={seccionActiva}
+         onToggleSidebar={() => setSidebarAbierto(!sidebarAbierto)}
+       />
 
         <div className="main-body">
         {seccionActiva === 'duplicados' && (
@@ -380,6 +321,13 @@ function Dashboard({ onLogout }) {
           {/* ─── PANEL GENERAL ────────────────────── */}
           {seccionActiva === 'panel' && (
             <>
+              <div className="dashboard-intro">
+                <div>
+                  <h2>Buenos días, {userGuardado.nombre || userGuardado.usuario || 'Admin'} <span aria-hidden="true">👋</span></h2>
+                  <p>Aquí tienes el resumen de actividad de FlashPago.</p>
+                </div>
+                <div className="dashboard-live"><Activity size={15} /> Actualización automática</div>
+              </div>
               <div className="tarjetas-grid">
                 <div className="tarjeta tarjeta-accent">
                   <div className="tarjeta-icon-box tarjeta-icon-naranja"><DollarSign size={22} /></div>
@@ -403,7 +351,7 @@ function Dashboard({ onLogout }) {
                   <div className="tarjeta-info">
                     <span className="tarjeta-label">Verificados</span>
                     <span className="tarjeta-valor">{totales.mes.cantidad}</span>
-                    <span className="tarjeta-sub">Tasa de éxito: 94%</span>
+                    <span className="tarjeta-sub">Tasa de éxito: —</span>
                   </div>
                 </div>
 
@@ -432,10 +380,27 @@ function Dashboard({ onLogout }) {
                     </span>
                   </div>
                 </div>
+                <button
+                  className="tarjeta tarjeta-clickable"
+                  onClick={() => setSeccionActiva('duplicados')}
+                  aria-label={`Ver ${duplicados.length} duplicados detectados`}
+                >
+                  <div className="tarjeta-icon-box tarjeta-icon-rojo">
+                    <AlertTriangle size={22} />
+                  </div>
+                  <div className="tarjeta-info">
+                    <span className="tarjeta-label">Duplicados</span>
+                    <span className="tarjeta-valor">{duplicados.length}</span>
+                    <span className="tarjeta-sub">
+                      {duplicados.length > 0 ? 'Requieren revisión' : 'Ninguno detectado'}
+                    </span>
+                  </div>
+                </button>
                 </div>
                 
 
-              <div className="seccion">
+              <div className="dashboard-overview-grid">
+              <div className="seccion dashboard-chart-card">
              <div className="seccion-header">
              <h2 className="seccion-titulo"><BarChart3 size={18} /> Ventas por día</h2>
              <div style={{ display: 'flex', gap: '0.4rem' }}>
@@ -458,19 +423,65 @@ function Dashboard({ onLogout }) {
         </button>
       ))}
     </div>
-  </div>
-  <div className="grafica-container">
-    <ResponsiveContainer width="100%" height={280}>
-      <BarChart data={statsFormateados}>
-        <CartesianGrid strokeDasharray="3 3" stroke="rgba(0,0,0,0.06)" />
-        <XAxis dataKey="fecha" tick={{ fontSize: 11 }} />
-        <YAxis tickFormatter={(v) => `$${v}k`} tick={{ fontSize: 11 }} />
-        <Tooltip formatter={(value) => [formatearMonto(value * 1000), 'Total']} />
-        <Bar dataKey="totalK" fill="#F57C00" radius={[6, 6, 0, 0]} />
-      </BarChart>
-    </ResponsiveContainer>
-  </div>
-</div>
+                 </div>
+                 <div className="grafica-container">
+                   <ResponsiveContainer width="100%" height={280}>
+                     <BarChart data={statsFormateados}>
+                       <CartesianGrid strokeDasharray="3 3" stroke="rgba(0,0,0,0.06)" />
+                       <XAxis dataKey="fecha" tick={{ fontSize: 11 }} />
+                       <YAxis tickFormatter={(v) => `$${v}k`} tick={{ fontSize: 11 }} />
+                       <Tooltip formatter={(value) => [formatearMonto(value * 1000), 'Total']} />
+                       <Bar dataKey="totalK" fill="#F57C00" radius={[6, 6, 0, 0]} />
+                     </BarChart>
+                   </ResponsiveContainer>
+                 </div>
+                </div>
+                <div className="seccion alertas-card">
+                   <div className="seccion-header">
+                     <h2 className="seccion-titulo"><Bell size={18} /> Alertas</h2>
+                     <span className="alertas-count">{pendientes.cantidad + duplicados.length}</span>
+                   </div>
+                   {pendientes.cantidad > 0 ? (
+                     <div className="alerta-item alerta-item-danger">
+                       <AlertTriangle size={17} />
+                       <div>
+                         <strong>{pendientes.cantidad} pago{pendientes.cantidad === 1 ? '' : 's'} pendiente{pendientes.cantidad === 1 ? '' : 's'}</strong>
+                         <span>{formatearMonto(pendientes.total)} por verificar</span>
+                       </div>
+                     </div>
+                   ) : duplicados.length === 0 ? (
+                     <div className="alerta-item alerta-item-success">
+                       <CheckCircle size={17} />
+                       <div>
+                         <strong>Todo está al día</strong>
+                         <span>No hay pagos pendientes</span>
+                       </div>
+                     </div>
+                   ) : null}
+                   {duplicados.length > 0 && (
+                     <div className="alerta-item alerta-item-warning">
+                       <AlertTriangle size={17} />
+                       <div>
+                         <strong>{duplicados.length} duplicado{duplicados.length === 1 ? '' : 's'} detectado{duplicados.length === 1 ? '' : 's'}</strong>
+                         <span>Revisar referencias repetidas</span>
+                       </div>
+                     </div>
+                   )}
+                   <div className="alerta-item alerta-item-info">
+                     <Activity size={17} />
+                     <div>
+                       <strong>Monitoreo activo</strong>
+                       <span>Datos sincronizados cada 30 segundos</span>
+                     </div>
+                   </div>
+                   <button className="alertas-link" onClick={() => setSeccionActiva(pendientes.cantidad > 0 ? 'pagos' : duplicados.length > 0 ? 'duplicados' : 'panel')}>
+                     {pendientes.cantidad > 0 ? 'Revisar pagos →' : duplicados.length > 0 ? 'Revisar duplicados →' : 'Ver actividad →'}
+                   </button>
+                   <button className="alertas-link alertas-link-secondary" onClick={() => setSeccionActiva('duplicados')}>
+                     Ver duplicados ({duplicados.length}) →
+                   </button>
+                 </div>
+             </div>
 
               <div className="seccion">
                 <div className="seccion-header">
@@ -504,15 +515,7 @@ function Dashboard({ onLogout }) {
             <div className="seccion">
               <div className="seccion-header">
                 <h2 className="seccion-titulo">Todos los pagos</h2>
-                <button className="exportar-btn" onClick={async () => {
-               const res = await fetch('/exportar', { headers });
-               const blob = await res.blob();
-               const url = window.URL.createObjectURL(blob);
-               const a = document.createElement('a');
-              a.href = url;
-              a.download = 'pagos.csv';
-              a.click();
-              }}>
+                <button className="exportar-btn" onClick={exportarPagos}>
   <Download size={14} /> Exportar Excel
 </button>
               </div>
@@ -667,15 +670,7 @@ function Dashboard({ onLogout }) {
                 <div className="exportar-icon-box"><Download size={32} color="#F57C00" /></div>
                 <h2>Exportar pagos a Excel</h2>
                 <p>Descarga un archivo con todos los pagos de los últimos 30 días. Se abre en Excel, Google Sheets o cualquier programa de hojas de cálculo.</p>
-                <button className="exportar-btn" onClick={async () => {
-               const res = await fetch('/exportar', { headers });
-               const blob = await res.blob();
-               const url = window.URL.createObjectURL(blob);
-               const a = document.createElement('a');
-               a.href = url;
-               a.download = 'pagos.csv';
-               a.click();
-              }}>
+                <button className="exportar-btn" onClick={exportarPagos}>
              <Download size={14} /> Exportar Excel
             </button>
 
