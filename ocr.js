@@ -58,14 +58,16 @@ async function leerComprobante(urlImagen, base64Data) {
                 type: 'text',
                 text: `Eres un experto en comprobantes de pago colombianos. Analiza esta imagen y extrae los datos.
 
-IDENTIFICACIÓN DEL BANCO - usa estas pistas:
-- NEQUI: QR con letra "N" en el centro, dice "Pago realizado", campo "¿Cuánto?", "Llave", referencia empieza con "M"
-- BANCOLOMBIA: dice "¡Transferencia exitosa!", "Comprobante No.", secciones con fondo oscuro negro
-- DAVIPLATA: logo "DAVI bank" rojo, dice "Pagaste", sello circular "TRANSACCIÓN EXITOSA"
-- AVVILLAS: tema rojo, dice "AVVillas", "Tu pago se realizó con éxito", icono pulgar azul
-- TRANSFIYA: icono de celular con check azul, dice "¡Envío exitoso!", "Cuenta origen", "ID Transacción", referencia empieza con "APIU"
-- NU: logo "nu" morado, dice "Comprobante de transferencia", entidad "Nu C.F.", NIT 901.658.107-2
-- BRE-B: logo "Bre-B" arriba, fondo oscuro gris/negro, dice "¡Pago exitoso!", "Código de negocio", "Punto de venta", check verde. Es una plataforma multi-banco, NO es AV Villas.
+REGLA IMPORTANTE: Si ves el logo "Bre-B" en la imagen, el banco es SIEMPRE "breb", NUNCA "avvillas". Bre-B NO es AV Villas.
+
+IDENTIFICACIÓN DEL BANCO - revisa en este ORDEN de prioridad:
+1. BRE-B: logo "Bre-B" en la parte superior, fondo oscuro gris/negro, dice "¡Pago exitoso!", "Código de negocio", "Punto de venta", check verde circular. Es una plataforma de pagos multi-banco. Si ves "Bre-B" → banco = "breb"
+2. NEQUI: QR con letra "N" en el centro, dice "Pago realizado", campo "¿Cuánto?", "Llave", referencia empieza con "M"
+3. BANCOLOMBIA: dice "¡Transferencia exitosa!", "Comprobante No.", secciones con fondo oscuro negro
+4. DAVIPLATA: logo "DAVI bank" rojo, dice "Pagaste", sello circular "TRANSACCIÓN EXITOSA"
+5. AVVILLAS: dice TEXTUALMENTE "AVVillas" o "AV Villas" en la pantalla, tema rojo, "Tu pago se realizó con éxito", icono pulgar azul. Solo si dice "AVVillas" explícitamente.
+6. TRANSFIYA: icono de celular con check azul, dice "¡Envío exitoso!", "Cuenta origen", "ID Transacción", referencia empieza con "APIU"
+7. NU: logo "nu" morado, dice "Comprobante de transferencia", entidad "Nu C.F.", NIT 901.658.107-2
 
 EXTRACCIÓN DEL MONTO - MUY IMPORTANTE:
 - En Colombia el PUNTO separa miles (25.900 = veinticinco mil novecientos)
