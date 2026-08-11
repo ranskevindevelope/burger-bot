@@ -37,12 +37,21 @@ function Dashboard({ onLogout }) {
   const api = useMemo(() => createApiClient(onLogout), [onLogout]);
 
   useEffect(() => {
-  if (seccionActiva === 'duplicados') {
-    api.request('/api/dashboard/duplicados')
-      .then(data => setDuplicados(Array.isArray(data) ? data : []))
-      .catch(err => console.error(err));
-  }
-}, [seccionActiva, api]);
+    if (seccionActiva !== 'duplicados') return undefined;
+
+    const actualizarDuplicados = () => {
+      cargarDuplicados();
+    };
+
+    actualizarDuplicados();
+    const intervalo = setInterval(actualizarDuplicados, 30000);
+    window.addEventListener('focus', actualizarDuplicados);
+
+    return () => {
+      clearInterval(intervalo);
+      window.removeEventListener('focus', actualizarDuplicados);
+    };
+  }, [seccionActiva, api]);
 
   useEffect(() => {
     cargarDatos();
@@ -77,6 +86,15 @@ function Dashboard({ onLogout }) {
     } catch (err) {
       console.error('Error cargando datos:', err);
       setCargando(false);
+    }
+  };
+
+  const cargarDuplicados = async () => {
+    try {
+      const data = await api.request('/api/dashboard/duplicados');
+      setDuplicados(Array.isArray(data) ? data : []);
+    } catch (err) {
+      console.error('Error cargando duplicados:', err);
     }
   };
 
@@ -126,6 +144,7 @@ function Dashboard({ onLogout }) {
       });
       setMotivoRevision('');
       setDuplicadoSeleccionado(null);
+      await cargarDuplicados();
       await cargarDatos();
     } catch (err) {
       console.error('Error guardando revisión de duplicado:', err);
