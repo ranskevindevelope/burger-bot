@@ -113,7 +113,7 @@ db.run(`
   )
 `);
 
-// Historial independiente de revisiones de duplicados. No modifica el estado original del pago.
+// Historial independiente de revisiones de duplicados. 
 db.run(`
   CREATE TABLE IF NOT EXISTS duplicate_reviews (
     id INTEGER PRIMARY KEY AUTOINCREMENT,

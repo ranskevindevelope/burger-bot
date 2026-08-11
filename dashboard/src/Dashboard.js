@@ -6,6 +6,15 @@ import Sidebar from './components/Sidebar';
 import DashboardHeader from './components/DashboardHeader';
 
 function Dashboard({ onLogout }) {
+  const getInitialSection = () => {
+    if (typeof window === 'undefined') return 'panel';
+    const params = new URLSearchParams(window.location.search);
+    const seccion = params.get('seccion');
+    return ['panel', 'pagos', 'estadisticas', 'buscar', 'exportar', 'duplicados', 'usuarios'].includes(seccion)
+      ? seccion
+      : 'panel';
+  };
+
   const [diasGrafica, setDiasGrafica] = useState(30);
   const [totales, setTotales] = useState({ dia: { total: 0, cantidad: 0 }, mes: { total: 0, cantidad: 0 } });
   const userGuardado = JSON.parse(localStorage.getItem('fp_user') || '{}');
@@ -19,7 +28,7 @@ function Dashboard({ onLogout }) {
   const [resultados, setResultados] = useState(null);
   const [cargando, setCargando] = useState(true);
   const [fotoActiva, setFotoActiva] = useState(null);
-  const [seccionActiva, setSeccionActiva] = useState('panel');
+  const [seccionActiva, setSeccionActiva] = useState(getInitialSection);
   const [sidebarAbierto, setSidebarAbierto] = useState(false);
   const [duplicadoSeleccionado, setDuplicadoSeleccionado] = useState(null);
   const [motivoRevision, setMotivoRevision] = useState('');
@@ -35,6 +44,44 @@ function Dashboard({ onLogout }) {
   const [exitoUsuario, setExitoUsuario] = useState('');
 
   const api = useMemo(() => createApiClient(onLogout), [onLogout]);
+
+  const cambiarSeccion = (nuevaSeccion) => {
+    if (nuevaSeccion === seccionActiva) {
+      setSidebarAbierto(false);
+      return;
+    }
+
+    setSeccionActiva(nuevaSeccion);
+    setSidebarAbierto(false);
+
+    if (typeof window !== 'undefined') {
+      const url = new URL(window.location.href);
+      url.searchParams.set('seccion', nuevaSeccion);
+      window.history.pushState({ seccion: nuevaSeccion }, '', `${url.pathname}?${url.searchParams.toString()}`);
+    }
+  };
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return undefined;
+
+    const url = new URL(window.location.href);
+    if (!url.searchParams.get('seccion')) {
+      url.searchParams.set('seccion', seccionActiva);
+      window.history.replaceState({ seccion: seccionActiva }, '', `${url.pathname}?${url.searchParams.toString()}`);
+    }
+
+    const manejarPopState = () => {
+      const params = new URLSearchParams(window.location.search);
+      const seccionDesdeUrl = params.get('seccion');
+      const siguienteSeccion = ['panel', 'pagos', 'estadisticas', 'buscar', 'exportar', 'duplicados', 'usuarios'].includes(seccionDesdeUrl)
+        ? seccionDesdeUrl
+        : 'panel';
+      setSeccionActiva(siguienteSeccion);
+    };
+
+    window.addEventListener('popstate', manejarPopState);
+    return () => window.removeEventListener('popstate', manejarPopState);
+  }, [seccionActiva]);
 
   useEffect(() => {
     if (seccionActiva !== 'duplicados') return undefined;
@@ -313,7 +360,7 @@ function Dashboard({ onLogout }) {
        isAdmin={esAdmin}
        paymentCount={totales.dia.cantidad}
        userCount={usuarios.length}
-       onSectionChange={(section) => { setSeccionActiva(section); setSidebarAbierto(false); }}
+       onSectionChange={(section) => cambiarSeccion(section)}
        onLogout={onLogout}
      />
 
@@ -463,7 +510,7 @@ function Dashboard({ onLogout }) {
                 </div>
                 <button
                   className="tarjeta tarjeta-clickable"
-                  onClick={() => setSeccionActiva('duplicados')}
+                  onClick={() => cambiarSeccion('duplicados')}
                   aria-label={`Ver ${duplicadosPendientes.length} duplicados pendientes`}
                 >
                   <div className="tarjeta-icon-box tarjeta-icon-rojo">
@@ -555,10 +602,10 @@ function Dashboard({ onLogout }) {
                        <span>Datos sincronizados cada 30 segundos</span>
                      </div>
                    </div>
-                   <button className="alertas-link" onClick={() => setSeccionActiva(pendientes.cantidad > 0 ? 'pagos' : duplicadosPendientes.length > 0 ? 'duplicados' : 'panel')}>
+                   <button className="alertas-link" onClick={() => cambiarSeccion(pendientes.cantidad > 0 ? 'pagos' : duplicadosPendientes.length > 0 ? 'duplicados' : 'panel')}>
                      {pendientes.cantidad > 0 ? 'Revisar pagos →' : duplicadosPendientes.length > 0 ? 'Revisar duplicados →' : 'Ver actividad →'}
                    </button>
-                   <button className="alertas-link alertas-link-secondary" onClick={() => setSeccionActiva('duplicados')}>
+                   <button className="alertas-link alertas-link-secondary" onClick={() => cambiarSeccion('duplicados')}>
                      Ver duplicados ({duplicadosPendientes.length}) →
                    </button>
                  </div>
@@ -567,7 +614,7 @@ function Dashboard({ onLogout }) {
               <div className="seccion">
                 <div className="seccion-header">
                   <h2 className="seccion-titulo"><CreditCard size={18} /> Últimos pagos</h2>
-                  <button className="ver-mas-btn" onClick={() => setSeccionActiva('pagos')}>Ver todos →</button>
+                  <button className="ver-mas-btn" onClick={() => cambiarSeccion('pagos')}>Ver todos →</button>
                 </div>
                 <div className="tabla-container">
                   <table className="tabla-pagos">
