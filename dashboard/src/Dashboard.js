@@ -12,6 +12,7 @@ function Dashboard({ onLogout }) {
   const esAdmin = userGuardado.rol === 'admin';
   const [pagos, setPagos] = useState([]);
   const [duplicados, setDuplicados] = useState([]);
+  const [duplicadosPendientes, setDuplicadosPendientes] = useState([]);
   const [pendientes, setPendientes] = useState({ cantidad: 0, total: 0 });
   const [stats, setStats] = useState([]);
   const [busqueda, setBusqueda] = useState('');
@@ -64,14 +65,14 @@ function Dashboard({ onLogout }) {
         api.request('/api/dashboard/pagos?limite=20'),
         api.request(`/api/dashboard/stats?dias=${diasGrafica}`),
         api.request('/api/dashboard/pendientes'),
-        api.request('/api/dashboard/duplicados'),
+        api.request('/api/dashboard/duplicados?estado=PENDIENTE'),
       ]);
 
       setTotales(resTotales || { dia: { total: 0, cantidad: 0 }, mes: { total: 0, cantidad: 0 } });
       setPagos(Array.isArray(resPagos) ? resPagos : []);
       setStats(Array.isArray(resStats) ? resStats : []);
       setPendientes(resPendientes || { cantidad: 0, total: 0 });
-      setDuplicados(Array.isArray(resDuplicados) ? resDuplicados : []);
+      setDuplicadosPendientes(Array.isArray(resDuplicados) ? resDuplicados : []);
       setCargando(false);
     } catch (err) {
       console.error('Error cargando datos:', err);
@@ -444,16 +445,16 @@ function Dashboard({ onLogout }) {
                 <button
                   className="tarjeta tarjeta-clickable"
                   onClick={() => setSeccionActiva('duplicados')}
-                  aria-label={`Ver ${duplicados.length} duplicados detectados`}
+                  aria-label={`Ver ${duplicadosPendientes.length} duplicados pendientes`}
                 >
                   <div className="tarjeta-icon-box tarjeta-icon-rojo">
                     <AlertTriangle size={22} />
                   </div>
                   <div className="tarjeta-info">
                     <span className="tarjeta-label">Duplicados</span>
-                    <span className="tarjeta-valor">{duplicados.length}</span>
+                    <span className="tarjeta-valor">{duplicadosPendientes.length}</span>
                     <span className="tarjeta-sub">
-                      {duplicados.length > 0 ? 'Requieren revisión' : 'Ninguno detectado'}
+                      {duplicadosPendientes.length > 0 ? 'Requieren revisión' : 'Ninguno pendiente'}
                     </span>
                   </div>
                 </button>
@@ -500,7 +501,7 @@ function Dashboard({ onLogout }) {
                 <div className="seccion alertas-card">
                    <div className="seccion-header">
                      <h2 className="seccion-titulo"><Bell size={18} /> Alertas</h2>
-                     <span className="alertas-count">{pendientes.cantidad + duplicados.length}</span>
+                     <span className="alertas-count">{pendientes.cantidad + duplicadosPendientes.length}</span>
                    </div>
                    {pendientes.cantidad > 0 ? (
                      <div className="alerta-item alerta-item-danger">
@@ -510,7 +511,7 @@ function Dashboard({ onLogout }) {
                          <span>{formatearMonto(pendientes.total)} por verificar</span>
                        </div>
                      </div>
-                   ) : duplicados.length === 0 ? (
+                   ) : duplicadosPendientes.length === 0 ? (
                      <div className="alerta-item alerta-item-success">
                        <CheckCircle size={17} />
                        <div>
@@ -519,11 +520,11 @@ function Dashboard({ onLogout }) {
                        </div>
                      </div>
                    ) : null}
-                   {duplicados.length > 0 && (
+                   {duplicadosPendientes.length > 0 && (
                      <div className="alerta-item alerta-item-warning">
                        <AlertTriangle size={17} />
                        <div>
-                         <strong>{duplicados.length} duplicado{duplicados.length === 1 ? '' : 's'} detectado{duplicados.length === 1 ? '' : 's'}</strong>
+                         <strong>{duplicadosPendientes.length} duplicado{duplicadosPendientes.length === 1 ? '' : 's'} detectado{duplicadosPendientes.length === 1 ? '' : 's'}</strong>
                          <span>Revisar referencias repetidas</span>
                        </div>
                      </div>
@@ -535,11 +536,11 @@ function Dashboard({ onLogout }) {
                        <span>Datos sincronizados cada 30 segundos</span>
                      </div>
                    </div>
-                   <button className="alertas-link" onClick={() => setSeccionActiva(pendientes.cantidad > 0 ? 'pagos' : duplicados.length > 0 ? 'duplicados' : 'panel')}>
-                     {pendientes.cantidad > 0 ? 'Revisar pagos →' : duplicados.length > 0 ? 'Revisar duplicados →' : 'Ver actividad →'}
+                   <button className="alertas-link" onClick={() => setSeccionActiva(pendientes.cantidad > 0 ? 'pagos' : duplicadosPendientes.length > 0 ? 'duplicados' : 'panel')}>
+                     {pendientes.cantidad > 0 ? 'Revisar pagos →' : duplicadosPendientes.length > 0 ? 'Revisar duplicados →' : 'Ver actividad →'}
                    </button>
                    <button className="alertas-link alertas-link-secondary" onClick={() => setSeccionActiva('duplicados')}>
-                     Ver duplicados ({duplicados.length}) →
+                     Ver duplicados ({duplicadosPendientes.length}) →
                    </button>
                  </div>
              </div>

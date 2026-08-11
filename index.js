@@ -431,6 +431,7 @@ function esAdmin(numero) {
       }
 
       const montoNum = parseInt(datos.monto);
+      const nombreFoto = mediaBase64 ? guardarFoto(mediaBase64, datos.referencia) : null;
 
       // ─── Verificar duplicado en la base de datos (últimos 7 días) ──
 if (datos.referencia) {
@@ -453,7 +454,7 @@ if (datos.referencia) {
       nombre_cliente: null,
       verificado_por: from,
       negocio_id: 1,
-      foto: null,
+      foto: nombreFoto,
     });
     return;
   }
@@ -473,7 +474,6 @@ if (datos.referencia) {
       // ─── Guardar el pago REAL en la base de datos ───────────
       if (verificacion.estado === 'REAL') {
         try { 
-          const nombreFoto = mediaBase64 ? guardarFoto(mediaBase64, datos.referencia) : null;
           await guardarPago({
           monto: montoNum,
           referencia: datos.referencia || null,
@@ -910,7 +910,10 @@ app.get('/api/dashboard/duplicados', verificarToken, async (req, res) => {
       return res.status(400).json({ ok: false, error: 'Estado de duplicado inválido' });
     }
 
-    const filtroEstado = estado === 'TODOS' ? '' : 'AND COALESCE(r.estado, \'PENDIENTE\') = ?';
+    const filtroEstado = estado === 'TODOS'
+      ? `AND (COALESCE(r.estado, 'PENDIENTE') = 'PENDIENTE'
+          OR r.revisado_en >= datetime('now', '-30 days', 'localtime'))`
+      : 'AND COALESCE(r.estado, \'PENDIENTE\') = ?';
     const parametros = estado === 'TODOS' ? [] : [estado];
     db.all(
       `SELECT p.id, p.referencia, p.monto, p.banco, p.fecha, p.hora,
