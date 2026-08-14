@@ -83,7 +83,7 @@ function Nav({ onLogin }) {
   );
 }
 
-// ─── PHONE CHAT ANIMATION ────────────────
+// ─── ANIMACION DE CHAT ────────────────
 function PhoneMockup() {
   const [step, setStep] = useState(0);
 
@@ -117,43 +117,45 @@ function PhoneMockup() {
         </div>
       </div>
 
-      <div style={{ ...bubbleBase, background: "#005c4b", color: "white", marginLeft: "auto", borderBottomRightRadius: 4, display: "flex", alignItems: "center", gap: 6, ...(step >= 1 ? visible : hidden) }}>
-        <Camera size={16} /> [Comprobante de pago]
-      </div>
+      <div style={{ minHeight: 220 }}>
+        <div style={{ ...bubbleBase, background: "#005c4b", color: "white", marginLeft: "auto", borderBottomRightRadius: 4, display: "flex", alignItems: "center", gap: 6, ...(step >= 1 ? visible : hidden) }}>
+          <Camera size={16} /> [Comprobante de pago]
+        </div>
 
-      <div style={{ ...bubbleBase, background: "rgba(255,255,255,0.08)", color: "#e0e0e0", borderBottomLeftRadius: 4, ...(step >= 2 ? visible : hidden) }}>
-        <span style={{ display: "flex", alignItems: "center", gap: 6 }}><Hourglass size={14} /> Verificando el pago...</span>
-        {step === 2 && (
-          <div style={{ display: "inline-flex", gap: 4, paddingTop: 6 }}>
-            {[0, 1, 2].map(i => (
-              <span key={i} style={{ width: 7, height: 7, background: "#b0b0c8", borderRadius: "50%", display: "inline-block", animation: `typingDot 1.4s infinite ${i * 0.2}s` }} />
-            ))}
+        <div style={{ ...bubbleBase, background: "rgba(255,255,255,0.08)", color: "#e0e0e0", borderBottomLeftRadius: 4, ...(step >= 2 ? visible : hidden) }}>
+          <span style={{ display: "flex", alignItems: "center", gap: 6 }}><Hourglass size={14} /> Verificando el pago...</span>
+          {step === 2 && (
+            <div style={{ display: "inline-flex", gap: 4, paddingTop: 6 }}>
+              {[0, 1, 2].map(i => (
+                <span key={i} style={{ width: 7, height: 7, background: "#b0b0c8", borderRadius: "50%", display: "inline-block", animation: `typingDot 1.4s infinite ${i * 0.2}s` }} />
+              ))}
+            </div>
+          )}
+        </div>
+
+        {step >= 3 && (
+          <div style={{ ...bubbleBase, background: "rgba(255,255,255,0.08)", color: "#e0e0e0", borderBottomLeftRadius: 4, ...visible }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 6 }}>
+              <span style={{ display: "inline-flex", animation: "popIn 0.5s cubic-bezier(0.175,0.885,0.32,1.275)" }}>
+                <CheckCircle2 size={18} color={COLORS.verde} />
+              </span>
+              <strong>PAGO VERIFICADO</strong>
+            </div>
+            <div style={{ lineHeight: 1.8 }}>
+              Monto: <strong>$53.300</strong><br />
+              Banco: Nequi<br />
+              Cliente: María López<br />
+              Fecha: 22/07/2026
+            </div>
+          </div>
+        )}
+
+        {step >= 4 && (
+          <div style={{ background: "rgba(46,204,113,0.15)", border: "1px solid rgba(46,204,113,0.3)", color: COLORS.verde, padding: "0.5rem 1rem", borderRadius: 8, fontSize: "0.75rem", fontWeight: 600, textAlign: "center", marginTop: "0.75rem", animation: "fadeIn 0.5s", display: "flex", alignItems: "center", justifyContent: "center", gap: 6 }}>
+            <Zap size={14} /> Verificado en 6 segundos — Ahorra 3 min por pago
           </div>
         )}
       </div>
-
-      {step >= 3 && (
-        <div style={{ ...bubbleBase, background: "rgba(255,255,255,0.08)", color: "#e0e0e0", borderBottomLeftRadius: 4, ...visible }}>
-          <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 6 }}>
-            <span style={{ display: "inline-flex", animation: "popIn 0.5s cubic-bezier(0.175,0.885,0.32,1.275)" }}>
-              <CheckCircle2 size={18} color={COLORS.verde} />
-            </span>
-            <strong>PAGO VERIFICADO</strong>
-          </div>
-          <div style={{ lineHeight: 1.8 }}>
-            Monto: <strong>$53.300</strong><br />
-            Banco: Nequi<br />
-            Cliente: María López<br />
-            Fecha: 22/07/2026
-          </div>
-        </div>
-      )}
-
-      {step >= 4 && (
-        <div style={{ background: "rgba(46,204,113,0.15)", border: "1px solid rgba(46,204,113,0.3)", color: COLORS.verde, padding: "0.5rem 1rem", borderRadius: 8, fontSize: "0.75rem", fontWeight: 600, textAlign: "center", marginTop: "0.75rem", animation: "fadeIn 0.5s", display: "flex", alignItems: "center", justifyContent: "center", gap: 6 }}>
-          <Zap size={14} /> Verificado en 6 segundos — Ahorra 3 min por pago
-        </div>
-      )}
     </div>
   );
 }
