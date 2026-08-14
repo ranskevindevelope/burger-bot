@@ -96,7 +96,7 @@ parece_falso = true si la imagen está borrosa, editada, cortada o los datos no 
           Authorization: `Bearer ${deepseekKey}`,
         },
         body: JSON.stringify({
-          model: process.env.DEEPSEEK_MODEL || 'deepseek-chat',
+          model: process.env.DEEPSEEK_MODEL || 'deepseek-v4-flash',
           max_tokens: 150,
           temperature: 0.1,
           messages: [
