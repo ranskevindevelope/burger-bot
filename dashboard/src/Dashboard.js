@@ -102,13 +102,9 @@ function Dashboard({ onLogout }) {
 
   useEffect(() => {
     cargarDatos();
-    const intervalo = setInterval(cargarDatos, 30000);
+    const intervalo = setInterval(() => cargarDatos(), 30000);
     return () => clearInterval(intervalo);
-  }, []);
-
-  useEffect(() => {
-    cargarDatos();
-  }, [diasGrafica]);
+  }, [diasGrafica, api]);
 
   useEffect(() => {
     if (seccionActiva === 'usuarios') cargarUsuarios();
@@ -726,7 +722,7 @@ function Dashboard({ onLogout }) {
 
               </div>
               <div className="seccion">
-                <h2 className="seccion-titulo"><TrendingUp size={18} /> Tendencia de ventas (30 días)</h2>
+                <h2 className="seccion-titulo"><TrendingUp size={18} /> Tendencia de ventas ({diasGrafica} días)</h2>
                 <div className="grafica-container">
                   <ResponsiveContainer width="100%" height={300}>
                     <BarChart data={statsFormateados}>

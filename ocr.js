@@ -19,44 +19,42 @@ function extraerDatos(texto) {
   return resultado;
 }
 
+function extraerJsonDesdeTexto(texto) {
+  const match = texto.match(/\{[\s\S]*\}/);
+  if (!match) throw new Error('No se encontró JSON en la respuesta del modelo');
+  return JSON.parse(match[0]);
+}
+
 async function leerComprobante(urlImagen, base64Data) {
-  if (process.env.CLAUDE_API_KEY) {
-    try {
-      let imageBase64 = '';
-      let mediaType = 'image/jpeg';
+  const deepseekKey = process.env.DEEPSEEK_API_KEY;
+  const claudeKey = process.env.CLAUDE_API_KEY;
 
-      if (base64Data) {
-        // OpenWA mandó la imagen en base64 directamente
-        imageBase64 = base64Data;
-        console.log('[OCR] Usando base64 del webhook');
-      } else if (urlImagen) {
-        // Intentar descargar desde URL
-        const imgResponse = await fetch(urlImagen);
-        const buffer = await imgResponse.buffer();
-        imageBase64 = buffer.toString('base64');
-        mediaType = imgResponse.headers.get('content-type') || 'image/jpeg';
-        console.log('[OCR] Imagen descargada desde URL');
-      } else {
-        throw new Error('Sin imagen disponible');
-      }
+  if (!deepseekKey && !claudeKey) {
+    console.log('[OCR] Error: el servicio de lectura no está disponible');
+    return {
+      error: true,
+      mensaje: '⚠️ Nuestro servicio está fallando en este momento. Volveremos lo más pronto posible.\n\n📞 Por favor contacta al administrador para verificar este pago manualmente.'
+    };
+  }
 
-      const response = await fetch('https://api.anthropic.com/v1/messages', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'x-api-key': process.env.CLAUDE_API_KEY,
-          'anthropic-version': '2023-06-01',
-        },
-        body: JSON.stringify({
-          model: 'claude-sonnet-4-5',
-          max_tokens: 150,
-          messages: [{
-            role: 'user',
-            content: [
-              { type: 'image', source: { type: 'base64', media_type: mediaType, data: imageBase64 } },
-              {
-                type: 'text',
-                text: `Eres un experto en comprobantes de pago colombianos. Analiza esta imagen y extrae los datos.
+  try {
+    let imageBase64 = '';
+    let mediaType = 'image/jpeg';
+
+    if (base64Data) {
+      imageBase64 = base64Data;
+      console.log('[OCR] Usando base64 del webhook');
+    } else if (urlImagen) {
+      const imgResponse = await fetch(urlImagen);
+      const buffer = await imgResponse.buffer();
+      imageBase64 = buffer.toString('base64');
+      mediaType = imgResponse.headers.get('content-type') || 'image/jpeg';
+      console.log('[OCR] Imagen descargada desde URL');
+    } else {
+      throw new Error('Sin imagen disponible');
+    }
+
+    const prompt = `Eres un experto en comprobantes de pago colombianos. Analiza esta imagen y extrae los datos.
 
 REGLA IMPORTANTE: Si ves el logo "Bre-B" en la imagen, el banco es SIEMPRE "breb", NUNCA "avvillas". Bre-B NO es AV Villas.
 
@@ -88,33 +86,84 @@ FECHA: devuelve siempre en formato DD/MM/AAAA
 Responde SOLO en JSON puro sin backticks ni texto adicional:
 {"banco":"nequi/bancolombia/daviplata/avvillas/transfiya/nu/breb/otro","monto":"99800","referencia":"ABC123","fecha":"07/08/2026","parece_falso":false}
 
-parece_falso = true si la imagen está borrosa, editada, cortada o los datos no son coherentes.`,
+parece_falso = true si la imagen está borrosa, editada, cortada o los datos no son coherentes.`;
 
-              }
-            ]
-          }]
-        })
+    if (deepseekKey) {
+      const response = await fetch('https://api.deepseek.com/v1/chat/completions', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${deepseekKey}`,
+        },
+        body: JSON.stringify({
+          model: process.env.DEEPSEEK_MODEL || 'deepseek-chat',
+          max_tokens: 150,
+          temperature: 0.1,
+          messages: [
+            {
+              role: 'user',
+              content: [
+                { type: 'text', text: prompt },
+                {
+                  type: 'image_url',
+                  image_url: {
+                    url: `data:${mediaType};base64,${imageBase64}`,
+                  },
+                },
+              ],
+            },
+          ],
+        }),
+      });
+
+      const data = await response.json();
+      const texto = data.choices?.[0]?.message?.content || '';
+      console.log('[OCR] Respuesta DeepSeek:', texto);
+      const json = extraerJsonDesdeTexto(texto);
+      console.log('[OCR] DeepSeek leyó:', json);
+      return json;
+    }
+
+    if (claudeKey) {
+      const response = await fetch('https://api.anthropic.com/v1/messages', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-api-key': claudeKey,
+          'anthropic-version': '2023-06-01',
+        },
+        body: JSON.stringify({
+          model: 'claude-sonnet-4-5',
+          max_tokens: 150,
+          messages: [{
+            role: 'user',
+            content: [
+              { type: 'image', source: { type: 'base64', media_type: mediaType, data: imageBase64 } },
+              { type: 'text', text: prompt },
+            ],
+          }],
+        }),
       });
 
       const data = await response.json();
       const texto = data.content?.[0]?.text || '';
       console.log('[OCR] Respuesta Claude:', texto);
-      const match = texto.match(/\{[\s\S]*\}/);
-      const json = JSON.parse(match[0]);
+      const json = extraerJsonDesdeTexto(texto);
       console.log('[OCR] Claude leyó:', json);
       return json;
-
-    } catch (err) {
-      console.error('[OCR] Error Claude:', err.message);
     }
+
+    throw new Error('No hay proveedor de OCR configurado');
+  } catch (err) {
+    const proveedor = process.env.DEEPSEEK_API_KEY ? 'DeepSeek' : 'Claude';
+    console.error(`[OCR] Error ${proveedor}:`, err.message);
   }
 
-// La API falló — verificar si algun modelo falla
-console.log('[OCR] Error: el servicio de lectura no está disponible');
-return {
-  error: true,
-  mensaje: '⚠️ Nuestro servicio está fallando en este momento. Volveremos lo más pronto posible.\n\n📞 Por favor contacta al administrador para verificar este pago manualmente.'
-};
+  console.log('[OCR] Error: el servicio de lectura no está disponible');
+  return {
+    error: true,
+    mensaje: '⚠️ Nuestro servicio está fallando en este momento. Volveremos lo más pronto posible.\n\n📞 Por favor contacta al administrador para verificar este pago manualmente.'
+  };
 }
 
 module.exports = { leerComprobante, extraerDatos };
