@@ -3,6 +3,7 @@ import FlashPagoLanding from './Flashpagolanding';
 import Login from './Login';
 import Dashboard from './Dashboard';
 import './App.css';
+import Terminos from './Terminos';
 
 function App() {
   const [vista, setVista] = useState(
@@ -16,7 +17,11 @@ function App() {
   };
 
   if (vista === 'landing') {
-    return <FlashPagoLanding onLogin={() => setVista('login')} />;
+  return <FlashPagoLanding onLogin={() => setVista('login')} onTerminos={() => setVista('terminos')} />;
+  
+  }
+  if (vista === 'terminos') {
+  return <Terminos onVolver={() => setVista('landing')} />;
   }
 
   if (vista === 'login') {

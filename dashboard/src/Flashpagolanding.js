@@ -43,43 +43,48 @@ function Nav({ onLogin }) {
 
   return (
     <nav style={{
-      position: "fixed", top: 0, width: "100%", zIndex: 100,
-      background: scrolled ? "rgba(26,26,46,0.97)" : "rgba(26,26,46,0.92)",
-      backdropFilter: "blur(12px)", padding: "1rem 2rem",
-      display: "flex", justifyContent: "space-between", alignItems: "center",
-      transition: "background 0.3s", boxSizing: "border-box",
-    }}>
-      <a href="#" style={{ fontFamily: "'Space Grotesk',sans-serif", fontWeight: 700, fontSize: "1.5rem", color: COLORS.naranja, textDecoration: "none", display: "flex", alignItems: "center", gap: 8 }}>
-        <Zap size={24} fill={COLORS.naranja} />
-        Flash<span style={{ color: COLORS.blanco }}>Pago</span>
-      </a>
+  position: "fixed", top: 0, width: "100%", zIndex: 100,
+  background: scrolled ? "rgba(26,26,46,0.97)" : "rgba(26,26,46,0.92)",
+  backdropFilter: "blur(12px)", padding: "1rem 2rem",
+  display: "flex", justifyContent: "space-between", alignItems: "center",
+  transition: "background 0.3s", boxSizing: "border-box",
+}}>
+  {/* Izquierda: hamburguesa + logo */}
+  <div style={{ display: "flex", alignItems: "center", gap: "0.75rem" }}>
+    <button className="menu-toggle-btn" onClick={() => setMenuOpen(!menuOpen)}
+      style={{ display: "none", background: "none", border: "none", cursor: "pointer", flexDirection: "column", gap: 5 }}>
+      <span style={{ width: 22, height: 2.5, background: COLORS.blanco, borderRadius: 2, display: "block" }} />
+      <span style={{ width: 22, height: 2.5, background: COLORS.blanco, borderRadius: 2, display: "block" }} />
+      <span style={{ width: 22, height: 2.5, background: COLORS.blanco, borderRadius: 2, display: "block" }} />
+    </button>
+    <a href="#" style={{ fontFamily: "'Space Grotesk',sans-serif", fontWeight: 700, fontSize: "1.5rem", color: COLORS.naranja, textDecoration: "none", display: "flex", alignItems: "center", gap: 2 }}>
+      <Zap size={24} fill={COLORS.naranja} />
+      Flash<span style={{ color: COLORS.blanco }}>Pago</span>
+    </a>
+  </div>
 
-      <ul className="nav-links-list" style={{
-        gap: "1.5rem", listStyle: "none", alignItems: "center", margin: 0, padding: 0,
-        ...(menuOpen ? { display: "flex", flexDirection: "column", position: "absolute", top: "100%", left: 0, right: 0, background: "rgba(26,26,46,0.98)", padding: "1.5rem 2rem", zIndex: 200 } : {}),
-      }}>
-        {[["#como-funciona", "Cómo funciona"], ["#beneficios", "Beneficios"], ["#planes", "Planes"]].map(([href, label]) => (
-          <li key={href}>
-            <a href={href} onClick={() => setMenuOpen(false)} style={{ color: "#b0b0c8", textDecoration: "none", fontSize: "0.9rem", fontWeight: 500 }}>{label}</a>
-          </li>
-        ))}
-      </ul>
+  {/* Centro: links */}
+  <ul className="nav-links-list" style={{
+    gap: "1.5rem", listStyle: "none", alignItems: "center", margin: 0, padding: 0,
+    ...(menuOpen ? { display: "flex", flexDirection: "column", position: "absolute", top: "100%", left: 0, right: 0, background: "rgba(26,26,46,0.98)", padding: "1.5rem 2rem", zIndex: 200 } : {}),
+  }}>
+    {[["#como-funciona", "Cómo funciona"], ["#beneficios", "Beneficios"], ["#planes", "Planes"]].map(([href, label]) => (
+      <li key={href}>
+        <a href={href} onClick={() => setMenuOpen(false)} style={{ color: "#b0b0c8", textDecoration: "none", fontSize: "0.9rem", fontWeight: 500 }}>{label}</a>
+      </li>
+    ))}
+  </ul>
 
-      <div style={{ display: "flex", gap: "0.5rem", alignItems: "center" }}>
-        <button onClick={onLogin} style={{ background: "transparent", border: "2px solid rgba(255,255,255,0.2)", color: COLORS.blanco, padding: "0.45rem 1.1rem", borderRadius: 8, cursor: "pointer", fontWeight: 600, fontSize: "0.85rem", display: "flex", alignItems: "center", gap: 6 }}>
-          <Lock size={15} /> Iniciar sesión
-        </button>
-        <a href="#contacto" style={{ background: COLORS.naranja, color: "white", padding: "0.5rem 1.1rem", borderRadius: 8, textDecoration: "none", fontWeight: 600, fontSize: "0.85rem" }}>
-          Contactar
-        </a>
-        <button className="menu-toggle-btn" onClick={() => setMenuOpen(!menuOpen)}
-          style={{ display: "none", background: "none", border: "none", cursor: "pointer", flexDirection: "column", gap: 5, marginLeft: 8 }}>
-          <span style={{ width: 25, height: 3, background: COLORS.blanco, borderRadius: 2, display: "block" }} />
-          <span style={{ width: 25, height: 3, background: COLORS.blanco, borderRadius: 2, display: "block" }} />
-          <span style={{ width: 25, height: 3, background: COLORS.blanco, borderRadius: 2, display: "block" }} />
-        </button>
-      </div>
-    </nav>
+  {/* Derecha: botones */}
+  <div style={{ display: "flex", gap: "0.5rem", alignItems: "center" }}>
+    <button onClick={onLogin} style={{ background: "transparent", border: "2px solid rgba(255,255,255,0.2)", color: COLORS.blanco, padding: "0.45rem 1.1rem", borderRadius: 8, cursor: "pointer", fontWeight: 600, fontSize: "0.85rem", display: "flex", alignItems: "center", gap: 6 }}>
+      <Lock size={15} /> Iniciar sesión
+    </button>
+    <a href="#contacto" style={{ background: COLORS.naranja, color: "white", padding: "0.5rem 1.1rem", borderRadius: 8, textDecoration: "none", fontWeight: 600, fontSize: "0.85rem" }}>
+      Contactar
+    </a>
+  </div>
+ </nav>
   );
 }
 
@@ -117,7 +122,7 @@ function PhoneMockup() {
         </div>
       </div>
 
-      <div style={{ minHeight: 220 }}>
+      <div style={{ minHeight: 280 }}>
         <div style={{ ...bubbleBase, background: "#005c4b", color: "white", marginLeft: "auto", borderBottomRightRadius: 4, display: "flex", alignItems: "center", gap: 6, ...(step >= 1 ? visible : hidden) }}>
           <Camera size={16} /> [Comprobante de pago]
         </div>
@@ -209,7 +214,7 @@ function HubDiagram() {
 }
 
 // ─── MAIN ────────────────────────────────
-export default function FlashPagoLanding({ onLogin }) {
+export default function FlashPagoLanding({ onLogin, onTerminos }) {
   const handleLogin = () => {
     if (onLogin) onLogin();
   };
@@ -480,7 +485,12 @@ export default function FlashPagoLanding({ onLogin }) {
           Flash<span style={{ color: COLORS.blanco }}>Pago</span>
         </div>
         <p style={{ color: "#6868a0", fontSize: "0.85rem", margin: "0 0 0.75rem 0" }}>Verificación de pagos con inteligencia artificial — Hecho en Colombia 🇨🇴</p>
-        <p style={{ color: "#6868a0", fontSize: "0.75rem", margin: 0 }}>© 2026 FlashPago. Todos los derechos reservados.</p>
+        <p style={{ color: "#6868a0", fontSize: "0.75rem", marginTop: "0.75rem" }}>
+         © 2026 FlashPago. Todos los derechos reservados. | {' '}
+         <a href="#" onClick={(e) => { e.preventDefault(); onTerminos(); }} style={{ color: "#8888a8", textDecoration: "underline", cursor: "pointer" }}>
+         Términos y Condiciones
+         </a>
+        </p>
       </footer>
     </div>
   );
