@@ -308,8 +308,10 @@ function Dashboard({ onLogout }) {
     if (b.includes('nequi')) return { clase: 'badge-nequi', nombre: 'Nequi' };
     if (b.includes('bancolombia')) return { clase: 'badge-bancolombia', nombre: 'Bancolombia' };
     if (b.includes('daviplata') || b.includes('davi')) return { clase: 'badge-daviplata', nombre: 'Daviplata' };
-    if (b.includes('avvillas') || b.includes('av villas') || b.includes('bre')) return { clase: 'badge-avvillas', nombre: 'AV Villas' };
+    if (b.includes('breb') || b.includes('bre-b')) return { clase: 'badge-breb', nombre: 'Bre-B' };
+    if (b.includes('avvillas') || b.includes('av villas')) return { clase: 'badge-avvillas', nombre: 'AV Villas' };
     if (b.includes('transfiya')) return { clase: 'badge-transfiya', nombre: 'Transfiya' };
+    if (b.includes('nu')) return { clase: 'badge-nu', nombre: 'Nu' };
     return { clase: 'badge-otro', nombre: banco || 'Otro' };
   };
 

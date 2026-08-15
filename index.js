@@ -532,7 +532,7 @@ if (datos.referencia) {
       fecha: new Date().toLocaleDateString('es-CO'),
       hora: new Date().toLocaleTimeString('es-CO'),
       estado: 'REAL',
-      fuente: pagoSMS ? 'sms' : (pagoGmail ? 'gmail' : 'otro'),
+      fuente: pagoGmail ? 'gmail' : 'otro',
       nombre_cliente: pagoGmail?.nombre || null,
       verificado_por: from,
       negocio_id: 1,
