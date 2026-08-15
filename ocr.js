@@ -106,7 +106,7 @@ async function leerComprobante(urlImagen, base64Data) {
         'anthropic-version': '2023-06-01',
       },
       body: JSON.stringify({
-        model: 'claude-sonnet-5',
+        model: 'claude-sonnet-4',
         max_tokens: 300,
         messages: [{
           role: 'user',
