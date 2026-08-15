@@ -1,67 +1,19 @@
-// ocr.js — Extrae datos del comprobante usando Claude API
-// Acepta base64 directamente desde OpenWA
-
+// ocr.js — Lectura de comprobantes con Claude AI
 const fetch = require('node-fetch');
 
-const PATRONES = {
-  monto:      [/\$\s?([\d.,]+)/, /valor[\s:]+([,\d.]+)/i, /monto[\s:]+([,\d.]+)/i, /total[\s:]+([,\d.]+)/i],
-  referencia: [/ref(?:erencia)?[\s:#]+([A-Z0-9]{6,20})/i, /transacci[oó]n[\s:#]+([A-Z0-9]{6,20})/i, /n[uú]mero[\s:#]+([A-Z0-9]{6,20})/i],
-  banco:      [/(nequi)/i, /(bancolombia)/i, /(daviplata)/i, /(davivienda)/i, /(bbva)/i],
-  fecha:      [/(\d{1,2}[\/\-]\d{1,2}[\/\-]\d{2,4})/, /(\d{4}[\/\-]\d{2}[\/\-]\d{2})/],
-};
+// ─── Prompt único ────────────────────────────
+const PROMPT_OCR = `Eres un experto en comprobantes de pago colombianos. Analiza esta imagen y extrae los datos.
 
-function extraerDatos(texto) {
-  const resultado = { monto: null, referencia: null, banco: null, fecha: null };
-  for (const p of PATRONES.monto)      { const m = texto.match(p); if (m) { resultado.monto = m[1].replace(/\./g, '').replace(',', '.'); break; } }
-  for (const p of PATRONES.referencia) { const m = texto.match(p); if (m) { resultado.referencia = m[1]; break; } }
-  for (const p of PATRONES.banco)      { const m = texto.match(p); if (m) { resultado.banco = m[1].toLowerCase(); break; } }
-  for (const p of PATRONES.fecha)      { const m = texto.match(p); if (m) { resultado.fecha = m[1]; break; } }
-  return resultado;
-}
+REGLA CRÍTICA: Si ves el logo "Bre-B" en cualquier parte de la imagen, el banco es SIEMPRE "breb". Bre-B NO es AV Villas. NUNCA pongas "avvillas" si ves "Bre-B".
 
-function extraerJsonDesdeTexto(texto) {
-  const match = texto.match(/\{[\s\S]*\}/);
-  if (!match) throw new Error('No se encontró JSON en la respuesta del modelo');
-  return JSON.parse(match[0]);
-}
-
-async function leerComprobante(urlImagen, base64Data) {
-  const deepseekKey = process.env.DEEPSEEK_API_KEY;
-  const claudeKey = process.env.CLAUDE_API_KEY;
-
-  if (!deepseekKey && !claudeKey) {
-    console.log('[OCR] Error: el servicio de lectura no está disponible');
-    return {
-      error: true,
-      mensaje: '⚠️ Nuestro servicio está fallando en este momento. Volveremos lo más pronto posible.\n\n📞 Por favor contacta al administrador para verificar este pago manualmente.'
-    };
-  }
-
-  try {
-    let imageBase64 = '';
-    let mediaType = 'image/jpeg';
-
-    if (base64Data) {
-      imageBase64 = base64Data;
-      console.log('[OCR] Usando base64 del webhook');
-    } else if (urlImagen) {
-      const imgResponse = await fetch(urlImagen);
-      const buffer = await imgResponse.buffer();
-      imageBase64 = buffer.toString('base64');
-      mediaType = imgResponse.headers.get('content-type') || 'image/jpeg';
-      console.log('[OCR] Imagen descargada desde URL');
-    } else {
-      throw new Error('Sin imagen disponible');
-    }
-
-    const prompt = `Eres un experto en comprobantes de pago colombianos. Analiza esta imagen y extrae los datos.
-
-IDENTIFICACIÓN DEL BANCO - revisa en este ORDEN de prioridad:
-1. BRE-B: logo "Bre-B" en la parte superior, fondo oscuro gris/negro, dice "¡Pago exitoso!", "Código de negocio", "Punto de venta", check verde circular. Es una plataforma de pagos multi-banco. Si ves "Bre-B" → banco = "breb"
-2. NEQUI: QR con letra "N" en el centro, dice "Pago realizado", campo "¿Cuánto?", "Llave", referencia empieza con "M"
-3. BANCOLOMBIA: dice "¡Transferencia exitosa!", "Comprobante No.", secciones con fondo oscuro negro
-4. TRANSFIYA: icono de celular con check azul, dice "¡Envío exitoso!", "Cuenta origen", "ID Transacción", referencia empieza con "APIU"
-5. NU: logo "nu" morado, dice "Comprobante de transferencia", entidad "Nu C.F.", NIT 901.658.107-2
+IDENTIFICACIÓN DEL BANCO - revisa en este ORDEN ESTRICTO:
+1. BRE-B: logo "Bre-B" arriba con franjas de colores (naranja, azul, amarillo), fondo oscuro gris/negro, dice "¡Pago exitoso!", "Código de negocio", "Punto de venta", check verde circular, "Valor del pago", "Costo del pago". Si ves CUALQUIERA de estas señales → banco = "breb"
+2. NEQUI: QR con letra "N" en el centro, dice "Pago realizado", campo "¿Cuánto?", "Llave", referencia empieza con "M", fondo con ilustraciones grises de ciudad
+3. BANCOLOMBIA: dice "¡Transferencia exitosa!", "Comprobante No.", secciones con fondo oscuro negro, "Datos de la transferencia", "Producto destino"
+4. DAVIPLATA: logo "DAVI bank" rojo, dice "Pagaste", sello circular "TRANSACCIÓN EXITOSA", "Número de transacción" largo hexadecimal
+5. AVVILLAS: SOLO si dice TEXTUALMENTE "AVVillas" o "AV Villas" en la pantalla, tema rojo, "Tu pago se realizó con éxito", icono pulgar azul. Si no dice "AVVillas" explícitamente, NO es avvillas.
+6. TRANSFIYA: icono de celular con check azul, dice "¡Envío exitoso!", "Cuenta origen", "ID Transacción", referencia empieza con "APIU"
+7. NU: logo "nu" morado, dice "Comprobante de transferencia", entidad "Nu C.F.", NIT 901.658.107-2
 
 EXTRACCIÓN DEL MONTO - MUY IMPORTANTE:
 - En Colombia el PUNTO separa miles (25.900 = veinticinco mil novecientos)
@@ -74,9 +26,10 @@ EXTRACCIÓN DE REFERENCIA:
 - Nequi: campo "Referencia" (empieza con M)
 - Bancolombia: "Comprobante No."
 - Daviplata: "Número de transacción" (código hexadecimal largo)
+- AV Villas: "No. de autorización"
 - Transfiya: "Número de transacción" (empieza con APIU)
-- Nu: "Número de comprobante" (número largo) o "Referencia interna"
-- Bre-B: "Comprobante No." (código alfanumérico)
+- Nu: "Número de comprobante" o "Referencia interna"
+- Bre-B: "Comprobante No." (código alfanumérico como TR2LG7Wt8LEC)
 
 FECHA: devuelve siempre en formato DD/MM/AAAA
 
@@ -85,82 +38,113 @@ Responde SOLO en JSON puro sin backticks ni texto adicional:
 
 parece_falso = true si la imagen está borrosa, editada, cortada o los datos no son coherentes.`;
 
-    if (deepseekKey) {
-      const response = await fetch('https://api.deepseek.com/v1/chat/completions', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${deepseekKey}`,
-        },
-        body: JSON.stringify({
-          model: process.env.DEEPSEEK_MODEL || 'deepseek-v4-flash',
-          max_tokens: 150,
-          temperature: 0.1,
-          messages: [
-            {
-              role: 'user',
-              content: [
-                { type: 'text', text: prompt },
-                {
-                  type: 'image_url',
-                  image_url: {
-                    url: `data:${mediaType};base64,${imageBase64}`,
-                  },
-                },
-              ],
-            },
-          ],
-        }),
-      });
+// ─── Extraer JSON desde texto ────────────────
+function extraerJsonDesdeTexto(texto) {
+  console.log('[OCR] Extrayendo JSON de:', texto.substring(0, 200));
 
-      const data = await response.json();
-      const texto = data.choices?.[0]?.message?.content || '';
-      console.log('[OCR] Respuesta DeepSeek:', texto);
-      const json = extraerJsonDesdeTexto(texto);
-      console.log('[OCR] DeepSeek leyó:', json);
-      return json;
-    }
-
-    if (claudeKey) {
-      const response = await fetch('https://api.anthropic.com/v1/messages', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'x-api-key': claudeKey,
-          'anthropic-version': '2023-06-01',
-        },
-        body: JSON.stringify({
-          model: 'claude-sonnet-4-5',
-          max_tokens: 150,
-          messages: [{
-            role: 'user',
-            content: [
-              { type: 'image', source: { type: 'base64', media_type: mediaType, data: imageBase64 } },
-              { type: 'text', text: prompt },
-            ],
-          }],
-        }),
-      });
-
-      const data = await response.json();
-      const texto = data.content?.[0]?.text || '';
-      console.log('[OCR] Respuesta Claude:', texto);
-      const json = extraerJsonDesdeTexto(texto);
-      console.log('[OCR] Claude leyó:', json);
-      return json;
-    }
-
-    throw new Error('No hay proveedor de OCR configurado');
-  } catch (err) {
-    const proveedor = process.env.DEEPSEEK_API_KEY ? 'DeepSeek' : 'Claude';
-    console.error(`[OCR] Error ${proveedor}:`, err.message);
+  let match = texto.match(/\{[\s\S]*\}/);
+  if (match) {
+    try { return JSON.parse(match[0]); }
+    catch (e) { console.error('[OCR] Error parseando JSON:', e.message); }
   }
 
-  console.log('[OCR] Error: el servicio de lectura no está disponible');
+  match = texto.match(/```json\s*([\s\S]*?)\s*```/);
+  if (match) {
+    try { return JSON.parse(match[1]); }
+    catch (e) { console.error('[OCR] Error parseando JSON backticks:', e.message); }
+  }
+
+  const jsonMatch = texto.match(/\{[^{]*"banco"[^}]*\}/);
+  if (jsonMatch) {
+    try { return JSON.parse(jsonMatch[0]); }
+    catch (e) { console.error('[OCR] Error parseando JSON parcial:', e.message); }
+  }
+
+  throw new Error('No se encontró JSON en la respuesta del modelo');
+}
+
+// ─── Obtener imagen en base64 ────────────────
+async function obtenerImagen(urlImagen, base64Data) {
+  if (base64Data) {
+    console.log('[OCR] Usando base64 del webhook, longitud:', base64Data.length);
+    return { imageBase64: base64Data, mediaType: 'image/jpeg' };
+  }
+
+  if (urlImagen) {
+    console.log('[OCR] Descargando imagen desde URL:', urlImagen);
+    const imgResponse = await fetch(urlImagen);
+    const buffer = await imgResponse.buffer();
+    const mediaType = imgResponse.headers.get('content-type') || 'image/jpeg';
+    console.log('[OCR] Imagen descargada, tamaño:', buffer.length);
+    return { imageBase64: buffer.toString('base64'), mediaType };
+  }
+
+  throw new Error('Sin imagen disponible');
+}
+
+// ─── Función principal ───────────────────────
+async function leerComprobante(urlImagen, base64Data) {
+  const claudeKey = process.env.CLAUDE_API_KEY;
+
+  if (!claudeKey) {
+    return {
+      error: true,
+      mensaje: '⚠️ Servicio de lectura no disponible. Contacta al administrador.',
+    };
+  }
+
+  try {
+    const { imageBase64, mediaType } = await obtenerImagen(urlImagen, base64Data);
+
+    console.log('[OCR] Enviando a Claude...');
+
+    const response = await fetch('https://api.anthropic.com/v1/messages', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'x-api-key': claudeKey,
+        'anthropic-version': '2023-06-01',
+      },
+      body: JSON.stringify({
+        model: 'claude-sonnet-4-20250514',
+        max_tokens: 300,
+        messages: [{
+          role: 'user',
+          content: [
+            { type: 'image', source: { type: 'base64', media_type: mediaType, data: imageBase64 } },
+            { type: 'text', text: PROMPT_OCR },
+          ],
+        }],
+      }),
+    });
+
+    const data = await response.json();
+
+    if (data.error) {
+      if (data.error.message?.includes('credit') || data.error.type === 'insufficient_quota') {
+        return {
+          error: true,
+          mensaje: '⚠️ Se agotaron los créditos del servicio de lectura. Contacta al administrador para recargar.',
+        };
+      }
+      throw new Error(`Claude error: ${data.error.message}`);
+    }
+
+    const texto = data.content?.[0]?.text || '';
+    console.log('[OCR] Claude respuesta:', texto.substring(0, 300));
+
+    const resultado = extraerJsonDesdeTexto(texto);
+    console.log('[OCR] ✅ Resultado:', JSON.stringify(resultado));
+    return resultado;
+
+  } catch (err) {
+    console.error('[OCR] Error:', err.message);
+  }
+
   return {
     error: true,
-    mensaje: '⚠️ Nuestro servicio está fallando en este momento. Volveremos lo más pronto posible.\n\n📞 Por favor contacta al administrador para verificar este pago manualmente.'
+    mensaje: '⚠️ No pudimos leer el comprobante. Intenta con una foto más clara.',
   };
 }
 
-module.exports = { leerComprobante, extraerDatos };
+module.exports = { leerComprobante };
