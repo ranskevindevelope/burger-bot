@@ -187,27 +187,25 @@ async function verificacionNocturna(revision) {
     const pago = pagosPendientes[i];
     try {
       const resultado = await verificarPorGmail(pago.monto, { intentos: 1, esperaMs: 0 });
+      
 
       if (resultado) {
-        await guardarPago({
-          monto: pago.monto,
-          referencia: pago.referencia,
-          banco: pago.banco,
-          fecha: pago.fecha,
-          hora: pago.hora,
-          estado: 'REAL',
-          fuente: 'gmail_nocturna',
-          nombre_cliente: resultado.nombre || null,
-          verificado_por: pago.empleado,
-          negocio_id: 1,
-          foto: pago.foto,
-        });
+  // Actualiza de NO_ENCONTRADO a REAL en la BD
+  const { db: database } = require('./db.js');
+  database.run(
+    `UPDATE pagos SET estado = 'REAL', fuente = 'gmail_asincronica', nombre_cliente = ? WHERE referencia = ? AND estado = 'NO_ENCONTRADO'`,
+    [resultado.nombre || null, pago.referencia],
+    function(err) {
+      if (err) console.error('[Asincronica] Error actualizando:', err.message);
+      else console.log('[Asincronica] ✅ Pago actualizado a REAL:', pago.referencia);
+    }
+  );
 
-        verificados.push({
-          monto: pago.monto,
-          nombre: resultado.nombre || 'Sin nombre',
-          referencia: pago.referencia || 'Sin ref',
-        });
+  verificados.push({
+    monto: pago.monto,
+    nombre: resultado.nombre || 'Sin nombre',
+    referencia: pago.referencia || 'Sin ref',
+  });
 
         pagosPendientes.splice(i, 1);
         console.log(`[asincronica] ✅ Pago de $${pago.monto} verificado`);
@@ -524,6 +522,46 @@ if (datos.referencia) {
         }
       }
 
+      if (verificacion.estado === 'REAL') {
+  try {
+    const nombreFoto = mediaBase64 ? guardarFoto(mediaBase64, datos.referencia) : null;
+    await guardarPago({
+      monto: montoNum,
+      referencia: datos.referencia || null,
+      banco: datos.banco || null,
+      fecha: new Date().toLocaleDateString('es-CO'),
+      hora: new Date().toLocaleTimeString('es-CO'),
+      estado: 'REAL',
+      fuente: pagoSMS ? 'sms' : (pagoGmail ? 'gmail' : 'otro'),
+      nombre_cliente: pagoGmail?.nombre || null,
+      verificado_por: from,
+      negocio_id: 1,
+      foto: nombreFoto,
+    });
+  } catch (err) {
+    console.error('[DB] Error guardando pago:', err.message);
+  }
+} else if (verificacion.estado === 'NO_ENCONTRADO') {
+  try {
+    const nombreFoto = mediaBase64 ? guardarFoto(mediaBase64, datos.referencia) : null;
+    await guardarPago({
+      monto: montoNum,
+      referencia: datos.referencia || null,
+      banco: datos.banco || null,
+      fecha: new Date().toLocaleDateString('es-CO'),
+      hora: new Date().toLocaleTimeString('es-CO'),
+      estado: 'NO_ENCONTRADO',
+      fuente: 'pendiente',
+      nombre_cliente: null,
+      verificado_por: from,
+      negocio_id: 1,
+      foto: nombreFoto,
+    });
+    console.log('[DB] Pago pendiente guardado en base de datos');
+  } catch (err) {
+    console.error('[DB] Error guardando pendiente:', err.message);
+  }
+}
     } catch (err) {
       console.error('[Bot] Error procesando imagen:', err);
       await enviarMensaje(from, '⚠️ Error interno. Intenta de nuevo o llama al dueño.');
