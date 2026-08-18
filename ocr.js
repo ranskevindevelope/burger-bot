@@ -7,34 +7,36 @@ const PROMPT_OCR = `Eres un experto en comprobantes de pago colombianos. Analiza
 REGLA CRÍTICA: Si ves el logo "Bre-B" en cualquier parte de la imagen, el banco es SIEMPRE "breb". Bre-B NO es AV Villas. NUNCA pongas "avvillas" si ves "Bre-B".
 
 IDENTIFICACIÓN DEL BANCO - revisa en este ORDEN ESTRICTO:
-1. BRE-B: logo "Bre-B" arriba con franjas de colores (naranja, azul, amarillo), fondo oscuro gris/negro, dice "¡Pago exitoso!", "Código de negocio", "Punto de venta", check verde circular, "Valor del pago", "Costo del pago". Si ves CUALQUIERA de estas señales → banco = "breb"
+1. BRE-B: logo "Bre-B" en cualquier parte (con o sin logo de otro banco al lado como "Banco Cooperativo Coop Central"). Puede tener fondo oscuro O fondo blanco. Señales: "¡Pago exitoso!" o "Transferencia exitosa", "Código de negocio" o "Nro. de confirmación", "Punto de venta" o "Enviado a", "Valor del pago" o "Valor enviado", "Llave destino", check verde. Si ves "Bre-B" → banco = "breb"
 2. NEQUI: QR con letra "N" en el centro, dice "Pago realizado", campo "¿Cuánto?", "Llave", referencia empieza con "M", fondo con ilustraciones grises de ciudad
 3. BANCOLOMBIA: dice "¡Transferencia exitosa!", "Comprobante No.", secciones con fondo oscuro negro, "Datos de la transferencia", "Producto destino"
-4. DAVIPLATA: logo "DAVI bank" rojo, dice "Pagaste", sello circular "TRANSACCIÓN EXITOSA", "Número de transacción" largo hexadecimal
-5. AVVILLAS: SOLO si dice TEXTUALMENTE "AVVillas" o "AV Villas" en la pantalla, tema rojo, "Tu pago se realizó con éxito", icono pulgar azul. Si no dice "AVVillas" explícitamente, NO es avvillas.
-6. TRANSFIYA: icono de celular con check azul, dice "¡Envío exitoso!", "Cuenta origen", "ID Transacción", referencia empieza con "APIU"
-7. NU: logo "nu" morado, dice "Comprobante de transferencia", entidad "Nu C.F.", NIT 901.658.107-2
+4. DAVIVIENDA: logo "DAVIVIENDA" rojo/naranja, fondo rojo arriba, dice "Transacción exitosa", "Número de comprobante", "Llave Bancolombia", "Costo de la transacción". Si ves "DAVIVIENDA" → banco = "davivienda"
+5. DAVIPLATA: logo "DAVI bank" rojo, dice "Pagaste", sello circular "TRANSACCIÓN EXITOSA", "Número de transacción" largo hexadecimal
+6. AVVILLAS: SOLO si dice TEXTUALMENTE "AVVillas" o "AV Villas" en la pantalla, tema rojo, "Tu pago se realizó con éxito", icono pulgar azul. Si no dice "AVVillas" explícitamente, NO es avvillas.
+7. TRANSFIYA: icono de celular con check azul, dice "¡Envío exitoso!", "Cuenta origen", "ID Transacción", referencia empieza con "APIU"
+8. NU: logo "nu" morado, dice "Comprobante de transferencia", entidad "Nu C.F.", NIT 901.658.107-2
 
 EXTRACCIÓN DEL MONTO - MUY IMPORTANTE:
 - En Colombia el PUNTO separa miles (25.900 = veinticinco mil novecientos)
 - Si hay "Monto total" Y "Monto" por separado, USA SOLO el campo "Monto" SIN impuesto (el "Monto total" incluye impuesto 4x1000 y NO es lo que llega a la cuenta)
 - Ignora centavos (.00 o ,00 o ,20)
-- Busca en campos: "Valor", "Valor del pago", "¿Cuánto?", "Pagaste", "Valor de la transferencia", "Monto"
+- Busca en campos: "Valor", "Valor del pago", "Valor enviado", "¿Cuánto?", "Pagaste", "Valor de la transferencia", "Monto"
 - Devuelve SOLO el número entero sin puntos ni comas (ejemplo: 99800 no 99.800,00)
 
 EXTRACCIÓN DE REFERENCIA:
 - Nequi: campo "Referencia" (empieza con M)
 - Bancolombia: "Comprobante No."
+- Davivienda: "Número de comprobante" (número corto como 90653910)
 - Daviplata: "Número de transacción" (código hexadecimal largo)
 - AV Villas: "No. de autorización"
 - Transfiya: "Número de transacción" (empieza con APIU)
 - Nu: "Número de comprobante" o "Referencia interna"
-- Bre-B: "Comprobante No." (código alfanumérico como TR2LG7Wt8LEC)
+- Bre-B: "Comprobante No." o "Nro. de confirmación" (código alfanumérico o numérico largo)
 
 FECHA: devuelve siempre en formato DD/MM/AAAA
 
 Responde SOLO en JSON puro sin backticks ni texto adicional:
-{"banco":"nequi/bancolombia/daviplata/avvillas/transfiya/nu/breb/otro","monto":"99800","referencia":"ABC123","fecha":"07/08/2026","parece_falso":false}
+{"banco":"nequi/bancolombia/davivienda/daviplata/avvillas/transfiya/nu/breb/otro","monto":"99800","referencia":"ABC123","fecha":"07/08/2026","parece_falso":false}
 
 parece_falso = true si la imagen está borrosa, editada, cortada o los datos no son coherentes.`;
 

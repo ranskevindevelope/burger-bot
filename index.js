@@ -1052,6 +1052,21 @@ app.get('/api/dashboard/pagos', verificarToken, async (req, res) => {
   }
 });
 
+app.put('/api/pagos/:id/estado', verificarToken, soloAdmin, (req, res) => {
+  const { estado } = req.body;
+  if (!['REAL', 'NO_ENCONTRADO', 'DUPLICADO', 'FALSO'].includes(estado)) {
+    return res.status(400).json({ ok: false, error: 'Estado no válido' });
+  }
+  const { db } = require('./db.js');
+  db.run('UPDATE pagos SET estado = ?, fuente = ? WHERE id = ?', 
+    [estado, 'manual_admin', req.params.id], 
+    function(err) {
+      if (err) return res.status(500).json({ ok: false, error: err.message });
+      res.json({ ok: true, mensaje: 'Estado actualizado' });
+    }
+  );
+});
+
 app.get('/api/dashboard/stats', verificarToken, async (req, res) => {
   try {
     const { db } = require('./db.js');
