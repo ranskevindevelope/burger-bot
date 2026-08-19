@@ -6,22 +6,25 @@ import './App.css';
 import Terminos from './Terminos';
 
 function App() {
+  const esPanel = window.location.pathname.startsWith('/panel');
   const [vista, setVista] = useState(
-    localStorage.getItem('fp_token') ? 'dashboard' : 'landing'
+    esPanel
+      ? (localStorage.getItem('fp_token') ? 'dashboard' : 'login')
+      : 'landing'
   );
 
   const handleLogout = () => {
     localStorage.removeItem('fp_token');
     localStorage.removeItem('fp_user');
-    setVista('landing');
+    setVista('login');
   };
 
   if (vista === 'landing') {
-  return <FlashPagoLanding onLogin={() => setVista('login')} onTerminos={() => setVista('terminos')} />;
-  
+    return <FlashPagoLanding onLogin={() => setVista('login')} onTerminos={() => setVista('terminos')} />;
   }
+
   if (vista === 'terminos') {
-  return <Terminos onVolver={() => setVista('landing')} />;
+    return <Terminos onVolver={() => setVista('landing')} />;
   }
 
   if (vista === 'login') {
@@ -30,5 +33,6 @@ function App() {
 
   return <Dashboard onLogout={handleLogout} />;
 }
+
 
 export default App;

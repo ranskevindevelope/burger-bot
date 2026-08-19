@@ -77,8 +77,8 @@ function Nav({ onLogin }) {
 
   {/* Derecha: botones */}
   <div style={{ display: "flex", gap: "0.5rem", alignItems: "center" }}>
-    <button onClick={onLogin} style={{ background: "transparent", border: "2px solid rgba(255,255,255,0.2)", color: COLORS.blanco, padding: "0.45rem 1.1rem", borderRadius: 8, cursor: "pointer", fontWeight: 600, fontSize: "0.85rem", display: "flex", alignItems: "center", gap: 6 }}>
-      <Lock size={15} /> Iniciar sesión
+    <button onClick={() => window.open('/panel', '_blank')} style={{ background: "transparent", border: "2px solid rgba(255,255,255,0.2)", color: COLORS.blanco, padding: "0.45rem 1.1rem", borderRadius: 8, cursor: "pointer", fontWeight: 600, fontSize: "0.85rem", display: "flex", alignItems: "center", gap: 6 }}>
+  <Lock size={15} /> Iniciar sesión
     </button>
     <a href="#contacto" style={{ background: COLORS.naranja, color: "white", padding: "0.5rem 1.1rem", borderRadius: 8, textDecoration: "none", fontWeight: 600, fontSize: "0.85rem" }}>
       Contactar
@@ -471,8 +471,9 @@ export default function FlashPagoLanding({ onLogin, onTerminos }) {
             <a href="https://wa.me/57XXXXXXXXXX?text=Hola%2C%20quiero%20conocer%20más%20sobre%20FlashPago" target="_blank" rel="noopener noreferrer" style={{ background: COLORS.naranja, color: "white", padding: "1rem 2rem", borderRadius: 12, textDecoration: "none", fontWeight: 600, fontSize: "1.05rem", display: "inline-flex", alignItems: "center", gap: 8 }}>
               <MessageCircle size={18} /> Escribir por WhatsApp
             </a>
-            <button onClick={handleLogin} style={{ background: "transparent", color: COLORS.blanco, padding: "1rem 2rem", borderRadius: 12, fontWeight: 600, fontSize: "1.05rem", border: "2px solid rgba(255,255,255,0.2)", cursor: "pointer", display: "inline-flex", alignItems: "center", gap: 8, fontFamily: "'Inter',sans-serif" }}>
-              <Lock size={17} /> Ir al Panel
+            <button onClick={() => window.open('/panel', '_blank')} style={{ background: "transparent", color: COLORS.blanco, padding: "1rem 2rem", borderRadius: 12, fontWeight: 600, fontSize: "1.05rem", border: "2px solid rgba(255,255,255,0.2)", cursor: "pointer", display: "inline-flex", alignItems: "center", gap: 8, fontFamily: "'Inter',sans-serif" }}>
+             <Lock size={17} /> Ir al Panel
+
             </button>
           </div>
         </div>

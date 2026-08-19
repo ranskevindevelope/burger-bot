@@ -5,6 +5,10 @@ comprobantes por WhatsApp mediante OpenWA, extrae sus datos con Claude,
 comprueba el pago mediante Gmail y registra el resultado en SQLite. Tambien
 incluye un dashboard web con login, reportes y administracion de usuarios.
 
+El codigo esta organizado en modulos separados por responsabilidad, de modo
+que `index.js` actua solo como punto de entrada del servidor y el resto de la
+logica vive en las carpetas `routes/` y `bot/`.
+
 ## Flujo principal
 
 1. Un empleado reenvia al bot la imagen del comprobante por WhatsApp.
@@ -41,12 +45,23 @@ Prometeo puede usar coincidencia por referencia o una diferencia maxima de
 
 ```text
 burger-bot-openwa/
-├── index.js              # Servidor Express, webhook, API y bot
+├── index.js              # Arranca el servidor, monta rutas y programa reportes
+├── config.js             # Variables de entorno centralizadas
+├── auth.js               # Middlewares de autenticacion: JWT, roles, login
 ├── db.js                 # Conexion SQLite, esquema y consultas
 ├── ocr.js                # Extraccion de datos con Claude o patrones locales
 ├── gmail.js              # Busqueda y confirmacion por Gmail API
 ├── verificador.js        # Verificacion Prometeo y modo demo
 ├── generar-token.js      # Autorizacion inicial de Gmail
+├── routes/
+│   ├── api.js            # Endpoints del dashboard (login, usuarios, reportes...)
+│   └── webhook.js        # Procesamiento de mensajes de WhatsApp
+├── bot/
+│   ├── comandos.js       # Comandos de texto del bot (hola, total, buscar...)
+│   ├── reportes.js       # Reporte diario y verificacion nocturna
+│   ├── state.js          # Estado en memoria (pendientes e historial)
+│   ├── openwa.js         # Envio de mensajes e imagenes por OpenWA
+│   └── utils.js          # Utilidades (formatear resultado, guardar foto)
 ├── package.json          # Dependencias del backend
 ├── vinsonbot.db          # Base SQLite local; no debe subirse al repositorio
 ├── comprobantes/         # Imagenes guardadas localmente
@@ -103,8 +118,6 @@ OPENWA_SESSION=tu_sesion
 
 # Seguridad del dashboard
 JWT_SECRET=un_secreto_largo_y_aleatorio
-DASHBOARD_USER=admin
-DASHBOARD_PASS=tu_contraseña_inicial
 
 # Seguridad de entradas de OpenWA
 INBOUND_WEBHOOK_SECRET=otro_secreto_largo_y_aleatorio
@@ -116,9 +129,11 @@ PROMETEO_API_KEY=tu_clave_de_prometeo
 MY_WHATSAPP=573000000000@c.us
 ```
 
-`JWT_SECRET` es obligatorio: el servidor no inicia sin el. Aunque
-`DASHBOARD_USER` y `DASHBOARD_PASS` existen en la configuracion local, el
-login actual valida los usuarios almacenados en la tabla `usuarios`.
+`JWT_SECRET` es obligatorio: el servidor no inicia sin el. El login del
+dashboard no usa credenciales fijas; los usuarios y sus contraseñas se
+almacenan en la tabla `usuarios` de la base de datos y se gestionan desde el
+dashboard por un administrador. `MY_WHATSAPP` recibe las alertas de pagos que
+requieren revision manual.
 
 ## Configurar Gmail
 
@@ -153,9 +168,10 @@ X-Webhook-Secret: el_mismo_valor_de_INBOUND_WEBHOOK_SECRET
 ```
 
 El webhook tambien aplica una lista de numeros autorizados definida en
-`index.js`. Los eventos de remitentes que no esten en esa lista se ignoran.
-El endpoint legado `/pago-recibido` esta retirado y responde `410 Gone`; ya no
-se usan MacroDroid, SMS ni una aplicacion Android para recibir pagos.
+`bot/comandos.js`. Los eventos de remitentes que no esten en esa lista se
+ignoran. El endpoint legado `/pago-recibido` esta retirado y responde `410
+Gone`; ya no se usan MacroDroid, SMS ni una aplicacion Android para recibir
+pagos.
 
 ## Dashboard y API
 
@@ -218,6 +234,10 @@ operacion. Realiza copias de seguridad y no las publiques.
 - Cambia las credenciales iniciales y crea usuarios desde el dashboard.
 - El modo demo no confirma pagos reales; para produccion configura una
   integracion bancaria verificable.
+- Se ha ejecutado una auditoria de seguridad automatizada con Strix en modo
+  profundo que no reporto vulnerabilidades. Sus resultados quedan en la
+  carpeta `strix_runs/`, que es generada por la herramienta y no forma parte
+  del codigo de la aplicacion.
 
 ## Scripts
 
