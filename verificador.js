@@ -1,6 +1,4 @@
-// verificador.js — Verifica pagos con Prometeo API
-// Sin cambios respecto al original
-
+// verificador.js — Verifica pagos con Prometeo API (multi-negocio)
 const fetch = require('node-fetch');
 
 const PROMETEO_BASE = process.env.PROMETEO_ENV === 'production'
@@ -9,15 +7,21 @@ const PROMETEO_BASE = process.env.PROMETEO_ENV === 'production'
 
 const PROMETEO_KEY = process.env.PROMETEO_API_KEY;
 
-// ─── Anti-duplicados ──────────────────────────────────────
+// ─── Anti-duplicados (key: "negocio_id:referencia") ──────
 const comprobantesUsados = new Map();
 
+function dupKey(referencia, negocio_id) {
+  return `${negocio_id || 1}:${referencia}`;
+}
+
 // ─── Verificar pago ───────────────────────────────────────
-async function verificarPago({ monto, referencia, banco, fecha }) {
+async function verificarPago({ monto, referencia, banco, fecha, negocio_id }) {
+
+  const nid = negocio_id || 1;
 
   // 1. Duplicado
-  if (referencia && comprobantesUsados.has(referencia)) {
-    const anterior = comprobantesUsados.get(referencia);
+  if (referencia && comprobantesUsados.has(dupKey(referencia, nid))) {
+    const anterior = comprobantesUsados.get(dupKey(referencia, nid));
     return {
       estado: 'DUPLICADO',
       mensaje: `⚠️ DUPLICADO: Este comprobante ya fue usado el ${anterior.fecha} por $${anterior.monto}`,
@@ -34,7 +38,7 @@ async function verificarPago({ monto, referencia, banco, fecha }) {
 
   // 3. Sin API key → modo demo
   if (!PROMETEO_KEY || PROMETEO_KEY.includes('xxx')) {
-    return verificarDemo({ monto, referencia, banco, fecha });
+    return verificarDemo({ monto, referencia, banco, fecha, negocio_id: nid });
   }
 
   // 4. Verificación real con Prometeo
@@ -56,7 +60,7 @@ async function verificarPago({ monto, referencia, banco, fecha }) {
 
     if (!loginData.key) {
       console.error('[Prometeo] Error login:', loginData);
-      return verificarDemo({ monto, referencia, banco, fecha });
+      return verificarDemo({ monto, referencia, banco, fecha, negocio_id: nid });
     }
 
     const sessionKey = loginData.key;
@@ -68,7 +72,6 @@ async function verificarPago({ monto, referencia, banco, fecha }) {
     const hoy       = formatFecha(ahora);
     const hace30dias = formatFecha(hace30);
 
-    // Obtener cuentas
     const cuentasRes = await fetch(
       `${PROMETEO_BASE}/account/?key=${sessionKey}`,
       { headers: { 'X-API-Key': PROMETEO_KEY.trim() } }
@@ -79,10 +82,9 @@ async function verificarPago({ monto, referencia, banco, fecha }) {
 
     if (!cuenta) {
       console.log('[Prometeo] Sin cuentas encontradas');
-      return verificarDemo({ monto, referencia, banco, fecha });
+      return verificarDemo({ monto, referencia, banco, fecha, negocio_id: nid });
     }
 
-    // Obtener movimientos
     const txRes = await fetch(
       `${PROMETEO_BASE}/movement/?key=${sessionKey}&account=${cuenta.number}&currency=${cuenta.currency}&date_start=${hace30dias}&date_end=${hoy}`,
       { headers: { 'X-API-Key': PROMETEO_KEY.trim() } }
@@ -90,14 +92,12 @@ async function verificarPago({ monto, referencia, banco, fecha }) {
     const txData = await txRes.json();
     const movimientos = txData.movements || txData.data || [];
 
-    // Buscar por referencia o monto
     const montoComprobante = parseFloat(monto);
     const txn = movimientos.find(m =>
       (m.reference && m.reference.includes(referencia)) ||
       Math.abs(Math.abs(m.amount) - montoComprobante) < 100
     );
 
-    // Cerrar sesión
     await fetch(`${PROMETEO_BASE}/logout/?key=${sessionKey}`, {
       headers: { 'X-API-Key': PROMETEO_KEY },
     });
@@ -119,7 +119,7 @@ async function verificarPago({ monto, referencia, banco, fecha }) {
       };
     }
 
-    comprobantesUsados.set(referencia, { monto, fecha, banco });
+    comprobantesUsados.set(dupKey(referencia, nid), { monto, fecha, banco });
 
     return {
       estado: 'REAL',
@@ -135,13 +135,13 @@ async function verificarPago({ monto, referencia, banco, fecha }) {
   }
 }
 
-
 // ─── Modo demo ────────────────────────────────────────────
-function verificarDemo({ monto, referencia, banco }) {
+function verificarDemo({ monto, referencia, banco, negocio_id }) {
   console.log('[Verificador] Modo demo activo');
+  const nid = negocio_id || 1;
 
-  if (referencia && comprobantesUsados.has(referencia)) {
-    const ant = comprobantesUsados.get(referencia);
+  if (referencia && comprobantesUsados.has(dupKey(referencia, nid))) {
+    const ant = comprobantesUsados.get(dupKey(referencia, nid));
     return {
       estado: 'DUPLICADO',
       mensaje: `⚠️ DUPLICADO: Este comprobante ya fue usado. Monto: $${ant.monto}`,
@@ -154,6 +154,4 @@ function verificarDemo({ monto, referencia, banco }) {
   };
 }
 
-module.exports = { verificarPago, comprobantesUsados }; // ← agregar comprobantesUsados
-
-
+module.exports = { verificarPago, comprobantesUsados };

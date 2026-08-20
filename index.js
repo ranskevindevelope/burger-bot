@@ -1,4 +1,4 @@
-// index.js — Punto de entrada del servidor: arranca Express, monta rutas y programas jobs.
+// index.js — Punto de entrada del servidor (multi-negocio)
 require('dotenv').config();
 const express = require('express');
 const fs = require('fs');
@@ -6,9 +6,31 @@ const path = require('path');
 
 const config = require('./config');
 const { verificarToken, soloAdmin } = require('./auth');
-const { obtenerPagosExportables } = require('./db');
-const { verificacionNocturna } = require('./bot/reportes');
-const { enviarReporteDiario } = require('./bot/reportes');
+const { obtenerPagosExportables, listarNegocios } = require('./db');
+const { verificacionNocturna, enviarReporteDiario } = require('./bot/reportes');
+const { esFestivo, esFinDeSemana } = require('./bot/festivos');
+
+// ─── Opciones según festivos / fin de semana ──────────────
+const HABILITAR_REPORTE_FESTIVOS =
+  (process.env.HABILITAR_REPORTE_FESTIVOS || 'true').toLowerCase() === 'true';
+const HABILITAR_REPORTE_FIN_SEMANA =
+  (process.env.HABILITAR_REPORTE_FIN_SEMANA || 'true').toLowerCase() === 'true';
+const HABILITAR_VERIFICACION_FESTIVOS =
+  (process.env.HABILITAR_VERIFICACION_FESTIVOS || 'true').toLowerCase() === 'true';
+const HABILITAR_VERIFICACION_FIN_SEMANA =
+  (process.env.HABILITAR_VERIFICACION_FIN_SEMANA || 'true').toLowerCase() === 'true';
+
+function verificarPermitidaHoy() {
+  if (esFestivo()) return HABILITAR_VERIFICACION_FESTIVOS;
+  if (esFinDeSemana()) return HABILITAR_VERIFICACION_FIN_SEMANA;
+  return true;
+}
+
+function reportePermitidoHoy() {
+  if (esFestivo()) return HABILITAR_REPORTE_FESTIVOS;
+  if (esFinDeSemana()) return HABILITAR_REPORTE_FIN_SEMANA;
+  return true;
+}
 
 // ─── Rutas ────────────────────────────────────────────────
 const webhookRouter = require('./routes/webhook');
@@ -53,7 +75,7 @@ if (!fs.existsSync(CARPETA_COMPROBANTES)) {
   fs.mkdirSync(CARPETA_COMPROBANTES);
 }
 
-// ─── Endpoint retirado: MacroDroid y la app Android ya no se usan
+// ─── Endpoint retirado ────────────────────────────────────
 app.post('/pago-recibido', (req, res) => {
   res.status(410).json({ ok: false, error: 'Este endpoint ya no está disponible' });
 });
@@ -64,10 +86,10 @@ app.use('/webhook', webhookRouter);
 // ─── API del dashboard ────────────────────────────────────
 app.use('/api', apiRouter);
 
-// ─── Ruta para descargar el Excel (CSV) ───────────────────
+// ─── Exportar CSV (filtrado por negocio del token) ────────
 app.get('/exportar', verificarToken, soloAdmin, async (req, res) => {
   try {
-    const pagos = await obtenerPagosExportables();
+    const pagos = await obtenerPagosExportables(req.user.negocio_id);
 
     let csv = 'ID,Monto,Referencia,Banco,Fecha,Hora,Estado,Fuente,Cliente,Verificado Por,Creado\n';
 
@@ -100,49 +122,70 @@ app.get('/', (req, res) => {
   });
 });
 
-// ─── Programar reportes y verificaciones según el día ─────
+// ─── Ejecutar para TODOS los negocios activos ─────────────
+async function ejecutarParaTodosLosNegocios(fn) {
+  try {
+    const negocios = await listarNegocios();
+    for (const neg of negocios) {
+      try {
+        await fn(neg.id);
+      } catch (err) {
+        console.error(`[Scheduler] Error en negocio ${neg.id} (${neg.nombre}):`, err.message);
+      }
+    }
+  } catch (err) {
+    console.error('[Scheduler] Error listando negocios:', err.message);
+  }
+}
+
+// ─── Programar reportes y verificaciones ──────────────────
 setInterval(async () => {
   const ahora = new Date();
-  const dia = ahora.getDay();       // 0=domingo, ..., 4=jueves, 5=viernes, 6=sábado
+  const dia = ahora.getDay();
   const hora = ahora.getHours();
   const minuto = ahora.getMinutes();
 
-  let debeEnviar = false;
+  const verificOk = verificarPermitidaHoy();
+  const reporteOk = reportePermitidoHoy();
 
   // Verificación nocturna - 1ra revisión a las 21:00
   if (hora === 21 && minuto === 0) {
-    console.log('[asincronica] Ejecutando 1ra revisión...');
-    await verificacionNocturna(1);
+    if (verificOk) {
+      console.log('[Asincronica] Ejecutando 1ra revisión para todos los negocios...');
+      await ejecutarParaTodosLosNegocios((nid) => verificacionNocturna(1, nid));
+    } else {
+      console.log('[Asincronica] Verificación 1ra omitida (festivo/fin de semana deshabilitado).');
+    }
   }
 
   // Verificación nocturna - 2da revisión a las 22:00
   if (hora === 22 && minuto === 0) {
-    console.log('[asincronica] Ejecutando 2da revisión...');
-    await verificacionNocturna(2);
+    if (verificOk) {
+      console.log('[Asincronica] Ejecutando 2da revisión para todos los negocios...');
+      await ejecutarParaTodosLosNegocios((nid) => verificacionNocturna(2, nid));
+    } else {
+      console.log('[Asincronica] Verificación 2da omitida (festivo/fin de semana deshabilitado).');
+    }
   }
 
-  // Jueves (4) a las 22:00
-  if (dia === 4 && hora === 22 && minuto === 0) debeEnviar = true;
+  // Reporte diario
+  const esHorarioReporte =
+    (dia === 4 && hora === 22 && minuto === 0) ||
+    ((dia === 5 || dia === 6) && hora === 22 && minuto === 30) ||
+    (dia === 0 && hora === 22 && minuto === 0);
 
-  // Viernes (5) a las 22:30
-  if (dia === 5 && hora === 22 && minuto === 30) debeEnviar = true;
-
-  // Sábado (6) a las 22:30
-  if (dia === 6 && hora === 22 && minuto === 30) debeEnviar = true;
-
-  // Domingo (0) a las 22:00
-  if (dia === 0 && hora === 22 && minuto === 0) debeEnviar = true;
-
-  if (debeEnviar) {
-    console.log('[Reporte] Ejecutando reporte diario...');
-    await enviarReporteDiario();
+  if (esHorarioReporte && reporteOk) {
+    console.log('[Reporte] Ejecutando reporte diario para todos los negocios...');
+    await ejecutarParaTodosLosNegocios(enviarReporteDiario);
+  } else if (esHorarioReporte) {
+    console.log('[Reporte] Reporte omitido (festivo/fin de semana deshabilitado).');
   }
-}, 60000); // revisa cada minuto
+}, 60000);
 
 // ─── Iniciar servidor ─────────────────────────────────────
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
-  console.log(`\n🍔 Bot ${config.NEGOCIO_NOMBRE} corriendo en puerto ${PORT}`);
+  console.log(`\n⚡ FlashPago corriendo en puerto ${PORT}`);
   console.log(`📱 Webhook: POST http://localhost:${PORT}/webhook`);
-  console.log(`🔗 se configura OpenWA Dashboard para apuntar a este webhook\n`);
+  console.log(`📊 Dashboard: http://localhost:${PORT}/panel\n`);
 });

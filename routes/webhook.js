@@ -1,4 +1,4 @@
-// webhook.js — Procesa los mensajes de WhatsApp que llegan de OpenWA
+// webhook.js — Procesa los mensajes de WhatsApp que llegan de OpenWA (multi-negocio)
 const express = require('express');
 const router = express.Router();
 const crypto = require('crypto');
@@ -7,18 +7,17 @@ const config = require('../config');
 const { leerComprobante } = require('../ocr');
 const { verificarPorGmail } = require('../gmail');
 const { verificarPago } = require('../verificador');
-const { guardarPago, buscarDuplicadoReciente } = require('../db');
+const { db, guardarPago, buscarDuplicadoReciente, contarComprobantesDelMes, obtenerNegocio } = require('../db');
 const { enviarMensaje } = require('../bot/openwa');
 const { formatearResultado, guardarFoto } = require('../bot/utils');
 const { pagosPendientes, historialPagos } = require('../bot/state');
 const comandos = require('../bot/comandos');
 
-const NEGOCIO = config.NEGOCIO_NOMBRE;
-
 const MENSAJES = {
   procesando: `⏳ Verificando el pago... un momento.`,
   sinFoto: `Por favor envía la *foto del comprobante*, no texto.`,
   errorLectura: `No pude leer bien ese comprobante. Asegúrate de que la imagen sea clara y completa.`,
+  limitePlan: `⚠️ Este negocio alcanzó el límite de comprobantes del mes. Contacta al administrador para mejorar el plan.`,
 };
 
 // Mapeo de LID (OpenWA) a números reales
@@ -28,6 +27,48 @@ const lidMap = {
   '165369796944036@lid': '573167064671@c.us',
   '241759531581483@c.us': '573044372639@c.us',
 };
+
+// ─── Cache de empleados → negocio (se refresca cada 5 min) ──
+let empleadoCache = {};
+let cacheTimestamp = 0;
+const CACHE_TTL = 300000; // 5 minutos
+
+function cargarEmpleados() {
+  return new Promise((resolve, reject) => {
+    db.all(
+      `SELECT u.whatsapp, u.negocio_id, n.nombre AS negocio_nombre, n.activo AS negocio_activo
+       FROM usuarios u
+       JOIN negocios n ON n.id = u.negocio_id
+       WHERE u.activo = 1 AND u.whatsapp IS NOT NULL`,
+      [],
+      (err, rows) => {
+        if (err) return reject(err);
+        const mapa = {};
+        for (const r of rows) {
+          // Normalizar: guardar con y sin @c.us
+          const num = r.whatsapp.includes('@') ? r.whatsapp : `${r.whatsapp}@c.us`;
+          mapa[num] = { negocio_id: r.negocio_id, negocio_nombre: r.negocio_nombre, negocio_activo: r.negocio_activo };
+        }
+        empleadoCache = mapa;
+        cacheTimestamp = Date.now();
+        console.log(`[Cache] ${Object.keys(mapa).length} empleados cargados`);
+        resolve(mapa);
+      }
+    );
+  });
+}
+
+async function getEmpleadoInfo(whatsapp) {
+  if (Date.now() - cacheTimestamp > CACHE_TTL) {
+    try { await cargarEmpleados(); } catch (e) { console.error('[Cache] Error:', e.message); }
+  }
+  return empleadoCache[whatsapp] || null;
+}
+
+// Cargar al iniciar (esperar 2s para que migraciones de DB terminen)
+setTimeout(() => {
+  cargarEmpleados().catch(e => console.error('[Cache] Error inicial:', e.message));
+}, 2000);
 
 // ─── Middleware: validar secreto del webhook ─────────────
 router.use((req, res, next) => {
@@ -44,7 +85,6 @@ router.use((req, res, next) => {
   next();
 });
 
-// ─── Endpoint retirado: MacroDroid y la app Android ya no se usan
 router.post('/pago-recibido', (req, res) => {
   res.status(410).json({ ok: false, error: 'Este endpoint ya no está disponible' });
 });
@@ -74,29 +114,35 @@ router.post('/', async (req, res) => {
 
   console.log('[Webhook] from:', from, '| body:', body, '| isMedia:', isMedia);
 
-  if (!from) {
-    console.log('[Webhook] Sin remitente, ignorando');
+  if (!from) return;
+  if (data.fromMe || data.key?.fromMe) return;
+
+  // ─── Buscar empleado y su negocio ─────────────────────
+  const empleado = await getEmpleadoInfo(from);
+
+  if (!empleado) {
+    // Fallback: si está en lista vieja de comandos, usar negocio 1
+    if (!comandos.NUMEROS_AUTORIZADOS.includes(from)) {
+      console.log('[Webhook] Remitente no autorizado:', from);
+      return;
+    }
+  }
+
+  const negocio_id = empleado?.negocio_id || 1;
+  const negocio_nombre = empleado?.negocio_nombre || config.NEGOCIO_NOMBRE;
+
+  if (empleado && !empleado.negocio_activo) {
+    await enviarMensaje(from, '⚠️ Este negocio está desactivado. Contacta al administrador.');
     return;
   }
 
-  if (data.fromMe || data.key?.fromMe) {
-    console.log('[Webhook] Mensaje propio ignorado');
-    return;
-  }
-
-  // ─── Lista blanca: solo empleados autorizados ─────────
-  if (!comandos.NUMEROS_AUTORIZADOS.includes(from)) {
-    console.log('[Webhook] Remitente no autorizado, ignorando:', from);
-    return;
-  }
-
-  console.log(`[Bot] Mensaje de ${from}: ${body || '[imagen]'}`);
+  console.log(`[Bot] Mensaje de ${from} (negocio: ${negocio_nombre}): ${body || '[imagen]'}`);
 
   // ─── Texto simple → comandos ──────────────────────────
   if (!isMedia) {
     try {
-      const cmdResult = await comandos.handleTextEvent(from, body);
-      if (cmdResult) return; // el módulo de comandos ya envió las respuestas
+      const cmdResult = await comandos.handleTextEvent(from, body, negocio_id);
+      if (cmdResult) return;
     } catch (err) {
       console.error('[Webhook] Error al procesar texto:', err.message);
     }
@@ -108,6 +154,22 @@ router.post('/', async (req, res) => {
   if (mediaType && !mediaType.startsWith('image/')) {
     await enviarMensaje(from, '⚠️ Solo acepto imágenes de comprobantes. Envía una foto.');
     return;
+  }
+
+  // ─── Verificar límite del plan ────────────────────────
+  try {
+    const negocio = await obtenerNegocio(negocio_id);
+    if (negocio) {
+      const usados = await contarComprobantesDelMes(negocio_id);
+      if (usados >= negocio.limite_comprobantes) {
+        await enviarMensaje(from, MENSAJES.limitePlan);
+        console.log(`[Plan] Negocio ${negocio_id} alcanzó límite: ${usados}/${negocio.limite_comprobantes}`);
+        return;
+      }
+    }
+  } catch (err) {
+    console.error('[Plan] Error verificando límite:', err.message);
+    // Continuar de todas formas
   }
 
   await enviarMensaje(from, MENSAJES.procesando);
@@ -127,9 +189,9 @@ router.post('/', async (req, res) => {
     const montoNum = parseInt(datos.monto);
     const nombreFoto = mediaBase64 ? guardarFoto(mediaBase64, datos.referencia) : null;
 
-    // ─── Verificar duplicado en la base (últimos 7 días) ─
+    // ─── Verificar duplicado (filtrado por negocio) ─────
     if (datos.referencia) {
-      const duplicado = await buscarDuplicadoReciente(datos.referencia);
+      const duplicado = await buscarDuplicadoReciente(datos.referencia, negocio_id);
       if (duplicado) {
         await enviarMensaje(from,
           `🚫 DUPLICADO: Este comprobante (Ref: ${datos.referencia}) ya fue verificado el ${duplicado.fecha} a las ${duplicado.hora}.\n\n` +
@@ -147,16 +209,16 @@ router.post('/', async (req, res) => {
           fuente: 'duplicado',
           nombre_cliente: null,
           verificado_por: from,
-          negocio_id: 1,
+          negocio_id,
           foto: nombreFoto,
         });
         return;
       }
     }
 
-    // ─── Verificar el pago por Gmail ────────────────────
-    console.log(`[DEBUG] Verificando en Gmail $${montoNum}...`);
-    const pagoGmail = await verificarPorGmail(datos.monto);
+    // ─── Verificar el pago por Gmail (por negocio) ──────
+    console.log(`[DEBUG] Verificando en Gmail $${montoNum} (negocio ${negocio_id})...`);
+    const pagoGmail = await verificarPorGmail(datos.monto, negocio_id);
     console.log('[DEBUG] Resultado de Gmail:', pagoGmail);
 
     // ─── Determinar resultado final ─────────────────────
@@ -177,10 +239,10 @@ router.post('/', async (req, res) => {
           fuente: pagoGmail ? 'gmail' : 'otro',
           nombre_cliente: pagoGmail?.nombre || null,
           verificado_por: from,
-          negocio_id: 1,
+          negocio_id,
           foto: nombreFoto,
         });
-        console.log('[DB] Pago guardado en base de datos');
+        console.log('[DB] Pago guardado (negocio:', negocio_id, ')');
       } catch (err) {
         console.error('[DB] Error guardando pago:', err.message);
       }
@@ -196,10 +258,10 @@ router.post('/', async (req, res) => {
           fuente: 'pendiente',
           nombre_cliente: null,
           verificado_por: from,
-          negocio_id: 1,
+          negocio_id,
           foto: nombreFoto,
         });
-        console.log('[DB] Pago pendiente guardado en base de datos');
+        console.log('[DB] Pago pendiente guardado (negocio:', negocio_id, ')');
       } catch (err) {
         console.error('[DB] Error guardando pendiente:', err.message);
       }
@@ -213,6 +275,7 @@ router.post('/', async (req, res) => {
       referencia: datos.referencia || '?',
       hora:       new Date().toLocaleTimeString('es-CO'),
       empleado:   from,
+      negocio_id,
     });
 
     const respuesta = formatearResultado(datos, verificacion);
@@ -220,7 +283,7 @@ router.post('/', async (req, res) => {
 
     // ─── Alertas para estados que requieren atención ────
     if (['NO_ENCONTRADO', 'DUPLICADO', 'MONTO_INCORRECTO'].includes(verificacion.estado)) {
-      const alerta = `🚨 *ALERTA — ${NEGOCIO}*\n\n${verificacion.mensaje}\n\nEmpleado: ${from}\nHora: ${new Date().toLocaleTimeString('es-CO')}`;
+      const alerta = `🚨 *ALERTA — ${negocio_nombre}*\n\n${verificacion.mensaje}\n\nEmpleado: ${from}\nHora: ${new Date().toLocaleTimeString('es-CO')}`;
       await enviarMensaje(process.env.MY_WHATSAPP, alerta);
 
       if (verificacion.estado === 'NO_ENCONTRADO') {
@@ -231,9 +294,10 @@ router.post('/', async (req, res) => {
           fecha: new Date().toLocaleDateString('es-CO'),
           hora: new Date().toLocaleTimeString('es-CO'),
           empleado: from,
+          negocio_id,
           foto: mediaBase64 ? guardarFoto(mediaBase64, datos.referencia) : null,
         });
-        console.log(`[Pendientes] Pago de $${montoNum} guardado para verificación nocturna. Total pendientes: ${pagosPendientes.length}`);
+        console.log(`[Pendientes] Pago de $${montoNum} guardado (negocio ${negocio_id}). Total pendientes: ${pagosPendientes.length}`);
       }
     }
   } catch (err) {

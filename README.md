@@ -127,6 +127,12 @@ CLAUDE_API_KEY=tu_clave_de_claude
 PROMETEO_ENV=sandbox
 PROMETEO_API_KEY=tu_clave_de_prometeo
 MY_WHATSAPP=573000000000@c.us
+
+# Control de reportes y verificaciones en festivos / fin de semana (true/false)
+HABILITAR_VERIFICACION_FESTIVOS=true
+HABILITAR_VERIFICACION_FIN_SEMANA=true
+HABILITAR_REPORTE_FESTIVOS=true
+HABILITAR_REPORTE_FIN_SEMANA=true
 ```
 
 `JWT_SECRET` es obligatorio: el servidor no inicia sin el. El login del
@@ -134,6 +140,12 @@ dashboard no usa credenciales fijas; los usuarios y sus contraseñas se
 almacenan en la tabla `usuarios` de la base de datos y se gestionan desde el
 dashboard por un administrador. `MY_WHATSAPP` recibe las alertas de pagos que
 requieren revision manual.
+
+Las variables `HABILITAR_*` permiten decidir si el bot ejecuta las
+verificaciones nocturnas y el reporte diario en días festivos o fines de
+semana. Si se ponen en `false`, esos procesos se omiten los días
+correspondientes (por ejemplo, si en un festivo el negocio no opera y no hay
+movimientos que revisar).
 
 ## Configurar Gmail
 
@@ -172,6 +184,23 @@ El webhook tambien aplica una lista de numeros autorizados definida en
 ignoran. El endpoint legado `/pago-recibido` esta retirado y responde `410
 Gone`; ya no se usan MacroDroid, SMS ni una aplicacion Android para recibir
 pagos.
+
+## Festivos y horarios
+
+El servidor detecta automaticamente los dias festivos de Colombia aplicando
+la Ley Emiliani (los festivos movibles se trasladan al lunes siguiente,
+excepto Año Nuevo, Día del Trabajo, Independencia, Batalla de Boyacá y
+Navidad). Tambien calcula los dias que son fin de semana.
+
+La logica vive en `bot/festivos.js` y se usa en `index.js` para decidir si se
+ejecutan las verificaciones nocturnas (21:00 y 22:00) y el reporte diario.
+Con las variables `HABILITAR_*_FESTIVOS` y `HABILITAR_*_FIN_SEMANA` del `.env`
+(por defecto `true`) puedes activar o desactivar estos procesos en festivos o
+fines de semana. En dias laborables siempre se ejecutan.
+
+Al iniciar o cada minuto, el log muestra la configuracion vigente del dia
+(por ejemplo: `[Festivos] Hoy es festivo. Configuracion: verificacion=SI,
+reporte=NO`).
 
 ## Dashboard y API
 

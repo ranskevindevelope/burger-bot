@@ -1,32 +1,86 @@
-// gmail.js — Verificación de pagos vía correos de Bancolombia
+// gmail.js — Verificación de pagos vía correos de Bancolombia (multi-negocio)
 const { google } = require('googleapis');
 const fs = require('fs');
 const path = require('path');
+const { obtenerTokenGmail, guardarTokenGmail } = require('./db');
 
-const TOKEN_PATH = path.join(__dirname, 'token.json');
 const CREDENTIALS_PATH = path.join(__dirname, 'credentials.json');
 
-function getAuth() {
-  const credentials = JSON.parse(fs.readFileSync(CREDENTIALS_PATH));
+// Fallback: token.json del archivo para negocio 1 (retrocompatibilidad)
+const TOKEN_PATH = path.join(__dirname, 'token.json');
+
+let credentialsCache = null;
+
+function getCredentials() {
+  if (!credentialsCache) {
+    credentialsCache = JSON.parse(fs.readFileSync(CREDENTIALS_PATH));
+  }
+  return credentialsCache;
+}
+
+// ─── Obtener auth OAuth2 por negocio ────────────────────
+async function getAuth(negocio_id) {
+  const credentials = getCredentials();
   const { client_secret, client_id, redirect_uris } = credentials.installed;
   const oAuth2Client = new google.auth.OAuth2(client_id, client_secret, redirect_uris[0]);
-  const token = JSON.parse(fs.readFileSync(TOKEN_PATH));
-  console.log('[Gmail] Scope del token cargado:', token.scope);
-  oAuth2Client.setCredentials(token);
-  return oAuth2Client;
+
+  // Intentar token de BD para este negocio
+  const tokenDB = await obtenerTokenGmail(negocio_id);
+
+  if (tokenDB) {
+    oAuth2Client.setCredentials({
+      access_token: tokenDB.access_token,
+      refresh_token: tokenDB.refresh_token,
+      expiry_date: tokenDB.expiry_date,
+    });
+
+    // Listener: si Google refresca el token, guardarlo en BD
+    oAuth2Client.on('tokens', async (newTokens) => {
+      try {
+        await guardarTokenGmail(negocio_id, {
+          access_token: newTokens.access_token,
+          refresh_token: newTokens.refresh_token,
+          expiry_date: newTokens.expiry_date,
+          email: tokenDB.email,
+        });
+        console.log(`[Gmail] Token refrescado para negocio ${negocio_id}`);
+      } catch (e) {
+        console.error(`[Gmail] Error guardando token refrescado:`, e.message);
+      }
+    });
+
+    console.log(`[Gmail] Usando token de BD para negocio ${negocio_id} (${tokenDB.email})`);
+    return oAuth2Client;
+  }
+
+  // Fallback: token.json del archivo solo para negocio 1
+  if (negocio_id === 1 && fs.existsSync(TOKEN_PATH)) {
+    const token = JSON.parse(fs.readFileSync(TOKEN_PATH));
+    oAuth2Client.setCredentials(token);
+    console.log('[Gmail] Usando token.json (fallback negocio 1)');
+    return oAuth2Client;
+  }
+
+  return null;
 }
 
 // ─── Función principal con reintentos ─────────────────────
-async function verificarPorGmail(montoEsperado, opciones = {}) {
+async function verificarPorGmail(montoEsperado, negocio_id = 1, opciones = {}) {
   const maxIntentos = opciones.intentos || 4;
   const esperaMs = opciones.esperaMs || 10000;
 
+  const auth = await getAuth(negocio_id);
+  if (!auth) {
+    console.log(`[Gmail] Negocio ${negocio_id} no tiene Gmail conectado`);
+    return null;
+  }
+
   for (let intento = 1; intento <= maxIntentos; intento++) {
     try {
-      const resultado = await buscarEnGmail(montoEsperado);
+      const resultado = await buscarEnGmail(auth, montoEsperado);
 
       if (resultado) {
-        console.log(`[Gmail] ✅ Pago encontrado al intento ${intento}`);
+        console.log(`[Gmail] ✅ Pago encontrado al intento ${intento} (negocio ${negocio_id})`);
         return resultado;
       }
 
@@ -40,14 +94,13 @@ async function verificarPorGmail(montoEsperado, opciones = {}) {
     }
   }
 
-  console.log('[Gmail] No se encontró el pago después de todos los intentos');
+  console.log(`[Gmail] No se encontró el pago después de todos los intentos (negocio ${negocio_id})`);
   return null;
 }
 
 // ─── Función interna que hace la búsqueda real ────────────
-async function buscarEnGmail(montoEsperado) {
+async function buscarEnGmail(auth, montoEsperado) {
   try {
-    const auth = getAuth();
     const gmail = google.gmail({ version: 'v1', auth });
 
     const res = await gmail.users.messages.list({
