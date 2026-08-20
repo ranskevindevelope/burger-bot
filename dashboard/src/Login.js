@@ -41,9 +41,9 @@ function Login({ onLogin }) {
       {/* IZQUIERDA - LOGIN */}
       <div style={{
         flex: 1, display: 'flex', flexDirection: 'column', justifyContent: 'center',
-        alignItems: 'center', padding: '2rem', background: '#fff',
+                alignItems: 'center', padding: '2rem', background: '#fff',
       }}>
-        <div style={{ width: '100%', maxWidth: 400 }}>
+        <div className="login-form-anim" style={{ width: '100%', maxWidth: 400 }}>
           <div style={{ marginBottom: '2.5rem' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: '0.5rem' }}>
               <Zap size={28} color="#F57C00" fill="#F57C00" />
@@ -111,7 +111,7 @@ function Login({ onLogin }) {
               </div>
             )}
 
-            <button type="submit" disabled={cargando} style={{
+                        <button type="submit" disabled={cargando} className="btn-login-anim" style={{
               width: '100%', padding: '0.9rem', background: '#F57C00', color: 'white',
               border: 'none', borderRadius: 12, fontSize: '1rem', fontWeight: 600,
               cursor: cargando ? 'not-allowed' : 'pointer', opacity: cargando ? 0.7 : 1,
@@ -128,7 +128,7 @@ function Login({ onLogin }) {
       </div>
 
       {/* DERECHA - ILUSTRACIÓN ABSTRACTA */}
-      <div className="login-visual" style={{
+            <div className="login-visual login-visual-anim" style={{
         flex: 1, background: 'linear-gradient(135deg, #1A1A2E 0%, #16213E 100%)',
         display: 'flex', flexDirection: 'column', justifyContent: 'center', alignItems: 'center',
         padding: '2.5rem', position: 'relative', overflow: 'hidden',
@@ -157,13 +157,13 @@ function Login({ onLogin }) {
           <line x1="300" y1="350" x2="200" y2="250" stroke="#FFB74D" strokeWidth="0.3" strokeDasharray="3 6" />
         </svg>
 
-        {/* Centro: Logo + texto + pills */}
-        <div style={{ position: 'relative', zIndex: 1, textAlign: 'center' }}>
-                    <div style={{
-            width: 140, height: 140, borderRadius: 30,
-            overflow: 'hidden', margin: '0 auto 1.5rem',
-            boxShadow: '0 0 80px rgba(245,124,0,0.25), 0 0 30px rgba(245,124,0,0.15)',
-          }}>
+                {/* Centro: Logo + texto + pills */}
+        <div className="center-content-anim" style={{ position: 'relative', zIndex: 1, textAlign: 'center' }}>
+                    <div className="logo-anim" style={{
+                      width: 140, height: 140, borderRadius: 30,
+                      overflow: 'hidden', margin: '0 auto 1.5rem',
+                      boxShadow: '0 0 80px rgba(245,124,0,0.25), 0 0 30px rgba(245,124,0,0.15)',
+                    }}>
             <img src="/logo.png" alt="FlashPago" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
           </div>
 
@@ -177,16 +177,16 @@ function Login({ onLogin }) {
             Verificación de pagos<br />con inteligencia artificial
           </p>
 
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 10, alignItems: 'center' }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 8, background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.08)', padding: '8px 18px', borderRadius: 50 }}>
+                    <div className="pills-anim" style={{ display: 'flex', flexDirection: 'column', gap: 10, alignItems: 'center' }}>
+            <div className="pill-item" style={{ display: 'flex', alignItems: 'center', gap: 8, background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.08)', padding: '8px 18px', borderRadius: 50 }}>
               <ShieldCheck size={16} color="#2ecc71" />
               <span style={{ color: '#b0b0c8', fontSize: '0.85rem' }}>Anti-fraude con IA</span>
             </div>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 8, background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.08)', padding: '8px 18px', borderRadius: 50 }}>
+            <div className="pill-item pill-item-2" style={{ display: 'flex', alignItems: 'center', gap: 8, background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.08)', padding: '8px 18px', borderRadius: 50 }}>
               <Clock size={16} color="#F57C00" />
               <span style={{ color: '#b0b0c8', fontSize: '0.85rem' }}>Verificación en segundos</span>
             </div>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 8, background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.08)', padding: '8px 18px', borderRadius: 50 }}>
+            <div className="pill-item pill-item-3" style={{ display: 'flex', alignItems: 'center', gap: 8, background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.08)', padding: '8px 18px', borderRadius: 50 }}>
               <BarChart3 size={16} color="#3498db" />
               <span style={{ color: '#b0b0c8', fontSize: '0.85rem' }}>Dashboard en tiempo real</span>
             </div>
@@ -194,8 +194,70 @@ function Login({ onLogin }) {
         </div>
       </div>
 
-      <style>{`
+            <style>{`
         @import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=Inter:wght@400;500;600&display=swap');
+
+        /* ─── Animación: entrada del formulario (lado izquierdo) ─── */
+        .login-form-anim {
+          animation: slideUp 0.8s ease both;
+        }
+        @keyframes slideUp {
+          from { opacity: 0; transform: translateY(25px); }
+          to   { opacity: 1; transform: translateY(0); }
+        }
+
+        /* ─── Animación: panel derecho entra desde la derecha ─── */
+        .login-visual-anim {
+          animation: slideRight 1s ease both;
+        }
+        @keyframes slideRight {
+          from { opacity: 0; transform: translateX(40px); }
+          to   { opacity: 1; transform: translateX(0); }
+        }
+
+        /* ─── Animación: contenido central (logo, título, pills) ─── */
+        .center-content-anim {
+          animation: fadeScale 1.2s ease both;
+          animation-delay: 0.3s;
+        }
+        @keyframes fadeScale {
+          from { opacity: 0; transform: scale(0.92); }
+          to   { opacity: 1; transform: scale(1); }
+        }
+
+                /* ─── Animación: logo se despliega y queda estable ─── */
+        .logo-anim {
+          animation: logoDeploy 1s cubic-bezier(0.25, 1, 0.5, 1) both;
+        }
+        @keyframes logoDeploy {
+          0%   { opacity: 0; transform: scale(0.5); }
+          60%  { opacity: 1; transform: scale(1.08); }
+          100% { opacity: 1; transform: scale(1); }
+        }
+
+        /* ─── Animación: pills (3 bloques) aparecen escalonados ─── */
+        .pills-anim .pill-item {
+          animation: pillSlide 0.7s ease both;
+        }
+        .pills-anim .pill-item-2 { animation-delay: 0.4s; }
+        .pills-anim .pill-item-3 { animation-delay: 0.6s; }
+        @keyframes pillSlide {
+          from { opacity: 0; transform: translateX(-15px); }
+          to   { opacity: 1; transform: translateX(0); }
+        }
+
+        /* ─── Botón: efecto hover elevado con sombra ─── */
+        .btn-login-anim {
+          box-shadow: 0 4px 15px rgba(245,124,0,0.3);
+        }
+        .btn-login-anim:hover {
+          transform: translateY(-3px);
+          box-shadow: 0 8px 25px rgba(245,124,0,0.4);
+        }
+        .btn-login-anim:active {
+          transform: translateY(0);
+        }
+
         @media(max-width:768px) {
           .login-visual { display: none !important; }
         }

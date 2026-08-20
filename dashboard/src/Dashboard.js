@@ -4,6 +4,7 @@ import { CreditCard, TrendingUp, Search, Download, DollarSign, Calendar, CheckCi
 import { createApiClient } from './services/api';
 import Sidebar from './components/Sidebar';
 import DashboardHeader from './components/DashboardHeader';
+import NotificacionesEnVivo from './components/NotificacionesEnVivo';
 
 function Dashboard({ onLogout }) {
   const getInitialSection = () => {
@@ -370,8 +371,9 @@ function Dashboard({ onLogout }) {
     );
   }
 
-  return (
+    return (
     <div className="layout">
+      <NotificacionesEnVivo onLogout={onLogout} />
       {sidebarAbierto && <div className="sidebar-overlay" onClick={() => setSidebarAbierto(false)} />}
       <Sidebar
         activeSection={seccionActiva}
