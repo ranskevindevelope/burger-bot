@@ -16,6 +16,7 @@ import { createApiClient } from '../services/api';
 function NotificacionesEnVivo({ onLogout }) {
   const api = useMemo(() => createApiClient(onLogout), [onLogout]);
   const [notificaciones, setNotificaciones] = useState([]); // cola de toasts
+  const audioRef = useRef(null);
   const ultimoPagoId = useRef(0);        // id máx de pagos REAL vistos
   const ultimaCantPend = useRef(0);      // cantidad de pendientes (NO_ENCONTRADO) vistos
   const ultimasDupIds = useRef(new Set()); // ids de duplicados vistos
@@ -24,15 +25,31 @@ function NotificacionesEnVivo({ onLogout }) {
   // formatear monto
   const formatearMonto = (monto) => '$' + Number(monto).toLocaleString('es-CO');
 
-  // Mostrar un toast
+  // Reproducir sonido cuando llega una notificación de pago verificado
+  const reproducirSonido = useCallback(async () => {
+    try {
+      if (audioRef.current) {
+        audioRef.current.currentTime = 0;
+        await audioRef.current.play();
+      }
+    } catch (err) {
+      // Silenciar si el navegador bloquea la reproducción de audio
+      console.debug('Audio de notificación bloqueado por el navegador');
+    }
+  }, []);
+
+  // Mostrar un toast (y sonar para pagos REAL verificados)
   const mostrarNotificacion = useCallback(({ tipo, titulo, detalle }) => {
     const id = Date.now() + Math.random();
     setNotificaciones((prev) => [...prev, { id, tipo, titulo, detalle }]);
+    if (tipo === 'real') {
+      reproducirSonido();
+    }
     // auto-ocultar después de 5s
     setTimeout(() => {
       setNotificaciones((prev) => prev.filter((n) => n.id !== id));
     }, 5000);
-  }, []);
+  }, [reproducirSonido]);
 
   // Detección de novedades
   const revisarNovedades = useCallback(async () => {
@@ -141,9 +158,11 @@ function NotificacionesEnVivo({ onLogout }) {
     };
   };
 
-  if (notificaciones.length === 0) return null;
-
   return (
+    <>
+      {/* Elemento de audio siempre montado para poder reproducir el sonido */}
+      <audio ref={audioRef} src="/notificacion_pago.mp3" preload="auto" style={{ display: 'none' }} />
+      {notificaciones.length > 0 && (
     <div style={{
       position: 'fixed', top: 20, right: 20, zIndex: 3000,
       display: 'flex', flexDirection: 'column', gap: '0.75rem',
@@ -181,6 +200,8 @@ function NotificacionesEnVivo({ onLogout }) {
         }
       `}</style>
     </div>
+      )}
+    </>
   );
 }
 
