@@ -13,5 +13,5 @@ module.exports = {
   OPENWA_URL: process.env.OPENWA_URL || 'http://localhost:2785',
   OPENWA_SESSION: process.env.OPENWA_SESSION || 'vinson',
   OPENWA_KEY: process.env.OPENWA_API_KEY || 'dev-admin-key',
-  NEGOCIO_NOMBRE: process.env.NEGOCIO_NOMBRE || 'VINSON PAGOS IA',
+  NEGOCIO_NOMBRE: process.env.NEGOCIO_NOMBRE || 'Flash Pago',
 };
