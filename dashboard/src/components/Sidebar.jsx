@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { CreditCard, Download, LayoutDashboard, LogOut, Search, TrendingUp, Users, AlertTriangle, DollarSign, Menu, X } from 'lucide-react';
+import { CreditCard, Download, LayoutDashboard, LogOut, Search, TrendingUp, Users, AlertTriangle, DollarSign, Menu, X, ShoppingBag } from 'lucide-react';
 
 function Sidebar({ activeSection, isOpen, isAdmin, paymentCount, userCount, onSectionChange, onLogout }) {
   const [fijado, setFijado] = useState(false);
@@ -9,6 +9,7 @@ function Sidebar({ activeSection, isOpen, isAdmin, paymentCount, userCount, onSe
   const menuItems = [
     { id: 'panel', icon: <LayoutDashboard size={18} />, label: 'Panel' },
     { id: 'pagos', icon: <CreditCard size={18} />, label: 'Pagos' },
+    { id: 'ventas', icon: <ShoppingBag size={18} />, label: 'Ventas' },
     { id: 'estadisticas', icon: <TrendingUp size={18} />, label: 'Estadísticas' },
     { id: 'buscar', icon: <Search size={18} />, label: 'Buscar' },
     { id: 'exportar', icon: <Download size={18} />, label: 'Exportar' },

@@ -6,8 +6,10 @@ const crypto = require('crypto');
 const fs = require('fs');
 const path = require('path');
 
+const { google } = require('googleapis');
+
 const config = require('../config');
-const { verificarToken, soloAdmin, limitarLogin } = require('../auth');
+const { verificarToken, soloAdmin, soloSuperAdmin, limitarLogin } = require('../auth');
 const {
   db,
   totalDelDia,
@@ -19,7 +21,33 @@ const {
   contarComprobantesDelMes,
   guardarTokenGmail,
   obtenerTokenGmail,
+  crearCierreCaja,
+  obtenerCierreDelDia,
+  listarCierres,
+  resumenSemanal,
+  totalTransferenciasDia,
+  registrarGasto,
+  listarGastos,
+  totalGastosDia,
+  gastosPorCategoria,
+  eliminarGasto,
 } = require('../db');
+
+// ─── Google OAuth config ────────────────────────────────
+const CREDENTIALS_PATH = path.join(__dirname, '..', 'credentials.json');
+let oAuth2Config = null;
+
+function getOAuth2Client(redirectUri) {
+  if (!oAuth2Config) {
+    const creds = JSON.parse(fs.readFileSync(CREDENTIALS_PATH));
+    oAuth2Config = creds.installed || creds.web;
+  }
+  return new google.auth.OAuth2(
+    oAuth2Config.client_id,
+    oAuth2Config.client_secret,
+    redirectUri
+  );
+}
 
 // ═══════════════════════════════════════════════════════════
 //  AUTH
@@ -59,13 +87,19 @@ router.post('/login', limitarLogin, (req, res) => {
 });
 
 // ═══════════════════════════════════════════════════════════
-//  NEGOCIOS (solo admin)
+//  NEGOCIOS (superadmin ve todos, admin ve solo el suyo)
 // ═══════════════════════════════════════════════════════════
 
-router.get('/negocios', verificarToken, soloAdmin, async (req, res) => {
+router.get('/negocios', verificarToken, soloSuperAdmin, async (req, res) => {
   try {
     const negocios = await listarNegocios();
-    res.json({ ok: true, negocios });
+    // Agregar uso de comprobantes a cada negocio
+    const negociosConUso = await Promise.all(negocios.map(async (n) => {
+      const usados = await contarComprobantesDelMes(n.id);
+      const tokenGmail = await obtenerTokenGmail(n.id);
+      return { ...n, comprobantes_usados: usados, gmail_conectado: !!tokenGmail, gmail_email: tokenGmail?.email || null };
+    }));
+    res.json({ ok: true, negocios: negociosConUso });
   } catch (err) {
     res.status(500).json({ ok: false, error: err.message });
   }
@@ -82,7 +116,7 @@ router.get('/negocios/:id', verificarToken, soloAdmin, async (req, res) => {
   }
 });
 
-router.post('/negocios', verificarToken, soloAdmin, async (req, res) => {
+router.post('/negocios', verificarToken, soloSuperAdmin, async (req, res) => {
   try {
     const { nombre, whatsapp, plan } = req.body;
     if (!nombre) return res.status(400).json({ ok: false, error: 'El nombre es obligatorio' });
@@ -93,7 +127,7 @@ router.post('/negocios', verificarToken, soloAdmin, async (req, res) => {
   }
 });
 
-router.put('/negocios/:id', verificarToken, soloAdmin, (req, res) => {
+router.put('/negocios/:id', verificarToken, soloSuperAdmin, (req, res) => {
   const { nombre, whatsapp, plan, activo } = req.body;
   const sets = []; const vals = [];
   if (nombre) { sets.push('nombre=?'); vals.push(nombre); }
@@ -134,24 +168,120 @@ router.get('/negocios/uso/plan', verificarToken, async (req, res) => {
 });
 
 // ═══════════════════════════════════════════════════════════
-//  GMAIL TOKENS POR NEGOCIO
+//  GMAIL OAuth POR NEGOCIO
 // ═══════════════════════════════════════════════════════════
 
+// Estado de conexión
+router.get('/gmail/estado', verificarToken, async (req, res) => {
+  try {
+    const token = await obtenerTokenGmail(req.user.negocio_id);
+    res.json({ ok: true, conectado: !!token, email: token?.email || null });
+  } catch (err) {
+    res.status(500).json({ ok: false, error: err.message });
+  }
+});
+
+// Paso 1: Generar URL de autorización de Google
+router.get('/gmail/auth-url', verificarToken, soloAdmin, (req, res) => {
+  try {
+    const redirectUri = `${req.protocol}://${req.get('host')}/api/gmail/callback`;
+    const oAuth2Client = getOAuth2Client(redirectUri);
+
+    // Guardar negocio_id + token JWT en el state para recuperarlo en el callback
+    const state = Buffer.from(JSON.stringify({
+      negocio_id: req.user.negocio_id,
+      token: req.query.token || req.headers.authorization?.split(' ')[1],
+    })).toString('base64');
+
+    const authUrl = oAuth2Client.generateAuthUrl({
+      access_type: 'offline',
+      prompt: 'consent',
+      scope: ['https://www.googleapis.com/auth/gmail.readonly'],
+      state,
+    });
+
+    res.json({ ok: true, url: authUrl });
+  } catch (err) {
+    res.status(500).json({ ok: false, error: err.message });
+  }
+});
+
+// Paso 2: Google redirige aquí con el código
+router.get('/gmail/callback', async (req, res) => {
+  try {
+    const { code, state } = req.query;
+    if (!code || !state) {
+      return res.status(400).send('Faltan parámetros de Google');
+    }
+
+    // Decodificar state
+    let stateData;
+    try {
+      stateData = JSON.parse(Buffer.from(state, 'base64').toString());
+    } catch (e) {
+      return res.status(400).send('State inválido');
+    }
+
+    const { negocio_id, token } = stateData;
+
+    // Verificar JWT
+    const jwt = require('jsonwebtoken');
+    try {
+      jwt.verify(token, config.JWT_SECRET);
+    } catch (e) {
+      return res.status(401).send('Sesión expirada. Vuelve al dashboard e intenta de nuevo.');
+    }
+
+    // Intercambiar código por tokens
+    const redirectUri = `${req.protocol}://${req.get('host')}/api/gmail/callback`;
+    const oAuth2Client = getOAuth2Client(redirectUri);
+    const { tokens } = await oAuth2Client.getToken(code);
+
+    // Obtener email del usuario
+    oAuth2Client.setCredentials(tokens);
+    const gmail = google.gmail({ version: 'v1', auth: oAuth2Client });
+    const profile = await gmail.users.getProfile({ userId: 'me' });
+    const email = profile.data.emailAddress;
+
+    // Guardar en BD
+    await guardarTokenGmail(negocio_id, {
+      access_token: tokens.access_token,
+      refresh_token: tokens.refresh_token,
+      expiry_date: tokens.expiry_date,
+      email,
+    });
+
+    console.log(`[Gmail] OAuth completado para negocio ${negocio_id}: ${email}`);
+
+    // Redirigir al dashboard con mensaje de éxito
+    res.redirect('/panel?seccion=panel&gmail=conectado');
+  } catch (err) {
+    console.error('[Gmail] Error en callback:', err.message);
+    res.redirect('/panel?seccion=panel&gmail=error');
+  }
+});
+
+// Desconectar Gmail
+router.delete('/gmail/desconectar', verificarToken, soloAdmin, async (req, res) => {
+  try {
+    const nid = req.user.negocio_id;
+    db.run('DELETE FROM tokens_gmail WHERE negocio_id = ?', [nid], function (err) {
+      if (err) return res.status(500).json({ ok: false, error: err.message });
+      console.log(`[Gmail] Desconectado para negocio ${nid}`);
+      res.json({ ok: true, mensaje: 'Gmail desconectado' });
+    });
+  } catch (err) {
+    res.status(500).json({ ok: false, error: err.message });
+  }
+});
+
+// Guardar token manualmente (superadmin)
 router.post('/gmail/token', verificarToken, soloAdmin, async (req, res) => {
   try {
     const { access_token, refresh_token, expiry_date, email } = req.body;
     if (!access_token) return res.status(400).json({ ok: false, error: 'Falta access_token' });
     await guardarTokenGmail(req.user.negocio_id, { access_token, refresh_token, expiry_date, email });
     res.json({ ok: true, mensaje: 'Token Gmail guardado' });
-  } catch (err) {
-    res.status(500).json({ ok: false, error: err.message });
-  }
-});
-
-router.get('/gmail/estado', verificarToken, async (req, res) => {
-  try {
-    const token = await obtenerTokenGmail(req.user.negocio_id);
-    res.json({ ok: true, conectado: !!token, email: token?.email || null });
   } catch (err) {
     res.status(500).json({ ok: false, error: err.message });
   }
@@ -287,15 +417,26 @@ router.get('/dashboard/pendientes', verificarToken, async (req, res) => {
 router.get('/dashboard/pagos', verificarToken, async (req, res) => {
   try {
     const nid = req.user.negocio_id;
-    const limite = parseInt(req.query.limite) || 20;
-    db.all(
-      'SELECT * FROM pagos WHERE estado = ? AND negocio_id = ? ORDER BY id DESC LIMIT ?',
-      ['REAL', nid, limite],
-      (err, filas) => {
-        if (err) return res.status(500).json({ error: err.message });
-        res.json(filas);
-      }
-    );
+    const limite = parseInt(req.query.limite) || 50;
+    const { mes, anio } = req.query;
+
+    let query, params;
+    if (mes && anio) {
+      const fechaInicio = `${anio}-${mes.padStart(2, '0')}-01`;
+      const fechaFin = `${anio}-${mes.padStart(2, '0')}-31 23:59:59`;
+      query = `SELECT * FROM pagos WHERE estado = 'REAL' AND negocio_id = ?
+               AND creado_en >= ? AND creado_en <= ?
+               ORDER BY id DESC LIMIT ?`;
+      params = [nid, fechaInicio, fechaFin, limite];
+    } else {
+      query = 'SELECT * FROM pagos WHERE estado = ? AND negocio_id = ? ORDER BY id DESC LIMIT ?';
+      params = ['REAL', nid, limite];
+    }
+
+    db.all(query, params, (err, filas) => {
+      if (err) return res.status(500).json({ error: err.message });
+      res.json(filas);
+    });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
@@ -307,7 +448,6 @@ router.put('/pagos/:id/estado', verificarToken, soloAdmin, (req, res) => {
   if (!['REAL', 'NO_ENCONTRADO', 'DUPLICADO', 'FALSO'].includes(estado)) {
     return res.status(400).json({ ok: false, error: 'Estado no válido' });
   }
-  // Solo puede cambiar pagos de su negocio
   db.run('UPDATE pagos SET estado = ?, fuente = ? WHERE id = ? AND negocio_id = ?',
     [estado, 'manual_admin', req.params.id, nid],
     function (err) {
@@ -321,16 +461,89 @@ router.put('/pagos/:id/estado', verificarToken, soloAdmin, (req, res) => {
 router.get('/dashboard/stats', verificarToken, async (req, res) => {
   try {
     const nid = req.user.negocio_id;
-    const dias = Math.min(parseInt(req.query.dias) || 30, 365);
-    db.all(
-      `SELECT fecha, COUNT(*) as cantidad, SUM(monto) as total 
+    const { mes, anio, dias } = req.query;
+
+    let query, params;
+    if (mes && anio) {
+      const fechaInicio = `${anio}-${mes.padStart(2, '0')}-01`;
+      const fechaFin = `${anio}-${mes.padStart(2, '0')}-31 23:59:59`;
+      query = `SELECT date(creado_en) as fecha, COUNT(*) as cantidad, SUM(monto) as total 
+               FROM pagos WHERE estado = 'REAL' AND negocio_id = ?
+               AND creado_en >= ? AND creado_en <= ?
+               GROUP BY date(creado_en) ORDER BY date(creado_en) ASC`;
+      params = [nid, fechaInicio, fechaFin];
+    } else {
+      const d = Math.min(parseInt(dias) || 30, 365);
+      query = `SELECT fecha, COUNT(*) as cantidad, SUM(monto) as total 
+               FROM pagos WHERE estado = 'REAL' AND negocio_id = ?
+               AND creado_en >= datetime('now', '-' || ? || ' days', 'localtime')
+               GROUP BY fecha ORDER BY fecha ASC`;
+      params = [nid, d];
+    }
+
+    db.all(query, params, (err, filas) => {
+      if (err) return res.status(500).json({ error: err.message });
+      res.json(filas);
+    });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// ─── Resumen por periodo (mes específico) ───────────────
+router.get('/dashboard/resumen-periodo', verificarToken, async (req, res) => {
+  try {
+    const nid = req.user.negocio_id;
+    const { mes, anio } = req.query;
+
+    if (!mes || !anio) {
+      return res.status(400).json({ ok: false, error: 'Falta mes o anio' });
+    }
+
+    const fechaInicio = `${anio}-${mes.padStart(2, '0')}-01`;
+    const fechaFin = `${anio}-${mes.padStart(2, '0')}-31 23:59:59`;
+
+    db.get(
+      `SELECT COUNT(*) as cantidad, COALESCE(SUM(monto), 0) as total,
+              MAX(monto) as pago_mas_alto, MIN(monto) as pago_mas_bajo
        FROM pagos WHERE estado = 'REAL' AND negocio_id = ?
-       AND creado_en >= datetime('now', '-' || ? || ' days', 'localtime')
-       GROUP BY fecha ORDER BY fecha ASC`,
-      [nid, dias],
-      (err, filas) => {
+       AND creado_en >= ? AND creado_en <= ?`,
+      [nid, fechaInicio, fechaFin],
+      (err, row) => {
         if (err) return res.status(500).json({ error: err.message });
-        res.json(filas);
+
+        db.get(
+          `SELECT COUNT(DISTINCT date(creado_en)) as dias_con_ventas
+           FROM pagos WHERE estado = 'REAL' AND negocio_id = ?
+           AND creado_en >= ? AND creado_en <= ?`,
+          [nid, fechaInicio, fechaFin],
+          (err2, diasRow) => {
+            if (err2) return res.status(500).json({ error: err2.message });
+
+            db.all(
+              `SELECT banco, COUNT(*) as cantidad, SUM(monto) as total
+               FROM pagos WHERE estado = 'REAL' AND negocio_id = ?
+               AND creado_en >= ? AND creado_en <= ?
+               GROUP BY banco ORDER BY cantidad DESC LIMIT 5`,
+              [nid, fechaInicio, fechaFin],
+              (err3, bancos) => {
+                if (err3) return res.status(500).json({ error: err3.message });
+
+                res.json({
+                  ok: true,
+                  periodo: { mes: parseInt(mes), anio: parseInt(anio) },
+                  total: row.total,
+                  cantidad: row.cantidad,
+                  pago_mas_alto: row.pago_mas_alto || 0,
+                  pago_mas_bajo: row.pago_mas_bajo || 0,
+                  ticket_promedio: row.cantidad > 0 ? Math.round(row.total / row.cantidad) : 0,
+                  dias_con_ventas: diasRow.dias_con_ventas,
+                  bancos: bancos || [],
+                });
+              }
+            );
+          }
+        );
       }
     );
   } catch (err) {
@@ -432,6 +645,188 @@ router.get('/exportar', verificarToken, soloAdmin, (req, res) => {
       res.json(filas);
     }
   );
+});
+
+// ═══════════════════════════════════════════════════════════
+//  VENTAS — Cierre de caja + Gastos
+// ═══════════════════════════════════════════════════════════
+
+// ─── Crear cierre de caja ───────────────────────────────
+router.post('/ventas/cierre', verificarToken, soloAdmin, async (req, res) => {
+  try {
+    const nid = req.user.negocio_id;
+    const { total_ventas, nota, foto } = req.body;
+
+    if (!total_ventas || total_ventas <= 0) {
+      return res.status(400).json({ ok: false, error: 'El total de ventas es obligatorio' });
+    }
+
+    const fecha = new Date().toLocaleDateString('es-CO');
+
+    // Verificar si ya hay cierre hoy
+    const existente = await obtenerCierreDelDia(nid, fecha);
+    if (existente) {
+      return res.status(409).json({ ok: false, error: 'Ya existe un cierre para hoy. Edítalo si necesitas cambiar el total.' });
+    }
+
+    // Calcular transferencias verificadas del día
+    const transferencias = await totalTransferenciasDia(nid, fecha);
+
+    // Calcular gastos del día
+    const gastos = await totalGastosDia(nid, fecha);
+
+    // Efectivo = Total ventas - Transferencias verificadas
+    const total_efectivo = total_ventas - transferencias.total;
+
+    const cierre = await crearCierreCaja({
+      negocio_id: nid,
+      fecha,
+      total_ventas,
+      total_transferencias: transferencias.total,
+      total_efectivo: Math.max(total_efectivo, 0),
+      total_gastos: gastos.total,
+      nota,
+      cerrado_por: req.user.usuario,
+      foto,
+    });
+
+    res.status(201).json({
+      ok: true,
+      cierre: {
+        ...cierre,
+        fecha,
+        total_ventas,
+        total_transferencias: transferencias.total,
+        total_efectivo: Math.max(total_efectivo, 0),
+        total_gastos: gastos.total,
+      },
+    });
+  } catch (err) {
+    res.status(500).json({ ok: false, error: err.message });
+  }
+});
+
+// ─── Obtener cierre del día ─────────────────────────────
+router.get('/ventas/cierre/hoy', verificarToken, async (req, res) => {
+  try {
+    const nid = req.user.negocio_id;
+    const fecha = new Date().toLocaleDateString('es-CO');
+
+    const cierre = await obtenerCierreDelDia(nid, fecha);
+    const transferencias = await totalTransferenciasDia(nid, fecha);
+    const gastos = await totalGastosDia(nid, fecha);
+
+    res.json({
+      ok: true,
+      cierre: cierre || null,
+      transferencias_hoy: transferencias,
+      gastos_hoy: gastos,
+    });
+  } catch (err) {
+    res.status(500).json({ ok: false, error: err.message });
+  }
+});
+
+// ─── Historial de cierres ───────────────────────────────
+router.get('/ventas/cierres', verificarToken, soloAdmin, async (req, res) => {
+  try {
+    const nid = req.user.negocio_id;
+    const dias = parseInt(req.query.dias) || 30;
+    const cierres = await listarCierres(nid, dias);
+    res.json({ ok: true, cierres });
+  } catch (err) {
+    res.status(500).json({ ok: false, error: err.message });
+  }
+});
+
+// ─── Resumen semanal ────────────────────────────────────
+router.get('/ventas/semanal', verificarToken, soloAdmin, async (req, res) => {
+  try {
+    const nid = req.user.negocio_id;
+    const resumen = await resumenSemanal(nid);
+    res.json({ ok: true, ...resumen });
+  } catch (err) {
+    res.status(500).json({ ok: false, error: err.message });
+  }
+});
+
+// ─── Resumen del día (sin cierre, datos en vivo) ────────
+router.get('/ventas/resumen', verificarToken, async (req, res) => {
+  try {
+    const nid = req.user.negocio_id;
+    const fecha = req.query.fecha || new Date().toLocaleDateString('es-CO');
+
+    const transferencias = await totalTransferenciasDia(nid, fecha);
+    const gastos = await totalGastosDia(nid, fecha);
+    const gastosLista = await listarGastos(nid, fecha);
+    const cierre = await obtenerCierreDelDia(nid, fecha);
+
+    res.json({
+      ok: true,
+      fecha,
+      transferencias,
+      gastos: { total: gastos.total, cantidad: gastos.cantidad, lista: gastosLista },
+      cierre: cierre || null,
+    });
+  } catch (err) {
+    res.status(500).json({ ok: false, error: err.message });
+  }
+});
+
+// ─── Registrar gasto ────────────────────────────────────
+router.post('/ventas/gasto', verificarToken, async (req, res) => {
+  try {
+    const nid = req.user.negocio_id;
+    const { monto, categoria, descripcion } = req.body;
+
+    if (!monto || monto <= 0) {
+      return res.status(400).json({ ok: false, error: 'El monto es obligatorio' });
+    }
+    if (!descripcion || descripcion.trim().length < 2) {
+      return res.status(400).json({ ok: false, error: 'La descripción es obligatoria' });
+    }
+
+    const categoriasPermitidas = ['general', 'insumos', 'nomina', 'servicios', 'arriendo', 'transporte', 'otro'];
+    const cat = categoriasPermitidas.includes(categoria) ? categoria : 'general';
+
+    const fecha = new Date().toLocaleDateString('es-CO');
+    const gasto = await registrarGasto({
+      negocio_id: nid,
+      fecha,
+      monto,
+      categoria: cat,
+      descripcion: descripcion.trim(),
+      registrado_por: req.user.usuario,
+    });
+
+    res.status(201).json({ ok: true, gasto: { ...gasto, monto, categoria: cat, descripcion: descripcion.trim(), fecha } });
+  } catch (err) {
+    res.status(500).json({ ok: false, error: err.message });
+  }
+});
+
+// ─── Eliminar gasto ─────────────────────────────────────
+router.delete('/ventas/gasto/:id', verificarToken, soloAdmin, async (req, res) => {
+  try {
+    const nid = req.user.negocio_id;
+    const changes = await eliminarGasto(req.params.id, nid);
+    if (changes === 0) return res.status(404).json({ ok: false, error: 'Gasto no encontrado' });
+    res.json({ ok: true, mensaje: 'Gasto eliminado' });
+  } catch (err) {
+    res.status(500).json({ ok: false, error: err.message });
+  }
+});
+
+// ─── Gastos por categoría ───────────────────────────────
+router.get('/ventas/gastos/categorias', verificarToken, soloAdmin, async (req, res) => {
+  try {
+    const nid = req.user.negocio_id;
+    const dias = parseInt(req.query.dias) || 30;
+    const categorias = await gastosPorCategoria(nid, dias);
+    res.json({ ok: true, categorias });
+  } catch (err) {
+    res.status(500).json({ ok: false, error: err.message });
+  }
 });
 
 module.exports = router;

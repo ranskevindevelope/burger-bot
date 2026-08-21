@@ -32,7 +32,7 @@ db.run(`
     // Insertar negocio por defecto si no existe
     db.run(`
       INSERT OR IGNORE INTO negocios (id, nombre, whatsapp, plan, limite_comprobantes)
-      VALUES (1, 'Vinson Burgers', NULL, 'basico', 300)
+      VALUES (1, 'Mi Negocio', NULL, 'basico', 300)
     `);
   }
 });
@@ -353,6 +353,217 @@ function obtenerPagosExportables(negocio_id) {
 }
 
 // ═══════════════════════════════════════════════════════════
+//  TABLAS — VENTAS (cierre de caja + gastos)
+// ═══════════════════════════════════════════════════════════
+
+db.run(`
+  CREATE TABLE IF NOT EXISTS cierres_caja (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    negocio_id INTEGER NOT NULL,
+    fecha TEXT NOT NULL,
+    total_ventas INTEGER NOT NULL DEFAULT 0,
+    total_transferencias INTEGER NOT NULL DEFAULT 0,
+    total_efectivo INTEGER NOT NULL DEFAULT 0,
+    total_gastos INTEGER NOT NULL DEFAULT 0,
+    nota TEXT,
+    cerrado_por TEXT,
+    foto TEXT,
+    creado_en TEXT DEFAULT (datetime('now','localtime')),
+    FOREIGN KEY (negocio_id) REFERENCES negocios(id)
+  )
+`, (err) => {
+  if (!err) {
+    console.log('[DB] Tabla "cierres_caja" lista');
+    db.run('CREATE INDEX IF NOT EXISTS idx_cierres_negocio_fecha ON cierres_caja (negocio_id, fecha)');
+  }
+});
+
+db.run(`
+  CREATE TABLE IF NOT EXISTS gastos (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    negocio_id INTEGER NOT NULL,
+    fecha TEXT NOT NULL,
+    monto INTEGER NOT NULL,
+    categoria TEXT DEFAULT 'general',
+    descripcion TEXT,
+    registrado_por TEXT,
+    creado_en TEXT DEFAULT (datetime('now','localtime')),
+    FOREIGN KEY (negocio_id) REFERENCES negocios(id)
+  )
+`, (err) => {
+  if (!err) {
+    console.log('[DB] Tabla "gastos" lista');
+    db.run('CREATE INDEX IF NOT EXISTS idx_gastos_negocio_fecha ON gastos (negocio_id, fecha)');
+  }
+});
+
+// ═══════════════════════════════════════════════════════════
+//  FUNCIONES — CIERRES DE CAJA
+// ═══════════════════════════════════════════════════════════
+
+function crearCierreCaja(cierre) {
+  return new Promise((resolve, reject) => {
+    const { negocio_id, fecha, total_ventas, total_transferencias, total_efectivo, total_gastos, nota, cerrado_por, foto } = cierre;
+    db.run(
+      `INSERT INTO cierres_caja (negocio_id, fecha, total_ventas, total_transferencias, total_efectivo, total_gastos, nota, cerrado_por, foto)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      [negocio_id, fecha, total_ventas || 0, total_transferencias || 0, total_efectivo || 0, total_gastos || 0, nota || null, cerrado_por || null, foto || null],
+      function (err) {
+        if (err) reject(err);
+        else resolve({ id: this.lastID });
+      }
+    );
+  });
+}
+
+function obtenerCierreDelDia(negocio_id, fecha) {
+  return new Promise((resolve, reject) => {
+    db.get(
+      `SELECT * FROM cierres_caja WHERE negocio_id = ? AND fecha = ?`,
+      [negocio_id, fecha],
+      (err, row) => {
+        if (err) reject(err);
+        else resolve(row);
+      }
+    );
+  });
+}
+
+function listarCierres(negocio_id, dias = 30) {
+  return new Promise((resolve, reject) => {
+    db.all(
+      `SELECT * FROM cierres_caja
+       WHERE negocio_id = ?
+       AND creado_en >= datetime('now', '-' || ? || ' days', 'localtime')
+       ORDER BY fecha DESC`,
+      [negocio_id, dias],
+      (err, rows) => {
+        if (err) reject(err);
+        else resolve(rows);
+      }
+    );
+  });
+}
+
+function resumenSemanal(negocio_id) {
+  return new Promise((resolve, reject) => {
+    db.all(
+      `SELECT fecha, total_ventas, total_transferencias, total_efectivo, total_gastos
+       FROM cierres_caja
+       WHERE negocio_id = ?
+       AND creado_en >= datetime('now', '-7 days', 'localtime')
+       ORDER BY fecha ASC`,
+      [negocio_id],
+      (err, rows) => {
+        if (err) reject(err);
+        else {
+          const totales = rows.reduce((acc, r) => ({
+            ventas: acc.ventas + r.total_ventas,
+            transferencias: acc.transferencias + r.total_transferencias,
+            efectivo: acc.efectivo + r.total_efectivo,
+            gastos: acc.gastos + r.total_gastos,
+          }), { ventas: 0, transferencias: 0, efectivo: 0, gastos: 0 });
+          resolve({ dias: rows, totales });
+        }
+      }
+    );
+  });
+}
+
+// ─── Calcular transferencias del día desde pagos REAL ───
+function totalTransferenciasDia(negocio_id, fecha) {
+  return new Promise((resolve, reject) => {
+    db.get(
+      `SELECT COALESCE(SUM(monto), 0) as total, COUNT(*) as cantidad
+       FROM pagos
+       WHERE estado = 'REAL' AND negocio_id = ? AND fecha = ?`,
+      [negocio_id, fecha],
+      (err, row) => {
+        if (err) reject(err);
+        else resolve(row);
+      }
+    );
+  });
+}
+
+// ═══════════════════════════════════════════════════════════
+//  FUNCIONES — GASTOS
+// ═══════════════════════════════════════════════════════════
+
+function registrarGasto(gasto) {
+  return new Promise((resolve, reject) => {
+    const { negocio_id, fecha, monto, categoria, descripcion, registrado_por } = gasto;
+    db.run(
+      `INSERT INTO gastos (negocio_id, fecha, monto, categoria, descripcion, registrado_por)
+       VALUES (?, ?, ?, ?, ?, ?)`,
+      [negocio_id, fecha, monto, categoria || 'general', descripcion || null, registrado_por || null],
+      function (err) {
+        if (err) reject(err);
+        else resolve({ id: this.lastID });
+      }
+    );
+  });
+}
+
+function listarGastos(negocio_id, fecha) {
+  return new Promise((resolve, reject) => {
+    db.all(
+      `SELECT * FROM gastos WHERE negocio_id = ? AND fecha = ? ORDER BY id DESC`,
+      [negocio_id, fecha],
+      (err, rows) => {
+        if (err) reject(err);
+        else resolve(rows);
+      }
+    );
+  });
+}
+
+function totalGastosDia(negocio_id, fecha) {
+  return new Promise((resolve, reject) => {
+    db.get(
+      `SELECT COALESCE(SUM(monto), 0) as total, COUNT(*) as cantidad
+       FROM gastos WHERE negocio_id = ? AND fecha = ?`,
+      [negocio_id, fecha],
+      (err, row) => {
+        if (err) reject(err);
+        else resolve(row);
+      }
+    );
+  });
+}
+
+function gastosPorCategoria(negocio_id, dias = 30) {
+  return new Promise((resolve, reject) => {
+    db.all(
+      `SELECT categoria, SUM(monto) as total, COUNT(*) as cantidad
+       FROM gastos
+       WHERE negocio_id = ?
+       AND creado_en >= datetime('now', '-' || ? || ' days', 'localtime')
+       GROUP BY categoria
+       ORDER BY total DESC`,
+      [negocio_id, dias],
+      (err, rows) => {
+        if (err) reject(err);
+        else resolve(rows);
+      }
+    );
+  });
+}
+
+function eliminarGasto(id, negocio_id) {
+  return new Promise((resolve, reject) => {
+    db.run(
+      `DELETE FROM gastos WHERE id = ? AND negocio_id = ?`,
+      [id, negocio_id],
+      function (err) {
+        if (err) reject(err);
+        else resolve(this.changes);
+      }
+    );
+  });
+}
+
+// ═══════════════════════════════════════════════════════════
 //  EXPORTS
 // ═══════════════════════════════════════════════════════════
 
@@ -375,4 +586,16 @@ module.exports = {
   resumenDelDia,
   totalUltimos30Dias,
   obtenerPagosExportables,
+  // Cierres de caja
+  crearCierreCaja,
+  obtenerCierreDelDia,
+  listarCierres,
+  resumenSemanal,
+  totalTransferenciasDia,
+  // Gastos
+  registrarGasto,
+  listarGastos,
+  totalGastosDia,
+  gastosPorCategoria,
+  eliminarGasto,
 };

@@ -20,8 +20,15 @@ function verificarToken(req, res, next) {
 }
 
 function soloAdmin(req, res, next) {
-  if (!req.user || req.user.rol !== 'admin') {
+  if (!req.user || (req.user.rol !== 'admin' && req.user.rol !== 'superadmin')) {
     return res.status(403).json({ ok: false, error: 'Solo administradores' });
+  }
+  next();
+}
+
+function soloSuperAdmin(req, res, next) {
+  if (!req.user || req.user.rol !== 'superadmin') {
+    return res.status(403).json({ ok: false, error: 'Solo superadmin' });
   }
   next();
 }
@@ -59,4 +66,4 @@ setInterval(() => {
   }
 }, 300000);
 
-module.exports = { verificarToken, soloAdmin, limitarLogin };
+module.exports = { verificarToken, soloAdmin, soloSuperAdmin, limitarLogin };

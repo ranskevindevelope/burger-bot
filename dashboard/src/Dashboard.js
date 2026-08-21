@@ -1,17 +1,16 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid } from 'recharts';
-import { CreditCard, TrendingUp, Search, Download, DollarSign, Calendar, CheckCircle, Shield, Trophy, BarChart3, Eye, X, Moon, Mail, Users, UserPlus, UserX, UserCheck, Edit, Trash2, Save, XCircle, AlertTriangle, Clock, Bell, Activity, Zap, Wifi, WifiOff } from 'lucide-react';
+import { CreditCard, TrendingUp, Search, Download, DollarSign, Calendar, CheckCircle, Shield, Trophy, BarChart3, Eye, X, Moon, Mail, Users, UserPlus, UserX, UserCheck, Edit, Trash2, Save, XCircle, AlertTriangle, Clock, Bell, Activity, Zap, Wifi, WifiOff, ShoppingBag, Receipt, Wallet, PlusCircle, MinusCircle, ArrowDownUp } from 'lucide-react';
 import { createApiClient } from './services/api';
 import Sidebar from './components/Sidebar';
 import DashboardHeader from './components/DashboardHeader';
-import NotificacionesEnVivo from './components/NotificacionesEnVivo';
 
 function Dashboard({ onLogout }) {
   const getInitialSection = () => {
     if (typeof window === 'undefined') return 'panel';
     const params = new URLSearchParams(window.location.search);
     const seccion = params.get('seccion');
-    return ['panel', 'pagos', 'estadisticas', 'buscar', 'exportar', 'duplicados', 'usuarios'].includes(seccion)
+    return ['panel', 'pagos', 'ventas', 'estadisticas', 'buscar', 'exportar', 'duplicados', 'usuarios'].includes(seccion)
       ? seccion
       : 'panel';
   };
@@ -51,6 +50,29 @@ function Dashboard({ onLogout }) {
   const [planInfo, setPlanInfo] = useState(null);
   const [gmailEstado, setGmailEstado] = useState(null);
 
+  // ─── Estado para Ventas (cierre de caja) ───────────────
+  const [ventasResumen, setVentasResumen] = useState(null);
+  const [ventasCierres, setVentasCierres] = useState([]);
+  const [ventasSemanal, setVentasSemanal] = useState(null);
+  const [ventasGastosCategorias, setVentasGastosCategorias] = useState([]);
+  const [montoVentas, setMontoVentas] = useState('');
+  const [notaCierre, setNotaCierre] = useState('');
+  const [gastoMonto, setGastoMonto] = useState('');
+  const [gastoCategoria, setGastoCategoria] = useState('general');
+  const [gastoDescripcion, setGastoDescripcion] = useState('');
+  const [guardandoCierre, setGuardandoCierre] = useState(false);
+  const [guardandoGasto, setGuardandoGasto] = useState(false);
+  const [ventasMensaje, setVentasMensaje] = useState({ tipo: '', texto: '' });
+  const [ventasTab, setVentasTab] = useState('hoy');
+
+  // ─── Estado para filtro por periodo ────────────────────
+  const [periodoMes, setPeriodoMes] = useState(new Date().getMonth() + 1);
+  const [periodoAnio, setPeriodoAnio] = useState(new Date().getFullYear());
+  const [resumenPeriodo, setResumenPeriodo] = useState(null);
+  const [statsPeriodo, setStatsPeriodo] = useState([]);
+  const [pagosPeriodo, setPagosPeriodo] = useState([]);
+  const [cargandoPeriodo, setCargandoPeriodo] = useState(false);
+
   const api = useMemo(() => createApiClient(onLogout), [onLogout]);
 
   const cambiarSeccion = (nuevaSeccion) => {
@@ -81,7 +103,7 @@ function Dashboard({ onLogout }) {
     const manejarPopState = () => {
       const params = new URLSearchParams(window.location.search);
       const seccionDesdeUrl = params.get('seccion');
-      const siguienteSeccion = ['panel', 'pagos', 'estadisticas', 'buscar', 'exportar', 'duplicados', 'usuarios'].includes(seccionDesdeUrl)
+      const siguienteSeccion = ['panel', 'pagos', 'ventas', 'estadisticas', 'buscar', 'exportar', 'duplicados', 'usuarios'].includes(seccionDesdeUrl)
         ? seccionDesdeUrl
         : 'panel';
       setSeccionActiva(siguienteSeccion);
@@ -117,6 +139,14 @@ function Dashboard({ onLogout }) {
   useEffect(() => {
     if (seccionActiva === 'usuarios') cargarUsuarios();
   }, [seccionActiva]);
+
+  useEffect(() => {
+    if (seccionActiva === 'ventas') cargarVentas();
+  }, [seccionActiva]);
+
+  useEffect(() => {
+    if (seccionActiva === 'estadisticas' || seccionActiva === 'pagos' || seccionActiva === 'panel') cargarPeriodo();
+  }, [seccionActiva, periodoMes, periodoAnio]);
 
   const cargarDatos = async () => {
     try {
@@ -313,6 +343,142 @@ function Dashboard({ onLogout }) {
     setErrorUsuario('');
   };
 
+  // ─── Funciones de Periodo ────────────────────────────────
+  const cargarPeriodo = async () => {
+    setCargandoPeriodo(true);
+    const m = String(periodoMes).padStart(2, '0');
+    const a = periodoAnio;
+    try {
+      const [resResumen, resStats, resPagos] = await Promise.all([
+        api.request(`/api/dashboard/resumen-periodo?mes=${m}&anio=${a}`),
+        api.request(`/api/dashboard/stats?mes=${m}&anio=${a}`),
+        api.request(`/api/dashboard/pagos?mes=${m}&anio=${a}&limite=100`),
+      ]);
+      if (resResumen?.ok) setResumenPeriodo(resResumen);
+      setStatsPeriodo(Array.isArray(resStats) ? resStats : []);
+      setPagosPeriodo(Array.isArray(resPagos) ? resPagos : []);
+    } catch (err) {
+      console.error('Error cargando periodo:', err);
+    }
+    setCargandoPeriodo(false);
+  };
+
+  const mesesNombres = ['Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio', 'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'];
+
+  const cambiarMes = (direccion) => {
+    let nuevoMes = periodoMes + direccion;
+    let nuevoAnio = periodoAnio;
+    if (nuevoMes > 12) { nuevoMes = 1; nuevoAnio++; }
+    if (nuevoMes < 1) { nuevoMes = 12; nuevoAnio--; }
+    setPeriodoMes(nuevoMes);
+    setPeriodoAnio(nuevoAnio);
+  };
+
+  const esMesActual = periodoMes === new Date().getMonth() + 1 && periodoAnio === new Date().getFullYear();
+
+  // ─── Funciones de Ventas ─────────────────────────────────
+  const cargarVentas = async () => {
+    try {
+      const [resResumen, resCierres, resSemanal, resCategorias] = await Promise.all([
+        api.request('/api/ventas/resumen'),
+        api.request('/api/ventas/cierres?dias=30'),
+        api.request('/api/ventas/semanal'),
+        api.request('/api/ventas/gastos/categorias'),
+      ]);
+      if (resResumen?.ok) setVentasResumen(resResumen);
+      if (resCierres?.ok) setVentasCierres(resCierres.cierres || []);
+      if (resSemanal?.ok) setVentasSemanal(resSemanal);
+      if (resCategorias?.ok) setVentasGastosCategorias(resCategorias.categorias || []);
+    } catch (err) {
+      console.error('Error cargando ventas:', err);
+    }
+  };
+
+  const hacerCierre = async () => {
+    const monto = parseInt(montoVentas.replace(/[.,\s]/g, ''));
+    if (!monto || monto <= 0) {
+      setVentasMensaje({ tipo: 'error', texto: 'Ingresa el total de ventas del día' });
+      return;
+    }
+    setGuardandoCierre(true);
+    try {
+      const data = await api.request('/api/ventas/cierre', {
+        method: 'POST',
+        body: JSON.stringify({ total_ventas: monto, nota: notaCierre.trim() || null }),
+      });
+      if (data.ok) {
+        setVentasMensaje({ tipo: 'exito', texto: `Cierre guardado: $${monto.toLocaleString('es-CO')} en ventas` });
+        setMontoVentas('');
+        setNotaCierre('');
+        cargarVentas();
+        setTimeout(() => setVentasMensaje({ tipo: '', texto: '' }), 4000);
+      } else {
+        setVentasMensaje({ tipo: 'error', texto: data.error });
+      }
+    } catch (err) {
+      setVentasMensaje({ tipo: 'error', texto: 'Error guardando el cierre' });
+    }
+    setGuardandoCierre(false);
+  };
+
+  const agregarGasto = async () => {
+    const monto = parseInt(gastoMonto.replace(/[.,\s]/g, ''));
+    if (!monto || monto <= 0) {
+      setVentasMensaje({ tipo: 'error', texto: 'Ingresa el monto del gasto' });
+      return;
+    }
+    if (!gastoDescripcion.trim()) {
+      setVentasMensaje({ tipo: 'error', texto: 'Agrega una descripción del gasto' });
+      return;
+    }
+    setGuardandoGasto(true);
+    try {
+      const data = await api.request('/api/ventas/gasto', {
+        method: 'POST',
+        body: JSON.stringify({ monto, categoria: gastoCategoria, descripcion: gastoDescripcion.trim() }),
+      });
+      if (data.ok) {
+        setVentasMensaje({ tipo: 'exito', texto: `Gasto de $${monto.toLocaleString('es-CO')} registrado` });
+        setGastoMonto('');
+        setGastoDescripcion('');
+        setGastoCategoria('general');
+        cargarVentas();
+        setTimeout(() => setVentasMensaje({ tipo: '', texto: '' }), 3000);
+      } else {
+        setVentasMensaje({ tipo: 'error', texto: data.error });
+      }
+    } catch (err) {
+      setVentasMensaje({ tipo: 'error', texto: 'Error registrando gasto' });
+    }
+    setGuardandoGasto(false);
+  };
+
+  const eliminarGastoHandler = async (id) => {
+    if (!window.confirm('¿Eliminar este gasto?')) return;
+    try {
+      const data = await api.request(`/api/ventas/gasto/${id}`, { method: 'DELETE' });
+      if (data.ok) cargarVentas();
+    } catch (err) {
+      console.error('Error eliminando gasto:', err);
+    }
+  };
+
+  const getCategoriaColor = (cat) => {
+    const colores = {
+      general: '#6B7280', insumos: '#F59E0B', nomina: '#3B82F6',
+      servicios: '#8B5CF6', arriendo: '#EF4444', transporte: '#10B981', otro: '#9CA3AF',
+    };
+    return colores[cat] || '#6B7280';
+  };
+
+  const getCategoriaLabel = (cat) => {
+    const labels = {
+      general: 'General', insumos: 'Insumos', nomina: 'Nómina',
+      servicios: 'Servicios', arriendo: 'Arriendo', transporte: 'Transporte', otro: 'Otro',
+    };
+    return labels[cat] || cat;
+  };
+
   const formatearMonto = (monto) => '$' + Number(monto).toLocaleString('es-CO');
 
   const getBancoBadge = (banco) => {
@@ -371,9 +537,8 @@ function Dashboard({ onLogout }) {
     );
   }
 
-    return (
+  return (
     <div className="layout">
-      <NotificacionesEnVivo onLogout={onLogout} />
       {sidebarAbierto && <div className="sidebar-overlay" onClick={() => setSidebarAbierto(false)} />}
       <Sidebar
         activeSection={seccionActiva}
@@ -600,30 +765,53 @@ function Dashboard({ onLogout }) {
                 <div className="seccion dashboard-chart-card">
                   <div className="seccion-header">
                     <h2 className="seccion-titulo"><BarChart3 size={18} /> Ventas por día</h2>
-                    <div style={{ display: 'flex', gap: '0.4rem' }}>
-                      {[7, 15, 30].map(d => (
-                        <button
-                          key={d}
-                          onClick={() => setDiasGrafica(d)}
-                          style={{
-                            padding: '0.35rem 0.75rem',
-                            borderRadius: 8,
-                            border: diasGrafica === d ? 'none' : '2px solid #e8e8f0',
-                            background: diasGrafica === d ? '#F57C00' : 'transparent',
-                            color: diasGrafica === d ? 'white' : '#4a4a68',
-                            fontWeight: 600,
-                            fontSize: '0.8rem',
-                            cursor: 'pointer',
-                          }}
-                        >
-                          {d}d
-                        </button>
-                      ))}
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+                      <button onClick={() => cambiarMes(-1)} style={{
+                        width: 28, height: 28, borderRadius: 8, border: '2px solid #e8e8f0',
+                        background: 'transparent', cursor: 'pointer', display: 'flex',
+                        alignItems: 'center', justifyContent: 'center', fontSize: '0.9rem', color: '#4a4a68',
+                      }}>‹</button>
+                      <div style={{
+                        padding: '0.3rem 0.7rem', borderRadius: 8, background: '#F57C00',
+                        color: '#fff', fontWeight: 600, fontSize: '0.75rem', minWidth: 100, textAlign: 'center',
+                      }}>
+                        {mesesNombres[periodoMes - 1]} {periodoAnio}
+                      </div>
+                      <button onClick={() => cambiarMes(1)} disabled={esMesActual} style={{
+                        width: 28, height: 28, borderRadius: 8, border: '2px solid #e8e8f0',
+                        background: 'transparent', cursor: esMesActual ? 'default' : 'pointer',
+                        display: 'flex', alignItems: 'center', justifyContent: 'center',
+                        fontSize: '0.9rem', color: '#4a4a68', opacity: esMesActual ? 0.3 : 1,
+                      }}>›</button>
                     </div>
                   </div>
+                  {/* Resumen rápido del periodo */}
+                  {resumenPeriodo && (
+                    <div style={{
+                      display: 'flex', gap: '1rem', padding: '0.5rem 0 0.75rem',
+                      borderBottom: '1px solid #f0f0f5', marginBottom: '0.5rem', flexWrap: 'wrap',
+                    }}>
+                      <div style={{ fontSize: '0.78rem', color: '#666' }}>
+                        Total: <strong style={{ color: '#1a1a2e' }}>{formatearMonto(resumenPeriodo.total)}</strong>
+                      </div>
+                      <div style={{ fontSize: '0.78rem', color: '#666' }}>
+                        Pagos: <strong style={{ color: '#1a1a2e' }}>{resumenPeriodo.cantidad}</strong>
+                      </div>
+                      <div style={{ fontSize: '0.78rem', color: '#666' }}>
+                        Promedio: <strong style={{ color: '#1a1a2e' }}>{formatearMonto(resumenPeriodo.ticket_promedio)}</strong>
+                      </div>
+                      <div style={{ fontSize: '0.78rem', color: '#666' }}>
+                        Mejor: <strong style={{ color: '#2E7D32' }}>{formatearMonto(resumenPeriodo.pago_mas_alto)}</strong>
+                      </div>
+                    </div>
+                  )}
                   <div className="grafica-container">
-                    <ResponsiveContainer width="100%" height={280}>
-                      <BarChart data={statsFormateados}>
+                    <ResponsiveContainer width="100%" height={250}>
+                      <BarChart data={statsPeriodo.length > 0 ? statsPeriodo.map(s => ({
+                        ...s,
+                        fecha: s.fecha ? s.fecha.slice(8, 10) + '/' + s.fecha.slice(5, 7) : (s.fecha || '').slice(0, 5),
+                        totalK: Math.round(s.total / 1000),
+                      })) : statsFormateados}>
                         <CartesianGrid strokeDasharray="3 3" stroke="rgba(0,0,0,0.06)" />
                         <XAxis dataKey="fecha" tick={{ fontSize: 11 }} />
                         <YAxis tickFormatter={(v) => `$${v}k`} tick={{ fontSize: 11 }} />
@@ -721,55 +909,122 @@ function Dashboard({ onLogout }) {
 
           {/* ─── PAGOS ───────────────────────────── */}
           {seccionActiva === 'pagos' && (
-            <div className="seccion">
-              <div className="seccion-header">
-                <h2 className="seccion-titulo">Todos los pagos</h2>
-                <button className="exportar-btn" onClick={exportarPagos}>
-                  <Download size={14} /> Exportar Excel
-                </button>
+            <>
+              {/* Selector de mes */}
+              <div style={{
+                display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+                marginBottom: '1.25rem', flexWrap: 'wrap', gap: '0.75rem',
+              }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                  <button onClick={() => cambiarMes(-1)} style={{
+                    width: 36, height: 36, borderRadius: 10, border: '2px solid #e8e8f0',
+                    background: '#fff', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  }}>
+                    <span style={{ fontSize: '1.1rem' }}>‹</span>
+                  </button>
+                  <div style={{
+                    padding: '0.5rem 1.25rem', borderRadius: 10, background: '#F57C00',
+                    color: '#fff', fontWeight: 700, fontSize: '0.95rem', minWidth: 160, textAlign: 'center',
+                  }}>
+                    {mesesNombres[periodoMes - 1]} {periodoAnio}
+                  </div>
+                  <button onClick={() => cambiarMes(1)} disabled={esMesActual} style={{
+                    width: 36, height: 36, borderRadius: 10, border: '2px solid #e8e8f0',
+                    background: esMesActual ? '#f5f5f5' : '#fff', cursor: esMesActual ? 'default' : 'pointer',
+                    display: 'flex', alignItems: 'center', justifyContent: 'center', opacity: esMesActual ? 0.4 : 1,
+                  }}>
+                    <span style={{ fontSize: '1.1rem' }}>›</span>
+                  </button>
+                </div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+                  <span style={{ fontSize: '0.85rem', color: '#666', fontWeight: 500 }}>
+                    {pagosPeriodo.length} pagos — {formatearMonto(pagosPeriodo.reduce((s, p) => s + p.monto, 0))}
+                  </span>
+                  <button className="exportar-btn" onClick={exportarPagos}>
+                    <Download size={14} /> Exportar
+                  </button>
+                </div>
               </div>
-              <div className="tabla-container">
-                <table className="tabla-pagos">
-                  <thead><tr><th>Cliente</th><th>Monto</th><th>Banco</th><th>Fecha</th><th>Hora</th><th>Fuente</th><th>Foto</th></tr></thead>
-                  <tbody>
-                    {pagos.map((pago) => {
-                      const banco = getBancoBadge(pago.banco);
-                      return (
-                        <tr key={pago.id}>
-                          <td className="td-cliente">{pago.nombre_cliente || 'Sin nombre'}</td>
-                          <td className="td-monto">{formatearMonto(pago.monto)}</td>
-                          <td><span className={`banco-badge ${banco.clase}`}>{banco.nombre}</span></td>
-                          <td>{pago.fecha || '-'}</td>
-                          <td>{pago.hora || '-'}</td>
-                          <td>
-                            <span className={`fuente-badge ${pago.fuente === 'gmail_nocturna' ? 'fuente-nocturna' : 'fuente-gmail'}`}>
-                              {pago.fuente === 'gmail_nocturna' ? <><Moon size={11} /> asincronica</> : <><Mail size={11} /> Gmail</>}
-                            </span>
-                          </td>
-                          <td>
-                            {pago.foto ? (
-                              <button className="ver-foto-btn" onClick={() => setFotoActiva(pago.foto)}><Eye size={13} /> Ver</button>
-                            ) : (<span className="sin-foto">—</span>)}
-                          </td>
-                        </tr>
-                      );
-                    })}
-                  </tbody>
-                </table>
+              <div className="seccion">
+                <div className="tabla-container">
+                  <table className="tabla-pagos">
+                    <thead><tr><th>Cliente</th><th>Monto</th><th>Banco</th><th>Fecha</th><th>Hora</th><th>Fuente</th><th>Foto</th></tr></thead>
+                    <tbody>
+                      {pagosPeriodo.length === 0 ? (
+                        <tr><td colSpan="7" style={{ textAlign: 'center', padding: '2rem', color: '#999' }}>No hay pagos en {mesesNombres[periodoMes - 1]} {periodoAnio}</td></tr>
+                      ) : (
+                        pagosPeriodo.map((pago) => {
+                          const banco = getBancoBadge(pago.banco);
+                          return (
+                            <tr key={pago.id}>
+                              <td className="td-cliente">{pago.nombre_cliente || 'Sin nombre'}</td>
+                              <td className="td-monto">{formatearMonto(pago.monto)}</td>
+                              <td><span className={`banco-badge ${banco.clase}`}>{banco.nombre}</span></td>
+                              <td>{pago.fecha || '-'}</td>
+                              <td>{pago.hora || '-'}</td>
+                              <td>
+                                <span className={`fuente-badge ${pago.fuente === 'gmail_nocturna' ? 'fuente-nocturna' : 'fuente-gmail'}`}>
+                                  {pago.fuente === 'gmail_nocturna' ? <><Moon size={11} /> asincronica</> : <><Mail size={11} /> Gmail</>}
+                                </span>
+                              </td>
+                              <td>
+                                {pago.foto ? (
+                                  <button className="ver-foto-btn" onClick={() => setFotoActiva(pago.foto)}><Eye size={13} /> Ver</button>
+                                ) : (<span className="sin-foto">—</span>)}
+                              </td>
+                            </tr>
+                          );
+                        })
+                      )}
+                    </tbody>
+                  </table>
+                </div>
               </div>
-            </div>
+            </>
           )}
 
           {/* ─── ESTADÍSTICAS ────────────────────── */}
           {seccionActiva === 'estadisticas' && (
             <>
+              {/* Selector de mes */}
+              <div style={{
+                display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+                marginBottom: '1.25rem', flexWrap: 'wrap', gap: '0.75rem',
+              }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                  <button onClick={() => cambiarMes(-1)} style={{
+                    width: 36, height: 36, borderRadius: 10, border: '2px solid #e8e8f0',
+                    background: '#fff', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  }}>
+                    <span style={{ fontSize: '1.1rem' }}>‹</span>
+                  </button>
+                  <div style={{
+                    padding: '0.5rem 1.25rem', borderRadius: 10, background: '#F57C00',
+                    color: '#fff', fontWeight: 700, fontSize: '0.95rem', minWidth: 160, textAlign: 'center',
+                  }}>
+                    {mesesNombres[periodoMes - 1]} {periodoAnio}
+                  </div>
+                  <button onClick={() => cambiarMes(1)} disabled={esMesActual} style={{
+                    width: 36, height: 36, borderRadius: 10, border: '2px solid #e8e8f0',
+                    background: esMesActual ? '#f5f5f5' : '#fff', cursor: esMesActual ? 'default' : 'pointer',
+                    display: 'flex', alignItems: 'center', justifyContent: 'center', opacity: esMesActual ? 0.4 : 1,
+                  }}>
+                    <span style={{ fontSize: '1.1rem' }}>›</span>
+                  </button>
+                </div>
+                {cargandoPeriodo && (
+                  <span style={{ fontSize: '0.8rem', color: '#999' }}>Cargando...</span>
+                )}
+              </div>
+
+              {/* Cards del periodo */}
               <div className="tarjetas-grid">
                 <div className="tarjeta tarjeta-accent">
                   <div className="tarjeta-icon-box tarjeta-icon-naranja"><DollarSign size={22} /></div>
                   <div className="tarjeta-info">
-                    <span className="tarjeta-label">Total del mes</span>
-                    <span className="tarjeta-valor">{formatearMonto(totales.mes.total)}</span>
-                    <span className="tarjeta-sub">{totales.mes.cantidad} transacciones</span>
+                    <span className="tarjeta-label">Total {mesesNombres[periodoMes - 1]}</span>
+                    <span className="tarjeta-valor">{formatearMonto(resumenPeriodo?.total || 0)}</span>
+                    <span className="tarjeta-sub">{resumenPeriodo?.cantidad || 0} transacciones</span>
                   </div>
                 </div>
                 <div className="tarjeta">
@@ -777,19 +1032,19 @@ function Dashboard({ onLogout }) {
                   <div className="tarjeta-info">
                     <span className="tarjeta-label">Promedio diario</span>
                     <span className="tarjeta-valor">
-                      {stats.length > 0 ? formatearMonto(Math.round(totales.mes.total / stats.length)) : '$0'}
+                      {resumenPeriodo?.dias_con_ventas > 0 ? formatearMonto(Math.round(resumenPeriodo.total / resumenPeriodo.dias_con_ventas)) : '$0'}
                     </span>
-                    <span className="tarjeta-sub">{stats.length} días con ventas</span>
+                    <span className="tarjeta-sub">{resumenPeriodo?.dias_con_ventas || 0} días con ventas</span>
                   </div>
                 </div>
                 <div className="tarjeta">
                   <div className="tarjeta-icon-box tarjeta-icon-verde"><Trophy size={22} /></div>
                   <div className="tarjeta-info">
-                    <span className="tarjeta-label">Mejor día</span>
+                    <span className="tarjeta-label">Pago más alto</span>
                     <span className="tarjeta-valor">
-                      {stats.length > 0 ? formatearMonto(Math.max(...stats.map(s => s.total))) : '$0'}
+                      {formatearMonto(resumenPeriodo?.pago_mas_alto || 0)}
                     </span>
-                    <span className="tarjeta-sub">Venta más alta en un día</span>
+                    <span className="tarjeta-sub">En una sola transacción</span>
                   </div>
                 </div>
                 <div className="tarjeta">
@@ -797,26 +1052,71 @@ function Dashboard({ onLogout }) {
                   <div className="tarjeta-info">
                     <span className="tarjeta-label">Ticket promedio</span>
                     <span className="tarjeta-valor">
-                      {totales.mes.cantidad > 0 ? formatearMonto(Math.round(totales.mes.total / totales.mes.cantidad)) : '$0'}
+                      {formatearMonto(resumenPeriodo?.ticket_promedio || 0)}
                     </span>
                     <span className="tarjeta-sub">Por transacción</span>
                   </div>
                 </div>
               </div>
-              <div className="seccion">
-                <h2 className="seccion-titulo"><TrendingUp size={18} /> Tendencia de ventas ({diasGrafica} días)</h2>
-                <div className="grafica-container">
-                  <ResponsiveContainer width="100%" height={300}>
-                    <BarChart data={statsFormateados}>
-                      <CartesianGrid strokeDasharray="3 3" stroke="rgba(0,0,0,0.06)" />
-                      <XAxis dataKey="fecha" tick={{ fontSize: 11 }} />
-                      <YAxis tickFormatter={(v) => `$${v}k`} tick={{ fontSize: 11 }} />
-                      <Tooltip formatter={(value) => [formatearMonto(value * 1000), 'Total']} />
-                      <Bar dataKey="totalK" fill="#F57C00" radius={[6, 6, 0, 0]} />
-                    </BarChart>
-                  </ResponsiveContainer>
+
+              {/* Gráfica del periodo */}
+              <div className="seccion" style={{ marginBottom: '1.25rem' }}>
+                <div className="seccion-header">
+                  <h2 className="seccion-titulo"><TrendingUp size={18} /> Ventas por día — {mesesNombres[periodoMes - 1]} {periodoAnio}</h2>
                 </div>
+                {statsPeriodo.length === 0 ? (
+                  <p className="empty-state">No hay ventas registradas en este mes.</p>
+                ) : (
+                  <div className="grafica-container">
+                    <ResponsiveContainer width="100%" height={300}>
+                      <BarChart data={statsPeriodo.map(s => ({
+                        ...s,
+                        fecha: s.fecha ? s.fecha.slice(8, 10) + '/' + s.fecha.slice(5, 7) : '',
+                        totalK: Math.round(s.total / 1000),
+                      }))}>
+                        <CartesianGrid strokeDasharray="3 3" stroke="rgba(0,0,0,0.06)" />
+                        <XAxis dataKey="fecha" tick={{ fontSize: 11 }} />
+                        <YAxis tickFormatter={(v) => `$${v}k`} tick={{ fontSize: 11 }} />
+                        <Tooltip formatter={(value) => [formatearMonto(value * 1000), 'Total']} />
+                        <Bar dataKey="totalK" fill="#F57C00" radius={[6, 6, 0, 0]} />
+                      </BarChart>
+                    </ResponsiveContainer>
+                  </div>
+                )}
               </div>
+
+              {/* Bancos más usados */}
+              {resumenPeriodo?.bancos?.length > 0 && (
+                <div className="seccion">
+                  <h2 className="seccion-titulo"><CreditCard size={18} /> Bancos más usados</h2>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '0.6rem', marginTop: '0.75rem' }}>
+                    {resumenPeriodo.bancos.map((b) => {
+                      const max = Math.max(...resumenPeriodo.bancos.map(x => x.total));
+                      const pct = max > 0 ? Math.round((b.total / max) * 100) : 0;
+                      const banco = getBancoBadge(b.banco);
+                      return (
+                        <div key={b.banco}>
+                          <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.25rem' }}>
+                            <span style={{ fontSize: '0.85rem', fontWeight: 500 }}>
+                              <span className={`banco-badge ${banco.clase}`} style={{ marginRight: '0.4rem' }}>{banco.nombre}</span>
+                              {b.cantidad} pagos
+                            </span>
+                            <span style={{ fontSize: '0.85rem', fontWeight: 600 }}>
+                              {formatearMonto(b.total)}
+                            </span>
+                          </div>
+                          <div style={{ height: 8, background: '#f0f0f5', borderRadius: 4, overflow: 'hidden' }}>
+                            <div style={{
+                              width: `${pct}%`, height: '100%', background: '#F57C00',
+                              borderRadius: 4, transition: 'width 0.5s ease',
+                            }} />
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
             </>
           )}
 
@@ -881,6 +1181,460 @@ function Dashboard({ onLogout }) {
                 </button>
               </div>
             </div>
+          )}
+
+          {/* ─── VENTAS (Cierre de Caja) ────────── */}
+          {seccionActiva === 'ventas' && (
+            <>
+              {/* Mensajes */}
+              {ventasMensaje.texto && (
+                <div className={`usuario-alerta ${ventasMensaje.tipo === 'exito' ? 'usuario-exito' : 'usuario-error'}`}>
+                  {ventasMensaje.tipo === 'exito' ? <CheckCircle size={16} /> : <XCircle size={16} />} {ventasMensaje.texto}
+                </div>
+              )}
+
+              {/* Tabs */}
+              <div style={{ display: 'flex', gap: '0.5rem', marginBottom: '1.25rem' }}>
+                {[
+                  { id: 'hoy', label: 'Hoy', icon: <Receipt size={15} /> },
+                  { id: 'historial', label: 'Historial', icon: <Calendar size={15} /> },
+                  { id: 'gastos', label: 'Gastos', icon: <MinusCircle size={15} /> },
+                ].map(tab => (
+                  <button key={tab.id} onClick={() => setVentasTab(tab.id)} style={{
+                    padding: '0.5rem 1rem', borderRadius: 10, border: 'none', cursor: 'pointer',
+                    display: 'flex', alignItems: 'center', gap: '0.4rem', fontSize: '0.85rem', fontWeight: 600,
+                    background: ventasTab === tab.id ? '#F57C00' : '#f0f0f5',
+                    color: ventasTab === tab.id ? '#fff' : '#4a4a68',
+                  }}>
+                    {tab.icon} {tab.label}
+                  </button>
+                ))}
+              </div>
+
+              {/* ── TAB: HOY ──────────────────────────── */}
+              {ventasTab === 'hoy' && (
+                <>
+                  {/* Cards resumen del día */}
+                  <div className="tarjetas-grid">
+                    <div className="tarjeta tarjeta-accent">
+                      <div className="tarjeta-icon-box tarjeta-icon-naranja"><ArrowDownUp size={22} /></div>
+                      <div className="tarjeta-info">
+                        <span className="tarjeta-label">Transferencias hoy</span>
+                        <span className="tarjeta-valor">{formatearMonto(ventasResumen?.transferencias?.total || 0)}</span>
+                        <span className="tarjeta-sub">{ventasResumen?.transferencias?.cantidad || 0} verificadas</span>
+                      </div>
+                    </div>
+                    <div className="tarjeta">
+                      <div className="tarjeta-icon-box tarjeta-icon-rojo"><MinusCircle size={22} /></div>
+                      <div className="tarjeta-info">
+                        <span className="tarjeta-label">Gastos hoy</span>
+                        <span className="tarjeta-valor" style={{ color: '#E53935' }}>{formatearMonto(ventasResumen?.gastos?.total || 0)}</span>
+                        <span className="tarjeta-sub">{ventasResumen?.gastos?.cantidad || 0} registrados</span>
+                      </div>
+                    </div>
+                    <div className="tarjeta">
+                      <div className="tarjeta-icon-box tarjeta-icon-verde"><Wallet size={22} /></div>
+                      <div className="tarjeta-info">
+                        <span className="tarjeta-label">Efectivo esperado</span>
+                        <span className="tarjeta-valor" style={{ color: '#43A047' }}>
+                          {ventasResumen?.cierre
+                            ? formatearMonto(ventasResumen.cierre.total_efectivo)
+                            : '—'}
+                        </span>
+                        <span className="tarjeta-sub">{ventasResumen?.cierre ? 'Cierre registrado' : 'Sin cierre aún'}</span>
+                      </div>
+                    </div>
+                    <div className="tarjeta">
+                      <div className="tarjeta-icon-box tarjeta-icon-morado"><ShoppingBag size={22} /></div>
+                      <div className="tarjeta-info">
+                        <span className="tarjeta-label">Total ventas</span>
+                        <span className="tarjeta-valor">
+                          {ventasResumen?.cierre
+                            ? formatearMonto(ventasResumen.cierre.total_ventas)
+                            : '—'}
+                        </span>
+                        <span className="tarjeta-sub">{ventasResumen?.cierre ? 'Del cierre de caja' : 'Pendiente de cierre'}</span>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="dashboard-overview-grid">
+                    {/* Cierre de caja */}
+                    <div className="seccion dashboard-chart-card">
+                      <div className="seccion-header">
+                        <h2 className="seccion-titulo"><Receipt size={18} /> Cierre de caja</h2>
+                      </div>
+                      {ventasResumen?.cierre ? (
+                        <div style={{ padding: '0.5rem 0' }}>
+                          <div style={{
+                            background: '#E8F5E9', borderRadius: 10, padding: '1rem 1.25rem',
+                            marginBottom: '1rem', display: 'flex', alignItems: 'center', gap: '0.75rem',
+                          }}>
+                            <CheckCircle size={20} color="#2E7D32" />
+                            <div>
+                              <div style={{ fontWeight: 600, color: '#1B5E20', fontSize: '0.9rem' }}>Cierre registrado hoy</div>
+                              <div style={{ fontSize: '0.8rem', color: '#388E3C' }}>por {ventasResumen.cierre.cerrado_por}</div>
+                            </div>
+                          </div>
+                          <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+                            {[
+                              { label: 'Total ventas', valor: ventasResumen.cierre.total_ventas, color: '#1a1a2e' },
+                              { label: 'Transferencias', valor: ventasResumen.cierre.total_transferencias, color: '#1565C0' },
+                              { label: 'Efectivo en caja', valor: ventasResumen.cierre.total_efectivo, color: '#2E7D32' },
+                              { label: 'Gastos del día', valor: ventasResumen.cierre.total_gastos, color: '#E53935' },
+                            ].map((item, i) => (
+                              <div key={i} style={{
+                                display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+                                padding: '0.5rem 0', borderBottom: i < 3 ? '1px solid #f0f0f5' : 'none',
+                              }}>
+                                <span style={{ fontSize: '0.85rem', color: '#4a4a68' }}>{item.label}</span>
+                                <span style={{ fontSize: '1rem', fontWeight: 700, color: item.color }}>{formatearMonto(item.valor)}</span>
+                              </div>
+                            ))}
+                          </div>
+                          {ventasResumen.cierre.nota && (
+                            <div style={{
+                              marginTop: '0.75rem', padding: '0.6rem 0.8rem', background: '#f8f8fc',
+                              borderRadius: 8, fontSize: '0.82rem', color: '#666',
+                            }}>
+                              📝 {ventasResumen.cierre.nota}
+                            </div>
+                          )}
+                        </div>
+                      ) : (
+                        <div style={{ padding: '0.5rem 0' }}>
+                          <p style={{ fontSize: '0.85rem', color: '#666', marginBottom: '1rem' }}>
+                            Ingresa el total de ventas del día (del ticket de la caja registradora). El sistema calcula el efectivo restando las transferencias verificadas.
+                          </p>
+                          <div style={{ marginBottom: '0.75rem' }}>
+                            <label style={{ fontSize: '0.8rem', color: '#4a4a68', fontWeight: 600, marginBottom: '0.3rem', display: 'block' }}>
+                              Total de ventas del día ($)
+                            </label>
+                            <input
+                              type="text"
+                              placeholder="Ej: 235100"
+                              value={montoVentas}
+                              onChange={(e) => setMontoVentas(e.target.value.replace(/[^0-9]/g, ''))}
+                              style={{
+                                width: '100%', padding: '0.65rem 0.8rem', borderRadius: 8,
+                                border: '2px solid #e8e8f0', fontSize: '1.1rem', fontWeight: 600,
+                                outline: 'none', boxSizing: 'border-box',
+                              }}
+                            />
+                            {montoVentas && (
+                              <div style={{ fontSize: '0.8rem', color: '#F57C00', marginTop: '0.3rem', fontWeight: 500 }}>
+                                {formatearMonto(parseInt(montoVentas) || 0)}
+                              </div>
+                            )}
+                          </div>
+                          <div style={{ marginBottom: '0.75rem' }}>
+                            <label style={{ fontSize: '0.8rem', color: '#4a4a68', fontWeight: 600, marginBottom: '0.3rem', display: 'block' }}>
+                              Nota (opcional)
+                            </label>
+                            <input
+                              type="text"
+                              placeholder="Ej: Día normal, faltó cambio"
+                              value={notaCierre}
+                              onChange={(e) => setNotaCierre(e.target.value)}
+                              style={{
+                                width: '100%', padding: '0.55rem 0.8rem', borderRadius: 8,
+                                border: '2px solid #e8e8f0', fontSize: '0.85rem',
+                                outline: 'none', boxSizing: 'border-box',
+                              }}
+                            />
+                          </div>
+                          <div style={{
+                            background: '#FFF3E0', borderRadius: 8, padding: '0.6rem 0.8rem',
+                            marginBottom: '1rem', fontSize: '0.8rem', color: '#E65100',
+                            display: 'flex', alignItems: 'center', gap: '0.4rem',
+                          }}>
+                            <ArrowDownUp size={14} />
+                            Transferencias verificadas hoy: <strong>{formatearMonto(ventasResumen?.transferencias?.total || 0)}</strong> ({ventasResumen?.transferencias?.cantidad || 0} pagos)
+                          </div>
+                          <button
+                            disabled={guardandoCierre || !montoVentas}
+                            onClick={hacerCierre}
+                            style={{
+                              width: '100%', padding: '0.7rem', borderRadius: 10, border: 'none',
+                              background: montoVentas ? '#F57C00' : '#e0e0e0',
+                              color: montoVentas ? '#fff' : '#999', fontWeight: 700,
+                              fontSize: '0.9rem', cursor: montoVentas ? 'pointer' : 'default',
+                              display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.4rem',
+                            }}
+                          >
+                            <Receipt size={16} /> {guardandoCierre ? 'Guardando...' : 'Cerrar caja del día'}
+                          </button>
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Gastos rápidos */}
+                    <div className="seccion alertas-card">
+                      <div className="seccion-header">
+                        <h2 className="seccion-titulo"><MinusCircle size={18} /> Registrar gasto</h2>
+                      </div>
+                      <div style={{ marginBottom: '0.6rem' }}>
+                        <input
+                          type="text"
+                          placeholder="Monto ($)"
+                          value={gastoMonto}
+                          onChange={(e) => setGastoMonto(e.target.value.replace(/[^0-9]/g, ''))}
+                          style={{
+                            width: '100%', padding: '0.55rem 0.8rem', borderRadius: 8,
+                            border: '2px solid #e8e8f0', fontSize: '0.95rem', fontWeight: 600,
+                            outline: 'none', marginBottom: '0.5rem', boxSizing: 'border-box',
+                          }}
+                        />
+                        <select
+                          value={gastoCategoria}
+                          onChange={(e) => setGastoCategoria(e.target.value)}
+                          style={{
+                            width: '100%', padding: '0.5rem 0.8rem', borderRadius: 8,
+                            border: '2px solid #e8e8f0', fontSize: '0.85rem',
+                            outline: 'none', marginBottom: '0.5rem', background: '#fff', boxSizing: 'border-box',
+                          }}
+                        >
+                          <option value="general">General</option>
+                          <option value="insumos">Insumos</option>
+                          <option value="nomina">Nómina</option>
+                          <option value="servicios">Servicios</option>
+                          <option value="arriendo">Arriendo</option>
+                          <option value="transporte">Transporte</option>
+                          <option value="otro">Otro</option>
+                        </select>
+                        <input
+                          type="text"
+                          placeholder="Descripción del gasto"
+                          value={gastoDescripcion}
+                          onChange={(e) => setGastoDescripcion(e.target.value)}
+                          style={{
+                            width: '100%', padding: '0.55rem 0.8rem', borderRadius: 8,
+                            border: '2px solid #e8e8f0', fontSize: '0.85rem',
+                            outline: 'none', marginBottom: '0.6rem', boxSizing: 'border-box',
+                          }}
+                        />
+                        <button
+                          disabled={guardandoGasto || !gastoMonto || !gastoDescripcion.trim()}
+                          onClick={agregarGasto}
+                          style={{
+                            width: '100%', padding: '0.6rem', borderRadius: 8, border: 'none',
+                            background: gastoMonto && gastoDescripcion.trim() ? '#E53935' : '#e0e0e0',
+                            color: gastoMonto && gastoDescripcion.trim() ? '#fff' : '#999',
+                            fontWeight: 600, fontSize: '0.85rem', cursor: gastoMonto ? 'pointer' : 'default',
+                            display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.4rem',
+                          }}
+                        >
+                          <PlusCircle size={15} /> {guardandoGasto ? 'Guardando...' : 'Registrar gasto'}
+                        </button>
+                      </div>
+
+                      {/* Lista de gastos de hoy */}
+                      {ventasResumen?.gastos?.lista?.length > 0 && (
+                        <div style={{ borderTop: '1px solid #f0f0f5', paddingTop: '0.6rem', marginTop: '0.3rem' }}>
+                          <div style={{ fontSize: '0.78rem', color: '#999', fontWeight: 600, marginBottom: '0.4rem' }}>
+                            GASTOS DE HOY
+                          </div>
+                          {ventasResumen.gastos.lista.map((g) => (
+                            <div key={g.id} style={{
+                              display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+                              padding: '0.4rem 0', borderBottom: '1px solid #f8f8fc',
+                            }}>
+                              <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                                <span style={{
+                                  width: 8, height: 8, borderRadius: '50%',
+                                  background: getCategoriaColor(g.categoria), flexShrink: 0,
+                                }} />
+                                <div>
+                                  <div style={{ fontSize: '0.82rem', fontWeight: 500 }}>{g.descripcion}</div>
+                                  <div style={{ fontSize: '0.72rem', color: '#999' }}>{getCategoriaLabel(g.categoria)}</div>
+                                </div>
+                              </div>
+                              <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+                                <span style={{ fontSize: '0.85rem', fontWeight: 600, color: '#E53935' }}>
+                                  -{formatearMonto(g.monto)}
+                                </span>
+                                {esAdmin && (
+                                  <button onClick={() => eliminarGastoHandler(g.id)}
+                                    style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 2, color: '#ccc' }}>
+                                    <Trash2 size={13} />
+                                  </button>
+                                )}
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                </>
+              )}
+
+              {/* ── TAB: HISTORIAL ────────────────────── */}
+              {ventasTab === 'historial' && (
+                <>
+                  {/* Resumen semanal cards */}
+                  {ventasSemanal && (
+                    <div className="tarjetas-grid">
+                      <div className="tarjeta tarjeta-accent">
+                        <div className="tarjeta-icon-box tarjeta-icon-naranja"><ShoppingBag size={22} /></div>
+                        <div className="tarjeta-info">
+                          <span className="tarjeta-label">Ventas (7 días)</span>
+                          <span className="tarjeta-valor">{formatearMonto(ventasSemanal.totales?.ventas || 0)}</span>
+                          <span className="tarjeta-sub">{ventasSemanal.dias?.length || 0} cierres</span>
+                        </div>
+                      </div>
+                      <div className="tarjeta">
+                        <div className="tarjeta-icon-box tarjeta-icon-azul"><ArrowDownUp size={22} /></div>
+                        <div className="tarjeta-info">
+                          <span className="tarjeta-label">Transferencias</span>
+                          <span className="tarjeta-valor">{formatearMonto(ventasSemanal.totales?.transferencias || 0)}</span>
+                          <span className="tarjeta-sub">Verificadas en la semana</span>
+                        </div>
+                      </div>
+                      <div className="tarjeta">
+                        <div className="tarjeta-icon-box tarjeta-icon-verde"><Wallet size={22} /></div>
+                        <div className="tarjeta-info">
+                          <span className="tarjeta-label">Efectivo</span>
+                          <span className="tarjeta-valor" style={{ color: '#43A047' }}>{formatearMonto(ventasSemanal.totales?.efectivo || 0)}</span>
+                          <span className="tarjeta-sub">Total en caja</span>
+                        </div>
+                      </div>
+                      <div className="tarjeta">
+                        <div className="tarjeta-icon-box tarjeta-icon-rojo"><MinusCircle size={22} /></div>
+                        <div className="tarjeta-info">
+                          <span className="tarjeta-label">Gastos</span>
+                          <span className="tarjeta-valor" style={{ color: '#E53935' }}>{formatearMonto(ventasSemanal.totales?.gastos || 0)}</span>
+                          <span className="tarjeta-sub">En la semana</span>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Gráfica semanal */}
+                  {ventasSemanal?.dias?.length > 0 && (
+                    <div className="seccion" style={{ marginBottom: '1.25rem' }}>
+                      <h2 className="seccion-titulo"><BarChart3 size={18} /> Ventas vs Efectivo (7 días)</h2>
+                      <div className="grafica-container">
+                        <ResponsiveContainer width="100%" height={260}>
+                          <BarChart data={ventasSemanal.dias.map(d => ({
+                            fecha: d.fecha?.slice(0, 5) || '',
+                            ventas: Math.round(d.total_ventas / 1000),
+                            efectivo: Math.round(d.total_efectivo / 1000),
+                          }))}>
+                            <CartesianGrid strokeDasharray="3 3" stroke="rgba(0,0,0,0.06)" />
+                            <XAxis dataKey="fecha" tick={{ fontSize: 11 }} />
+                            <YAxis tickFormatter={(v) => `$${v}k`} tick={{ fontSize: 11 }} />
+                            <Tooltip formatter={(value, name) => [formatearMonto(value * 1000), name === 'ventas' ? 'Ventas' : 'Efectivo']} />
+                            <Bar dataKey="ventas" fill="#F57C00" radius={[6, 6, 0, 0]} name="ventas" />
+                            <Bar dataKey="efectivo" fill="#43A047" radius={[6, 6, 0, 0]} name="efectivo" />
+                          </BarChart>
+                        </ResponsiveContainer>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Tabla historial */}
+                  <div className="seccion">
+                    <div className="seccion-header">
+                      <h2 className="seccion-titulo"><Calendar size={18} /> Historial de cierres</h2>
+                      <span style={{ fontSize: '0.8rem', color: '#999' }}>{ventasCierres.length} cierres</span>
+                    </div>
+                    {ventasCierres.length === 0 ? (
+                      <p className="empty-state">No hay cierres registrados aún.</p>
+                    ) : (
+                      <div className="tabla-container">
+                        <table className="tabla-pagos">
+                          <thead>
+                            <tr>
+                              <th>Fecha</th>
+                              <th>Ventas</th>
+                              <th>Transferencias</th>
+                              <th>Efectivo</th>
+                              <th>Gastos</th>
+                              <th>Cerrado por</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {ventasCierres.map((c) => (
+                              <tr key={c.id}>
+                                <td style={{ fontWeight: 500 }}>{c.fecha}</td>
+                                <td className="td-monto">{formatearMonto(c.total_ventas)}</td>
+                                <td style={{ color: '#1565C0' }}>{formatearMonto(c.total_transferencias)}</td>
+                                <td style={{ color: '#2E7D32', fontWeight: 600 }}>{formatearMonto(c.total_efectivo)}</td>
+                                <td style={{ color: '#E53935' }}>{c.total_gastos > 0 ? `-${formatearMonto(c.total_gastos)}` : '$0'}</td>
+                                <td style={{ fontSize: '0.8rem' }}>{c.cerrado_por || '—'}</td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+                    )}
+                  </div>
+                </>
+              )}
+
+              {/* ── TAB: GASTOS ───────────────────────── */}
+              {ventasTab === 'gastos' && (
+                <>
+                  {/* Gastos por categoría */}
+                  {ventasGastosCategorias.length > 0 && (
+                    <>
+                      <div className="tarjetas-grid">
+                        <div className="tarjeta tarjeta-accent">
+                          <div className="tarjeta-icon-box tarjeta-icon-rojo"><MinusCircle size={22} /></div>
+                          <div className="tarjeta-info">
+                            <span className="tarjeta-label">Total gastos (30 días)</span>
+                            <span className="tarjeta-valor" style={{ color: '#E53935' }}>
+                              {formatearMonto(ventasGastosCategorias.reduce((s, c) => s + c.total, 0))}
+                            </span>
+                            <span className="tarjeta-sub">{ventasGastosCategorias.reduce((s, c) => s + c.cantidad, 0)} gastos</span>
+                          </div>
+                        </div>
+                      </div>
+
+                      <div className="seccion">
+                        <h2 className="seccion-titulo"><BarChart3 size={18} /> Gastos por categoría (30 días)</h2>
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.6rem', marginTop: '1rem' }}>
+                          {ventasGastosCategorias.map((cat) => {
+                            const max = Math.max(...ventasGastosCategorias.map(c => c.total));
+                            const pct = max > 0 ? Math.round((cat.total / max) * 100) : 0;
+                            return (
+                              <div key={cat.categoria}>
+                                <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.25rem' }}>
+                                  <span style={{ fontSize: '0.85rem', fontWeight: 500, display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+                                    <span style={{
+                                      width: 10, height: 10, borderRadius: '50%',
+                                      background: getCategoriaColor(cat.categoria),
+                                    }} />
+                                    {getCategoriaLabel(cat.categoria)}
+                                  </span>
+                                  <span style={{ fontSize: '0.85rem', fontWeight: 600, color: '#E53935' }}>
+                                    {formatearMonto(cat.total)} <span style={{ color: '#999', fontWeight: 400 }}>({cat.cantidad})</span>
+                                  </span>
+                                </div>
+                                <div style={{ height: 8, background: '#f0f0f5', borderRadius: 4, overflow: 'hidden' }}>
+                                  <div style={{
+                                    width: `${pct}%`, height: '100%',
+                                    background: getCategoriaColor(cat.categoria),
+                                    borderRadius: 4, transition: 'width 0.5s ease',
+                                  }} />
+                                </div>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    </>
+                  )}
+
+                  {ventasGastosCategorias.length === 0 && (
+                    <div className="seccion">
+                      <p className="empty-state">No hay gastos registrados en los últimos 30 días.</p>
+                    </div>
+                  )}
+                </>
+              )}
+            </>
           )}
 
           {/* ─── USUARIOS ────────────────────────── */}
