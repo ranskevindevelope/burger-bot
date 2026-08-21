@@ -32,7 +32,7 @@ db.run(`
     // Insertar negocio por defecto si no existe
     db.run(`
       INSERT OR IGNORE INTO negocios (id, nombre, whatsapp, plan, limite_comprobantes)
-      VALUES (1, 'Flash Pago', NULL, 'basico', 300)
+      VALUES (1, 'Vinson Burgers', NULL, 'basico', 300)
     `);
   }
 });
