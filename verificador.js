@@ -29,7 +29,7 @@ async function verificarPago({ monto, referencia, banco, fecha, negocio_id }) {
   }
 
   // 2. Datos incompletos
-  if (!monto || !referencia) {
+  if (!monto )  {
     return {
       estado: 'INCOMPLETO',
       mensaje: '⚠️ No pude leer bien el comprobante. Pide al cliente otro pantallazo más claro.',
