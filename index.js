@@ -7,7 +7,7 @@ const path = require('path');
 const config = require('./config');
 const { verificarToken, soloAdmin } = require('./auth');
 const { obtenerPagosExportables, listarNegocios } = require('./db');
-const { verificacionNocturna, enviarReporteDiario } = require('./bot/reportes');
+const { verificacionNocturna, enviarReporteDiario, buscarIngresosSinComprobante } = require('./bot/reportes');
 const { esFestivo, esFinDeSemana } = require('./bot/festivos');
 
 // ─── Opciones según festivos / fin de semana ──────────────
@@ -175,6 +175,9 @@ setInterval(async () => {
     (dia === 0 && hora === 22 && minuto === 0);
 
   if (esHorarioReporte && reporteOk) {
+    console.log('[Reporte] Buscando ingresos sin comprobante antes del reporte...');
+    await ejecutarParaTodosLosNegocios(buscarIngresosSinComprobante);
+
     console.log('[Reporte] Ejecutando reporte diario para todos los negocios...');
     await ejecutarParaTodosLosNegocios(enviarReporteDiario);
   } else if (esHorarioReporte) {

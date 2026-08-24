@@ -1,6 +1,6 @@
 // reportes.js — Reportes y verificación nocturna (multi-negocio)
-const { db, resumenDelDia, obtenerNegocio } = require('../db');
-const { verificarPorGmail } = require('../gmail');
+const { db, resumenDelDia, obtenerNegocio, totalDelDia } = require('../db');
+const { verificarPorGmail, listarIngresosDelDia } = require('../gmail');
 const { enviarMensaje } = require('./openwa');
 const { pagosPendientes } = require('./state');
 
@@ -180,4 +180,56 @@ async function verificacionNocturna(revision, negocio_id) {
   console.log(`[Asincronica] Revisión ${revision} completada. Verificados: ${verificados.length}, Pendientes restantes: ${pagosPendientes.length}`);
 }
 
-module.exports = { enviarReporteDiario, verificacionNocturna };
+// ─── Buscar transferencias recibidas SIN comprobante ───────
+//  1) Lista los ingresos de Bancolombia del día (Gmail).
+//  2) Compara contra los montos de pagos REAL ya registrados del día.
+//  3) Lo que llegó al banco pero NO tiene pago registrado = sin comprobante.
+async function buscarIngresosSinComprobante(negocio_id = 1) {
+  try {
+    // 1) Ingresos vistos en el banco (Gmail)
+    const ingresos = await listarIngresosDelDia(negocio_id);
+    if (!ingresos || ingresos.length === 0) {
+      console.log(`[SinComprobante] No se detectaron ingresos en el banco (negocio ${negocio_id})`);
+      return;
+    }
+
+    // 2) Montos REAL ya registrados del día
+    const { pagos } = await totalDelDia(negocio_id);
+    const montosRegistrados = new Set((pagos || []).map(p => p.monto));
+
+    // 3) Ingresos del banco que no tienen pago registrado
+    const sinComprobante = ingresos.filter(i => !montosRegistrados.has(i.monto));
+
+    if (sinComprobante.length === 0) {
+      console.log(`[SinComprobante] Todos los ingresos del banco tienen comprobante (negocio ${negocio_id})`);
+      return;
+    }
+
+    let negocioNombre = 'FlashPago';
+    try {
+      const neg = await obtenerNegocio(negocio_id);
+      if (neg) negocioNombre = neg.nombre;
+    } catch (_) {}
+
+    const fecha = new Date().toLocaleDateString('es-CO');
+    const totalSinComprobante = sinComprobante.reduce((s, i) => s + i.monto, 0);
+    const lista = sinComprobante.map(i => `💸 $${i.monto.toLocaleString('es-CO')}${i.nombre ? ' — ' + i.nombre : ''}`).join('\n');
+
+    const mensaje =
+      `💰 *${negocioNombre} — Ingresos sin comprobante — ${fecha}*\n\n` +
+      `Se encontraron las siguientes transferencias en el banco que NO tienen comprobante registrado:\n\n` +
+      `${lista}\n\n` +
+            `📊 Total sin comprobante: $${totalSinComprobante.toLocaleString('es-CO')}\n\n` +
+            `⚠️ por favor enviar los comprobantes correspondientes y registrar el pago`;
+
+    const numerosReporte = await obtenerAdminsNegocio(negocio_id);
+    for (const numero of numerosReporte) {
+      await enviarMensaje(numero, mensaje);
+    }
+    console.log(`[SinComprobante] Alerta enviada: ${sinComprobante.length} ingreso(s) sin comprobante (negocio ${negocio_id})`);
+  } catch (err) {
+    console.error('[SinComprobante] Error:', err.message);
+  }
+}
+
+module.exports = { enviarReporteDiario, verificacionNocturna, buscarIngresosSinComprobante };

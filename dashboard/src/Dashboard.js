@@ -4,7 +4,6 @@ import { CreditCard, TrendingUp, Search, Download, DollarSign, Calendar, CheckCi
 import { createApiClient } from './services/api';
 import Sidebar from './components/Sidebar';
 import DashboardHeader from './components/DashboardHeader';
-import NotificacionesEnVivo from './components/NotificacionesEnVivo';
 
 function Dashboard({ onLogout }) {
   const getInitialSection = () => {
@@ -50,6 +49,28 @@ function Dashboard({ onLogout }) {
   // ─── Estado para Plan y Gmail ──────────────────────────
   const [planInfo, setPlanInfo] = useState(null);
   const [gmailEstado, setGmailEstado] = useState(null);
+  const [gmailCargando, setGmailCargando] = useState(false);
+  const [gmailMensaje, setGmailMensaje] = useState('');
+
+  // Detectar redirect de Gmail OAuth
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const gmailResult = params.get('gmail');
+    if (gmailResult === 'conectado') {
+      setGmailMensaje('Gmail conectado exitosamente');
+      setTimeout(() => setGmailMensaje(''), 4000);
+      // Limpiar URL
+      const url = new URL(window.location.href);
+      url.searchParams.delete('gmail');
+      window.history.replaceState({}, '', url.toString());
+    } else if (gmailResult === 'error') {
+      setGmailMensaje('Error conectando Gmail. Intenta de nuevo.');
+      setTimeout(() => setGmailMensaje(''), 4000);
+      const url = new URL(window.location.href);
+      url.searchParams.delete('gmail');
+      window.history.replaceState({}, '', url.toString());
+    }
+  }, []);
 
   // ─── Estado para Ventas (cierre de caja) ───────────────
   const [ventasResumen, setVentasResumen] = useState(null);
@@ -344,6 +365,40 @@ function Dashboard({ onLogout }) {
     setErrorUsuario('');
   };
 
+  // ─── Funciones de Gmail ──────────────────────────────────
+  const conectarGmail = async () => {
+    setGmailCargando(true);
+    try {
+      const token = localStorage.getItem('fp_token');
+      const data = await api.request(`/api/gmail/auth-url?token=${token}`);
+      if (data.ok && data.url) {
+        window.location.href = data.url;
+      } else {
+        setGmailMensaje('Error obteniendo URL de Google');
+        setTimeout(() => setGmailMensaje(''), 3000);
+      }
+    } catch (err) {
+      setGmailMensaje('Error de conexión');
+      setTimeout(() => setGmailMensaje(''), 3000);
+    }
+    setGmailCargando(false);
+  };
+
+  const desconectarGmail = async () => {
+    if (!window.confirm('¿Desconectar Gmail? El bot no podrá verificar pagos automáticamente.')) return;
+    try {
+      const data = await api.request('/api/gmail/desconectar', { method: 'DELETE' });
+      if (data.ok) {
+        setGmailEstado({ ok: true, conectado: false, email: null });
+        setGmailMensaje('Gmail desconectado');
+        setTimeout(() => setGmailMensaje(''), 3000);
+      }
+    } catch (err) {
+      setGmailMensaje('Error desconectando');
+      setTimeout(() => setGmailMensaje(''), 3000);
+    }
+  };
+
   // ─── Funciones de Periodo ────────────────────────────────
   const cargarPeriodo = async () => {
     setCargandoPeriodo(true);
@@ -538,10 +593,9 @@ function Dashboard({ onLogout }) {
     );
   }
 
-    return (
+  return (
     <div className="layout">
       {sidebarAbierto && <div className="sidebar-overlay" onClick={() => setSidebarAbierto(false)} />}
-      <NotificacionesEnVivo onLogout={onLogout} />
       <Sidebar
         activeSection={seccionActiva}
         isOpen={sidebarAbierto}
@@ -644,15 +698,21 @@ function Dashboard({ onLogout }) {
                 </div>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
                   {gmailEstado && (
-                    <div className="gmail-status-badge" style={{
-                      display: 'flex', alignItems: 'center', gap: '0.35rem',
-                      padding: '0.35rem 0.75rem', borderRadius: 8, fontSize: '0.78rem', fontWeight: 600,
-                      background: gmailEstado.conectado ? '#E8F5E9' : '#FFF3E0',
-                      color: gmailEstado.conectado ? '#2E7D32' : '#E65100',
-                    }}>
-                      {gmailEstado.conectado ? <Wifi size={13} /> : <WifiOff size={13} />}
-                      {gmailEstado.conectado ? `Gmail: ${gmailEstado.email}` : 'Gmail no conectado'}
-                    </div>
+                    <button
+                      onClick={gmailEstado.conectado ? desconectarGmail : conectarGmail}
+                      disabled={gmailCargando}
+                      style={{
+                        display: 'flex', alignItems: 'center', gap: '0.35rem',
+                        padding: '0.35rem 0.75rem', borderRadius: 8, fontSize: '0.78rem', fontWeight: 600,
+                        background: gmailEstado.conectado ? '#E8F5E9' : '#FFF3E0',
+                        color: gmailEstado.conectado ? '#2E7D32' : '#E65100',
+                        border: 'none', cursor: gmailCargando ? 'wait' : 'pointer',
+                        transition: 'all 0.2s',
+                      }}
+                    >
+                      {gmailCargando ? '...' : gmailEstado.conectado ? <Wifi size={13} /> : <WifiOff size={13} />}
+                      {gmailEstado.conectado ? `Gmail: ${gmailEstado.email}` : 'Conectar Gmail'}
+                    </button>
                   )}
                   <div className="dashboard-live"><Activity size={15} /> Actualización automática</div>
                 </div>
@@ -690,6 +750,54 @@ function Dashboard({ onLogout }) {
                   }}>
                     {planInfo.usados} / {planInfo.limite} comprobantes ({planInfo.porcentaje}%)
                   </span>
+                </div>
+              )}
+
+              {/* Mensaje de Gmail */}
+              {gmailMensaje && (
+                <div style={{
+                  padding: '0.75rem 1rem', borderRadius: 10, marginBottom: '1rem',
+                  background: gmailMensaje.includes('Error') || gmailMensaje.includes('error') ? '#FFEBEE' : '#E8F5E9',
+                  color: gmailMensaje.includes('Error') || gmailMensaje.includes('error') ? '#C62828' : '#2E7D32',
+                  fontSize: '0.85rem', fontWeight: 500, display: 'flex', alignItems: 'center', gap: '0.5rem',
+                }}>
+                  {gmailMensaje.includes('Error') || gmailMensaje.includes('error') ? <WifiOff size={16} /> : <Wifi size={16} />}
+                  {gmailMensaje}
+                </div>
+              )}
+
+              {/* Tarjeta de conectar Gmail */}
+              {gmailEstado && !gmailEstado.conectado && esAdmin && (
+                <div style={{
+                  background: '#fff', borderRadius: 12, padding: '1rem 1.25rem',
+                  marginBottom: '1.25rem', border: '2px solid #FFF3E0',
+                  display: 'flex', alignItems: 'center', gap: '1rem', flexWrap: 'wrap',
+                }}>
+                  <div style={{
+                    width: 44, height: 44, borderRadius: 12, background: '#FFF3E0',
+                    display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0,
+                  }}>
+                    <Mail size={22} color="#E65100" />
+                  </div>
+                  <div style={{ flex: 1, minWidth: 200 }}>
+                    <div style={{ fontWeight: 600, fontSize: '0.9rem', color: '#1a1a2e' }}>
+                      Conecta tu Gmail para verificar pagos
+                    </div>
+                    <div style={{ fontSize: '0.78rem', color: '#666', marginTop: 2 }}>
+                      FlashPago necesita leer las notificaciones de tu banco para verificar comprobantes automáticamente.
+                    </div>
+                  </div>
+                  <button
+                    onClick={conectarGmail}
+                    disabled={gmailCargando}
+                    style={{
+                      padding: '0.6rem 1.25rem', borderRadius: 10, border: 'none',
+                      background: '#F57C00', color: '#fff', fontWeight: 600, fontSize: '0.85rem',
+                      cursor: gmailCargando ? 'wait' : 'pointer', display: 'flex', alignItems: 'center', gap: '0.4rem',
+                    }}
+                  >
+                    <Mail size={15} /> {gmailCargando ? 'Conectando...' : 'Conectar Gmail'}
+                  </button>
                 </div>
               )}
 

@@ -114,7 +114,21 @@ db.run(`
   }
 });
 
-// ─── Historial de revisiones de duplicados ────────────────
+// ─── Códigos de verificación (registro) ───────────────────
+db.run(`
+  CREATE TABLE IF NOT EXISTS codigos_verificacion (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    email TEXT NOT NULL,
+    codigo TEXT NOT NULL,
+    datos TEXT NOT NULL,
+    intentos INTEGER DEFAULT 0,
+    usado INTEGER DEFAULT 0,
+    expira_en TEXT NOT NULL,
+    creado_en TEXT DEFAULT (datetime('now','localtime'))
+  )
+`, (err) => {
+  if (!err) console.log('[DB] Tabla "codigos_verificacion" lista');
+});
 db.run(`
   CREATE TABLE IF NOT EXISTS duplicate_reviews (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -564,6 +578,58 @@ function eliminarGasto(id, negocio_id) {
 }
 
 // ═══════════════════════════════════════════════════════════
+//  FUNCIONES — CÓDIGOS DE VERIFICACIÓN
+// ═══════════════════════════════════════════════════════════
+
+function generarCodigo() {
+  return Math.floor(100000 + Math.random() * 900000).toString();
+}
+
+function guardarCodigoVerificacion(email, codigo, datos) {
+  return new Promise((resolve, reject) => {
+    // Invalidar códigos anteriores del mismo email
+    db.run(`UPDATE codigos_verificacion SET usado = 1 WHERE email = ? AND usado = 0`, [email], () => {
+      const expira = new Date(Date.now() + 10 * 60 * 1000).toISOString(); // 10 minutos
+      db.run(
+        `INSERT INTO codigos_verificacion (email, codigo, datos, expira_en) VALUES (?, ?, ?, ?)`,
+        [email, codigo, JSON.stringify(datos), expira],
+        function (err) {
+          if (err) reject(err);
+          else resolve({ id: this.lastID, codigo });
+        }
+      );
+    });
+  });
+}
+
+function verificarCodigo(email, codigo) {
+  return new Promise((resolve, reject) => {
+    db.get(
+      `SELECT * FROM codigos_verificacion
+       WHERE email = ? AND codigo = ? AND usado = 0 AND intentos < 5
+       AND expira_en > datetime('now')
+       ORDER BY id DESC LIMIT 1`,
+      [email, codigo],
+      (err, row) => {
+        if (err) return reject(err);
+        if (!row) {
+          // Incrementar intentos del último código
+          db.run(
+            `UPDATE codigos_verificacion SET intentos = intentos + 1
+             WHERE email = ? AND usado = 0 ORDER BY id DESC LIMIT 1`,
+            [email]
+          );
+          return resolve(null);
+        }
+        // Marcar como usado
+        db.run(`UPDATE codigos_verificacion SET usado = 1 WHERE id = ?`, [row.id]);
+        resolve(JSON.parse(row.datos));
+      }
+    );
+  });
+}
+
+// ═══════════════════════════════════════════════════════════
 //  EXPORTS
 // ═══════════════════════════════════════════════════════════
 
@@ -598,4 +664,8 @@ module.exports = {
   totalGastosDia,
   gastosPorCategoria,
   eliminarGasto,
+  // Verificación
+  generarCodigo,
+  guardarCodigoVerificacion,
+  verificarCodigo,
 };

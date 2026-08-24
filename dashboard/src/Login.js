@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Zap, Lock, User, Eye, EyeOff, ShieldCheck, Clock, BarChart3 } from 'lucide-react';
 
-function Login({ onLogin }) {
+function Login({ onLogin , onRegistro }) {
   const [usuario, setUsuario] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
@@ -122,9 +122,20 @@ function Login({ onLogin }) {
             </button>
           </form>
 
-          <p style={{ textAlign: 'center', color: '#b0b0c8', fontSize: '0.8rem', marginTop: '2rem' }}>
+                    <p style={{ textAlign: 'center', color: '#666', fontSize: '0.85rem', marginTop: '1.5rem' }}>
+            ¿No tienes cuenta?{' '}
+            <button onClick={onRegistro} style={{
+              background: 'none', border: 'none', color: '#F57C00',
+              fontWeight: 600, cursor: 'pointer', fontSize: '0.85rem', fontFamily: 'inherit',
+            }}>
+              Crear cuenta
+            </button>
+          </p>
+
+          <p style={{ textAlign: 'center', color: '#b0b0c8', fontSize: '0.8rem', marginTop: '1rem' }}>
             © 2026 FlashPago — Verificación de pagos con IA
           </p>
+        
         </div>
       </div>
 

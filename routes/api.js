@@ -87,6 +87,167 @@ router.post('/login', limitarLogin, (req, res) => {
 });
 
 // ═══════════════════════════════════════════════════════════
+//  REGISTRO (público, sin auth)
+// ═══════════════════════════════════════════════════════════
+
+const { enviarCodigoVerificacion, enviarBienvenida } = require('../mailer');
+const { generarCodigo, guardarCodigoVerificacion, verificarCodigo } = require('../db');
+
+// Paso 1: Enviar código de verificación
+router.post('/registro/enviar-codigo', limitarLogin, async (req, res) => {
+  try {
+    const { email, nombre_negocio, plan, ciudad, whatsapp_negocio, nombre, usuario, password } = req.body;
+
+    // Validaciones
+    if (!email || !nombre_negocio || !nombre || !usuario || !password) {
+      return res.status(400).json({ ok: false, error: 'Faltan campos obligatorios' });
+    }
+    if (password.length < 6) {
+      return res.status(400).json({ ok: false, error: 'La contraseña debe tener al menos 6 caracteres' });
+    }
+    if (!['basico', 'premium', 'empresarial'].includes(plan)) {
+      return res.status(400).json({ ok: false, error: 'Plan no válido' });
+    }
+
+    // Verificar que el usuario no exista
+    const existeUsuario = await new Promise((resolve, reject) => {
+      db.get('SELECT id FROM usuarios WHERE usuario = ?', [usuario.trim().toLowerCase()], (err, row) => {
+        if (err) reject(err);
+        else resolve(row);
+      });
+    });
+    if (existeUsuario) {
+      return res.status(409).json({ ok: false, error: 'Ese usuario ya existe. Elige otro.' });
+    }
+
+    // Verificar que el email no esté registrado
+    const existeEmail = await new Promise((resolve, reject) => {
+      db.get('SELECT id FROM usuarios WHERE whatsapp = ?', [email], (err, row) => {
+        if (err) reject(err);
+        else resolve(row);
+      });
+    });
+
+    // Generar y guardar código
+    const codigo = generarCodigo();
+    await guardarCodigoVerificacion(email, codigo, {
+      email, nombre_negocio, plan, ciudad, whatsapp_negocio, nombre, usuario, password,
+    });
+
+    // Enviar correo
+    await enviarCodigoVerificacion(email, codigo, nombre_negocio);
+
+    res.json({ ok: true, mensaje: 'Código enviado', email });
+  } catch (err) {
+    console.error('[Registro] Error enviando código:', err.message);
+    res.status(500).json({ ok: false, error: 'Error enviando el código. Intenta de nuevo.' });
+  }
+});
+
+// Paso 2: Verificar código y crear cuenta
+router.post('/registro/verificar', limitarLogin, async (req, res) => {
+  try {
+    const { email, codigo } = req.body;
+    if (!email || !codigo) {
+      return res.status(400).json({ ok: false, error: 'Faltan datos' });
+    }
+
+    const datos = await verificarCodigo(email, codigo);
+    if (!datos) {
+      return res.status(400).json({ ok: false, error: 'Código incorrecto o expirado' });
+    }
+
+    // Crear negocio
+    const limites = { basico: 300, premium: 1000, empresarial: 999999 };
+    const negocio = await crearNegocio({
+      nombre: datos.nombre_negocio,
+      whatsapp: datos.whatsapp_negocio || null,
+      plan: datos.plan,
+      limite_comprobantes: limites[datos.plan],
+    });
+
+    // Crear usuario admin
+    const salt = crypto.randomBytes(32).toString('hex');
+    const hash = crypto.pbkdf2Sync(datos.password, salt, 10000, 64, 'sha512').toString('hex');
+
+    const userId = await new Promise((resolve, reject) => {
+      db.run(
+        `INSERT INTO usuarios (usuario, password_hash, salt, nombre, rol, whatsapp, negocio_id)
+         VALUES (?, ?, ?, ?, 'admin', ?, ?)`,
+      [datos.usuario.trim().toLowerCase(), hash, salt, datos.nombre, datos.whatsapp_negocio || null, negocio.id],
+        function (err) {
+          if (err) reject(err);
+          else resolve(this.lastID);
+        }
+      );
+    });
+
+    // Enviar email de bienvenida
+    try {
+      await enviarBienvenida(datos.email, datos.nombre, datos.usuario);
+    } catch (e) {
+      console.error('[Registro] Error enviando bienvenida:', e.message);
+    }
+
+    // Generar token JWT para auto-login
+    const token = jwt.sign(
+      { id: userId, usuario: datos.usuario, rol: 'admin', negocio_id: negocio.id },
+      config.JWT_SECRET,
+      { expiresIn: '24h' }
+    );
+
+    console.log(`[Registro] Nuevo negocio: ${datos.nombre_negocio} (${datos.plan}) — ${datos.email}`);
+
+    res.status(201).json({
+      ok: true,
+      token,
+      user: { id: userId, nombre: datos.nombre, rol: 'admin', negocio_id: negocio.id },
+      negocio: { id: negocio.id, nombre: datos.nombre_negocio, plan: datos.plan },
+    });
+  } catch (err) {
+    console.error('[Registro] Error verificando:', err.message);
+    if (err.message?.includes('UNIQUE')) {
+      return res.status(409).json({ ok: false, error: 'Ese usuario ya existe' });
+    }
+    res.status(500).json({ ok: false, error: 'Error creando la cuenta' });
+  }
+});
+
+// Reenviar código
+router.post('/registro/reenviar', limitarLogin, async (req, res) => {
+  try {
+    const { email, nombre_negocio } = req.body;
+    if (!email) return res.status(400).json({ ok: false, error: 'Falta el email' });
+
+    const codigo = generarCodigo();
+
+    // Buscar datos del último código para este email
+    const ultimo = await new Promise((resolve, reject) => {
+      db.get(
+        `SELECT datos FROM codigos_verificacion WHERE email = ? ORDER BY id DESC LIMIT 1`,
+        [email],
+        (err, row) => {
+          if (err) reject(err);
+          else resolve(row ? JSON.parse(row.datos) : null);
+        }
+      );
+    });
+
+    if (!ultimo) {
+      return res.status(404).json({ ok: false, error: 'No hay registro pendiente para este email' });
+    }
+
+    await guardarCodigoVerificacion(email, codigo, ultimo);
+    await enviarCodigoVerificacion(email, codigo, nombre_negocio || ultimo.nombre_negocio);
+
+    res.json({ ok: true, mensaje: 'Código reenviado' });
+  } catch (err) {
+    console.error('[Registro] Error reenviando:', err.message);
+    res.status(500).json({ ok: false, error: 'Error reenviando el código' });
+  }
+});
+
+// ═══════════════════════════════════════════════════════════
 //  NEGOCIOS (superadmin ve todos, admin ve solo el suyo)
 // ═══════════════════════════════════════════════════════════
 

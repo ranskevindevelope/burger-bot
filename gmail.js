@@ -164,4 +164,77 @@ async function buscarEnGmail(auth, montoEsperado) {
   }
 }
 
-module.exports = { verificarPorGmail };
+// ─── Listar ingresos (transferencias recibidas) de Bancolombia del día ───
+//  No filtra por un monto específico: devuelve TODOS los ingresos detectados
+//  en notificaciones de Bancolombia de las últimas 24h para un negocio.
+async function listarIngresosDelDia(negocio_id = 1) {
+  const auth = await getAuth(negocio_id);
+  if (!auth) {
+    console.log(`[Gmail] Negocio ${negocio_id} no tiene Gmail conectado`);
+    return [];
+  }
+
+  try {
+    const gmail = google.gmail({ version: 'v1', auth });
+
+    const res = await gmail.users.messages.list({
+      userId: 'me',
+      q: 'from:notificacionesbancolombia.com newer_than:1d is:unread',
+      maxResults: 20,
+    });
+
+    if (!res.data.messages || res.data.messages.length === 0) {
+      console.log('[Gmail] No hay correos de Bancolombia del día');
+      return [];
+    }
+
+    const ingresos = [];
+
+    for (const msg of res.data.messages) {
+      const detalle = await gmail.users.messages.get({
+        userId: 'me',
+        id: msg.id,
+        format: 'full',
+      });
+
+            const snippet = detalle.data.snippet || '';
+
+      // ❌ Excluir retiros / salidas de dinero (evitar falsos "ingresos")
+      if (/retiraste|retiró|retiro|debitaste|pagaste|descont|cajero|de tu t\.deb|de tu t deb|de su t\.deb|compra|compraste|folios?|avance|retiro en/i.test(snippet)) {
+        continue;
+      }
+
+      // ✅ Requerir señales claras de INGRESO (transferencias recibidas)
+      if (!/recibiste|recibido|recibida|recibimos|consignaci|abono|un pago de|una transferencia|transferencia de|te hicieron|te realizaron|a tu cuenta|a su cuenta|ingresó|ingreso de|depósito|deposito/i.test(snippet)) {
+        continue;
+      }
+
+      const match = snippet.match(/\$\s?([\d.,]+)/);
+      if (!match) continue;
+
+      let montoTexto = match[1];
+      if (/\.\d{2}$/.test(montoTexto)) {
+        montoTexto = montoTexto.slice(0, -3);
+      }
+      const monto = parseInt(montoTexto.replace(/[.,]/g, ''));
+      if (isNaN(monto)) continue;
+
+      let nombreCliente = null;
+      const matchNombre = snippet.match(/pago de (.+?) por/i);
+      if (matchNombre) {
+        nombreCliente = matchNombre[1].trim();
+      }
+
+      ingresos.push({ monto, nombre: nombreCliente, snippet });
+    }
+
+    console.log(`[Gmail] Ingresos detectados del día (negocio ${negocio_id}): ${ingresos.length}`);
+    return ingresos;
+
+  } catch (err) {
+    console.error('[Gmail] Error listando ingresos:', err.message);
+    return [];
+  }
+}
+
+module.exports = { verificarPorGmail, listarIngresosDelDia };
