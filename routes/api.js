@@ -19,6 +19,7 @@ const {
   obtenerNegocio,
   listarNegocios,
   contarComprobantesDelMes,
+  verificarTrialActivo,
   guardarTokenGmail,
   obtenerTokenGmail,
   crearCierreCaja,
@@ -174,7 +175,7 @@ router.post('/registro/verificar', limitarLogin, async (req, res) => {
       db.run(
         `INSERT INTO usuarios (usuario, password_hash, salt, nombre, rol, whatsapp, negocio_id)
          VALUES (?, ?, ?, ?, 'admin', ?, ?)`,
-      [datos.usuario.trim().toLowerCase(), hash, salt, datos.nombre, datos.whatsapp_negocio || null, negocio.id],
+        [datos.usuario.trim().toLowerCase(), hash, salt, datos.nombre, datos.email, negocio.id],
         function (err) {
           if (err) reject(err);
           else resolve(this.lastID);
@@ -247,6 +248,72 @@ router.post('/registro/reenviar', limitarLogin, async (req, res) => {
   }
 });
 
+// ─── Verificación de WhatsApp ───────────────────────────
+const codigosWhatsapp = new Map(); // { numero: { codigo, expira, intentos } }
+
+router.post('/registro/verificar-whatsapp', limitarLogin, async (req, res) => {
+  try {
+    const { whatsapp } = req.body;
+    if (!whatsapp) return res.status(400).json({ ok: false, error: 'Falta el número' });
+
+    const wppLimpio = whatsapp.replace(/\D/g, '');
+    if (wppLimpio.length !== 10 && wppLimpio.length !== 12) {
+      return res.status(400).json({ ok: false, error: 'Número no válido (10 o 12 dígitos)' });
+    }
+
+    const numero = wppLimpio.startsWith('3') && wppLimpio.length === 10 ? '57' + wppLimpio : wppLimpio;
+    const codigo = generarCodigo();
+
+    codigosWhatsapp.set(numero, {
+      codigo,
+      expira: Date.now() + 5 * 60 * 1000, // 5 minutos
+      intentos: 0,
+    });
+
+    // Enviar código por WhatsApp usando el bot
+    const { enviarMensaje } = require('../bot/openwa');
+    await enviarMensaje(`${numero}@c.us`,
+      `🔐 *FlashPago — Verificación*\n\nTu código de verificación es:\n\n*${codigo}*\n\nExpira en 5 minutos.`
+    );
+
+    console.log(`[Registro] Código WhatsApp enviado a ${numero}`);
+    res.json({ ok: true, mensaje: 'Código enviado por WhatsApp' });
+  } catch (err) {
+    console.error('[Registro] Error enviando WhatsApp:', err.message);
+    res.status(500).json({ ok: false, error: 'Error enviando el código. Verifica que el número tenga WhatsApp.' });
+  }
+});
+
+router.post('/registro/confirmar-whatsapp', limitarLogin, (req, res) => {
+  const { whatsapp, codigo } = req.body;
+  if (!whatsapp || !codigo) return res.status(400).json({ ok: false, error: 'Faltan datos' });
+
+  const wppLimpio = whatsapp.replace(/\D/g, '');
+  const numero = wppLimpio.startsWith('3') && wppLimpio.length === 10 ? '57' + wppLimpio : wppLimpio;
+
+  const datos = codigosWhatsapp.get(numero);
+  if (!datos) return res.status(400).json({ ok: false, error: 'No hay código pendiente para este número' });
+
+  if (Date.now() > datos.expira) {
+    codigosWhatsapp.delete(numero);
+    return res.status(400).json({ ok: false, error: 'Código expirado. Solicita uno nuevo.' });
+  }
+
+  if (datos.intentos >= 5) {
+    codigosWhatsapp.delete(numero);
+    return res.status(400).json({ ok: false, error: 'Demasiados intentos. Solicita un nuevo código.' });
+  }
+
+  if (datos.codigo !== codigo) {
+    datos.intentos++;
+    return res.status(400).json({ ok: false, error: 'Código incorrecto' });
+  }
+
+  codigosWhatsapp.delete(numero);
+  console.log(`[Registro] WhatsApp verificado: ${numero}`);
+  res.json({ ok: true, mensaje: 'WhatsApp verificado' });
+});
+
 // ═══════════════════════════════════════════════════════════
 //  NEGOCIOS (superadmin ve todos, admin ve solo el suyo)
 // ═══════════════════════════════════════════════════════════
@@ -316,12 +383,20 @@ router.get('/negocios/uso/plan', verificarToken, async (req, res) => {
     const negocio = await obtenerNegocio(nid);
     if (!negocio) return res.status(404).json({ ok: false, error: 'Negocio no encontrado' });
     const usados = await contarComprobantesDelMes(nid);
+    const trial = await verificarTrialActivo(nid);
     res.json({
       ok: true,
       plan: negocio.plan,
       limite: negocio.limite_comprobantes,
       usados,
       porcentaje: Math.round((usados / negocio.limite_comprobantes) * 100),
+      trial: {
+        activo: trial.activo,
+        pagado: trial.pagado || false,
+        dias: trial.dias || 0,
+        trial_fin: trial.trial_fin || null,
+        razon: trial.razon || null,
+      },
     });
   } catch (err) {
     res.status(500).json({ ok: false, error: err.message });

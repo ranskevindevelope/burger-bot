@@ -7,7 +7,7 @@ const config = require('../config');
 const { leerComprobante } = require('../ocr');
 const { verificarPorGmail } = require('../gmail');
 const { verificarPago } = require('../verificador');
-const { db, guardarPago, buscarDuplicadoReciente, contarComprobantesDelMes, obtenerNegocio } = require('../db');
+const { db, guardarPago, buscarDuplicadoReciente, contarComprobantesDelMes, obtenerNegocio, verificarTrialActivo } = require('../db');
 const { enviarMensaje } = require('../bot/openwa');
 const { formatearResultado, guardarFoto } = require('../bot/utils');
 const { pagosPendientes, historialPagos } = require('../bot/state');
@@ -154,6 +154,22 @@ router.post('/', async (req, res) => {
   if (mediaType && !mediaType.startsWith('image/')) {
     await enviarMensaje(from, '⚠️ Solo acepto imágenes de comprobantes. Envía una foto.');
     return;
+  }
+
+  // ─── Verificar trial activo ─────────────────────────────
+  try {
+    const trial = await verificarTrialActivo(negocio_id);
+    if (!trial.activo && trial.razon === 'trial_expirado') {
+      await enviarMensaje(from,
+        `🔒 *Prueba finalizada*\n\n` +
+        `Tu periodo de prueba de 15 días ha terminado. Para seguir verificando comprobantes, elige un plan en el dashboard:\n\n` +
+        `🔗 https://flashpago.duckdns.org/panel`
+      );
+      console.log(`[Trial] Negocio ${negocio_id} trial expirado`);
+      return;
+    }
+  } catch (err) {
+    console.error('[Trial] Error verificando:', err.message);
   }
 
   // ─── Verificar límite del plan ────────────────────────

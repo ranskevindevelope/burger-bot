@@ -34,6 +34,17 @@ db.run(`
       INSERT OR IGNORE INTO negocios (id, nombre, whatsapp, plan, limite_comprobantes)
       VALUES (1, 'Mi Negocio', NULL, 'basico', 300)
     `);
+    // Migración: agregar trial_fin si no existe
+    db.run(`ALTER TABLE negocios ADD COLUMN trial_fin TEXT`, (err) => {
+      if (err && !err.message.includes('duplicate column')) {
+        console.error('[DB] Error migrando trial_fin:', err.message);
+      }
+    });
+    db.run(`ALTER TABLE negocios ADD COLUMN pagado INTEGER DEFAULT 0`, (err) => {
+      if (err && !err.message.includes('duplicate column')) {
+        console.error('[DB] Error migrando pagado:', err.message);
+      }
+    });
   }
 });
 
@@ -149,16 +160,18 @@ db.run(`
 //  FUNCIONES — NEGOCIOS
 // ═══════════════════════════════════════════════════════════
 
-function crearNegocio({ nombre, whatsapp, plan, limite_comprobantes }) {
+function crearNegocio({ nombre, whatsapp, plan, limite_comprobantes, ciudad, banco }) {
   const limites = { basico: 300, premium: 1000, empresarial: 999999 };
   const limite = limite_comprobantes || limites[plan] || 300;
+  // Trial de 15 días desde hoy
+  const trial = new Date(Date.now() + 15 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
   return new Promise((resolve, reject) => {
     db.run(
-      `INSERT INTO negocios (nombre, whatsapp, plan, limite_comprobantes) VALUES (?, ?, ?, ?)`,
-      [nombre, whatsapp || null, plan || 'basico', limite],
+      `INSERT INTO negocios (nombre, whatsapp, plan, limite_comprobantes, trial_fin, pagado, ciudad, banco) VALUES (?, ?, ?, ?, ?, 0, ?, ?)`,
+      [nombre, whatsapp || null, plan || 'basico', limite, trial, ciudad || null, banco || null],
       function (err) {
         if (err) reject(err);
-        else resolve({ id: this.lastID, nombre, plan: plan || 'basico', limite });
+        else resolve({ id: this.lastID, nombre, plan: plan || 'basico', limite, trial_fin: trial });
       }
     );
   });
@@ -192,6 +205,34 @@ function contarComprobantesDelMes(negocio_id) {
       (err, row) => {
         if (err) reject(err);
         else resolve(row.total);
+      }
+    );
+  });
+}
+
+function verificarTrialActivo(negocio_id) {
+  return new Promise((resolve, reject) => {
+    db.get(
+      `SELECT trial_fin, pagado, plan FROM negocios WHERE id = ? AND activo = 1`,
+      [negocio_id],
+      (err, row) => {
+        if (err) return reject(err);
+        if (!row) return resolve({ activo: false, razon: 'negocio_no_encontrado' });
+
+        // Si ya pagó, siempre activo
+        if (row.pagado) return resolve({ activo: true, pagado: true, plan: row.plan });
+
+        // Si no tiene trial_fin (negocio viejo), está activo
+        if (!row.trial_fin) return resolve({ activo: true, pagado: false, plan: row.plan });
+
+        const hoy = new Date().toISOString().split('T')[0];
+        const diasRestantes = Math.ceil((new Date(row.trial_fin) - new Date(hoy)) / (1000 * 60 * 60 * 24));
+
+        if (diasRestantes <= 0) {
+          return resolve({ activo: false, razon: 'trial_expirado', trial_fin: row.trial_fin, dias: 0, plan: row.plan });
+        }
+
+        resolve({ activo: true, pagado: false, trial_fin: row.trial_fin, dias: diasRestantes, plan: row.plan });
       }
     );
   });
@@ -640,6 +681,7 @@ module.exports = {
   obtenerNegocio,
   listarNegocios,
   contarComprobantesDelMes,
+  verificarTrialActivo,
   // Gmail tokens
   guardarTokenGmail,
   obtenerTokenGmail,

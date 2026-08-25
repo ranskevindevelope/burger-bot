@@ -718,6 +718,84 @@ function Dashboard({ onLogout }) {
                 </div>
               </div>
 
+              {/* ─── Banner de trial ────────────────── */}
+              {planInfo?.trial && !planInfo.trial.pagado && planInfo.trial.trial_fin && (
+                <div style={{
+                  background: planInfo.trial.activo
+                    ? planInfo.trial.dias <= 3 ? '#FFF3E0' : '#E3F2FD'
+                    : '#FFEBEE',
+                  border: `1px solid ${planInfo.trial.activo
+                    ? planInfo.trial.dias <= 3 ? '#FFE0B2' : '#BBDEFB'
+                    : '#FFCDD2'}`,
+                  borderRadius: 12, padding: '1rem 1.25rem', marginBottom: '1rem',
+                  display: 'flex', alignItems: 'center', gap: '1rem', flexWrap: 'wrap',
+                }}>
+                  <div style={{
+                    width: 40, height: 40, borderRadius: 10, flexShrink: 0,
+                    background: planInfo.trial.activo
+                      ? planInfo.trial.dias <= 3 ? '#F57C00' : '#1565C0'
+                      : '#E53935',
+                    display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  }}>
+                    {planInfo.trial.activo
+                      ? <Clock size={20} color="#fff" />
+                      : <Shield size={20} color="#fff" />
+                    }
+                  </div>
+                  <div style={{ flex: 1, minWidth: 200 }}>
+                    <div style={{
+                      fontWeight: 600, fontSize: '0.9rem',
+                      color: planInfo.trial.activo
+                        ? planInfo.trial.dias <= 3 ? '#E65100' : '#0D47A1'
+                        : '#C62828',
+                    }}>
+                      {planInfo.trial.activo
+                        ? `Prueba gratuita — ${planInfo.trial.dias} día${planInfo.trial.dias === 1 ? '' : 's'} restante${planInfo.trial.dias === 1 ? '' : 's'}`
+                        : 'Tu prueba gratuita ha terminado'
+                      }
+                    </div>
+                    <div style={{
+                      fontSize: '0.78rem', marginTop: 2,
+                      color: planInfo.trial.activo
+                        ? planInfo.trial.dias <= 3 ? '#E65100' : '#1565C0'
+                        : '#C62828',
+                    }}>
+                      {planInfo.trial.activo
+                        ? planInfo.trial.dias <= 3
+                          ? 'Elige un plan para seguir verificando sin interrupción.'
+                          : `Tu periodo de prueba termina el ${new Date(planInfo.trial.trial_fin).toLocaleDateString('es-CO')}. Todas las funciones están activas.`
+                        : 'El bot dejó de verificar comprobantes. Elige un plan para reactivar.'
+                      }
+                    </div>
+                    {planInfo.trial.activo && (
+                      <div style={{
+                        height: 4, background: 'rgba(0,0,0,0.08)', borderRadius: 2,
+                        overflow: 'hidden', marginTop: 6,
+                      }}>
+                        <div style={{
+                          height: '100%', borderRadius: 2,
+                          background: planInfo.trial.dias <= 3 ? '#F57C00' : '#1565C0',
+                          width: `${Math.round(((15 - planInfo.trial.dias) / 15) * 100)}%`,
+                          transition: 'width 0.5s ease',
+                        }} />
+                      </div>
+                    )}
+                  </div>
+                  {(planInfo.trial.dias <= 3 || !planInfo.trial.activo) && (
+                    <button
+                      onClick={() => window.open('https://flashpago.duckdns.org/panel', '_self')}
+                      style={{
+                        padding: '0.6rem 1.25rem', borderRadius: 10, border: 'none',
+                        background: !planInfo.trial.activo ? '#E53935' : '#F57C00',
+                        color: '#fff', fontWeight: 600, fontSize: '0.85rem', cursor: 'pointer',
+                      }}
+                    >
+                      Elegir plan
+                    </button>
+                  )}
+                </div>
+              )}
+
               {/* ─── Barra de progreso del plan ────── */}
               {planInfo && (
                 <div className="plan-usage-bar" style={{

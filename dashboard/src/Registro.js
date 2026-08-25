@@ -17,6 +17,10 @@ function Registro({ onBack }) {
   const [whatsappNegocio, setWhatsappNegocio] = useState('');
   const [cantidadEmpleados, setCantidadEmpleados] = useState('1-3');
   const [bancoNegocio, setBancoNegocio] = useState('Bancolombia');
+  const [wppVerificado, setWppVerificado] = useState(false);
+  const [wppCodigo, setWppCodigo] = useState('');
+  const [wppEnviando, setWppEnviando] = useState(false);
+  const [wppMensaje, setWppMensaje] = useState('');
 
   // Paso 3: Cuenta
   const [nombre, setNombre] = useState('');
@@ -39,6 +43,59 @@ function Registro({ onBack }) {
   ];
 
   const planActual = planes.find(p => p.id === plan);
+
+  // ─── Verificar WhatsApp ──────────────────────────────────
+  const enviarCodigoWhatsapp = async () => {
+    const wpp = whatsappNegocio.replace(/\D/g, '');
+    if (wpp.length !== 10 && wpp.length !== 12) {
+      setWppMensaje('Número no válido (10 dígitos)');
+      return;
+    }
+    setWppEnviando(true);
+    setWppMensaje('');
+    try {
+      const res = await fetch(`${API_BASE}/api/registro/verificar-whatsapp`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ whatsapp: whatsappNegocio }),
+      });
+      const data = await res.json();
+      if (data.ok) {
+        setWppMensaje('Código enviado a tu WhatsApp');
+      } else {
+        setWppMensaje(data.error || 'Error enviando código');
+      }
+    } catch (err) {
+      setWppMensaje('Error de conexión');
+    }
+    setWppEnviando(false);
+  };
+
+  const confirmarWhatsapp = async () => {
+    if (wppCodigo.length !== 6) {
+      setWppMensaje('Ingresa los 6 dígitos');
+      return;
+    }
+    setWppEnviando(true);
+    try {
+      const res = await fetch(`${API_BASE}/api/registro/confirmar-whatsapp`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ whatsapp: whatsappNegocio, codigo: wppCodigo }),
+      });
+      const data = await res.json();
+      if (data.ok) {
+        setWppVerificado(true);
+        setWppMensaje('');
+      } else {
+        setWppMensaje(data.error || 'Código incorrecto');
+        setWppCodigo('');
+      }
+    } catch (err) {
+      setWppMensaje('Error de conexión');
+    }
+    setWppEnviando(false);
+  };
 
   // ─── Enviar código ─────────────────────────────────────
   const enviarCodigo = async () => {
@@ -184,7 +241,10 @@ function Registro({ onBack }) {
   // ─── Validaciones por paso ────────────────────────────
   const puedeAvanzar = () => {
     if (paso === 1) return !!plan;
-    if (paso === 2) return nombreNegocio.trim().length >= 2;
+    if (paso === 2) {
+      const wpp = whatsappNegocio.replace(/\D/g, '');
+      return nombreNegocio.trim().length >= 2 && (wpp.length === 10 || wpp.length === 12) && wppVerificado;
+    }
     if (paso === 3) return nombre.trim() && email.includes('@') && usuario.trim() && password.length >= 6;
     return true;
   };
@@ -342,9 +402,21 @@ function Registro({ onBack }) {
               opacity: plan ? 1 : 0.3, transition: 'all 0.4s ease',
             }}>
               <span style={{ fontSize: 12, color: 'rgba(255,255,255,0.5)' }}>Precio</span>
-              <span style={{ fontSize: 14, fontWeight: 700, color: '#F57C00', transition: 'all 0.3s ease' }}>
-                {planActual?.precio || '—'}<span style={{ fontSize: 10, fontWeight: 400 }}>/mes</span>
+              <span style={{ fontSize: 13, transition: 'all 0.3s ease' }}>
+                <span style={{ textDecoration: 'line-through', color: 'rgba(255,255,255,0.3)', marginRight: 6 }}>
+                  {planActual?.precio || '—'}
+                </span>
+                <span style={{ color: '#43A047', fontWeight: 700 }}>GRATIS</span>
               </span>
+            </div>
+
+            {/* Duración trial */}
+            <div style={{
+              display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+              opacity: plan ? 1 : 0.3, transition: 'all 0.4s ease',
+            }}>
+              <span style={{ fontSize: 12, color: 'rgba(255,255,255,0.5)' }}>Duración</span>
+              <span style={{ fontSize: 12, color: 'rgba(255,255,255,0.7)' }}>15 días</span>
             </div>
 
             {/* Comprobantes */}
@@ -502,21 +574,32 @@ function Registro({ onBack }) {
         {paso === 1 && (
           <>
             <div style={s.title}>Elige tu plan</div>
-            <div style={s.desc}>Selecciona el plan que mejor se ajuste a tu negocio</div>
+            <div style={s.desc}>Prueba gratis por 15 días. Sin tarjeta de crédito.</div>
+            <div style={{
+              display: 'inline-flex', alignItems: 'center', gap: 5, padding: '5px 14px',
+              borderRadius: 50, background: '#E8F5E9', color: '#2E7D32',
+              fontSize: 12, fontWeight: 600, marginBottom: 14,
+            }}>
+              🎁 15 días gratis en cualquier plan
+            </div>
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 10, marginBottom: 16 }}>
               {planes.map(p => (
                 <div key={p.id} style={s.planCard(plan === p.id)} onClick={() => setPlan(p.id)}>
                   {p.popular && <div style={s.planTag}>Popular</div>}
                   <div style={{ fontSize: 14, fontWeight: 600, color: '#1A1A2E', marginBottom: 4 }}>{p.nombre}</div>
                   <div style={{ fontSize: 20, fontWeight: 700, color: '#F57C00', marginBottom: 4 }}>{p.precio}</div>
-                  <div style={{ fontSize: 11, color: '#999' }}>{p.comprobantes}</div>
+                  <div style={{ fontSize: 11, color: '#999', marginBottom: 6 }}>{p.comprobantes}</div>
+                  <div style={{ fontSize: 10, color: '#2E7D32', fontWeight: 600 }}>🎁 15 días gratis</div>
                 </div>
               ))}
             </div>
             <button style={s.btn(true)} onClick={avanzar}>
-              Continuar <ArrowRight size={16} />
+              Empezar gratis <ArrowRight size={16} />
             </button>
-            <div style={{ fontSize: 13, color: '#999', textAlign: 'center', marginTop: 14 }}>
+            <div style={{ fontSize: 11, color: '#999', textAlign: 'center', marginTop: 8 }}>
+              Sin tarjeta de crédito. Cancela cuando quieras.
+            </div>
+            <div style={{ fontSize: 13, color: '#999', textAlign: 'center', marginTop: 10 }}>
               ¿Ya tienes cuenta? <button style={s.link} onClick={onBack}>Inicia sesión</button>
             </div>
           </>
@@ -539,9 +622,67 @@ function Registro({ onBack }) {
                   onChange={e => setCiudad(e.target.value)} />
               </div>
               <div style={s.field}>
-                <label style={s.label}>WhatsApp del negocio</label>
-                <input style={s.input} placeholder="3001234567" value={whatsappNegocio}
-                  onChange={e => setWhatsappNegocio(e.target.value)} />
+                <label style={s.label}>WhatsApp del negocio *</label>
+                {wppVerificado ? (
+                  <div style={{
+                    display: 'flex', alignItems: 'center', gap: 8, padding: '10px 12px',
+                    borderRadius: 10, background: '#E8F5E9', border: '2px solid #A5D6A7',
+                  }}>
+                    <Check size={16} color="#2E7D32" />
+                    <span style={{ fontSize: 14, fontWeight: 600, color: '#2E7D32' }}>{whatsappNegocio}</span>
+                    <button onClick={() => { setWppVerificado(false); setWppCodigo(''); }} style={{
+                      marginLeft: 'auto', background: 'none', border: 'none', color: '#999',
+                      cursor: 'pointer', fontSize: 12,
+                    }}>Cambiar</button>
+                  </div>
+                ) : (
+                  <>
+                    <div style={{ display: 'flex', gap: 6 }}>
+                      <input style={{ ...s.input, flex: 1 }} placeholder="3001234567" value={whatsappNegocio}
+                        onChange={e => { setWhatsappNegocio(e.target.value.replace(/[^0-9]/g, '')); setWppMensaje(''); }}
+                        maxLength={12} />
+                      <button onClick={enviarCodigoWhatsapp} disabled={wppEnviando || whatsappNegocio.replace(/\D/g, '').length < 10}
+                        style={{
+                          padding: '0 14px', borderRadius: 10, border: 'none', fontSize: 12, fontWeight: 600,
+                          background: whatsappNegocio.replace(/\D/g, '').length >= 10 ? '#F57C00' : '#e0e0e0',
+                          color: whatsappNegocio.replace(/\D/g, '').length >= 10 ? '#fff' : '#999',
+                          cursor: whatsappNegocio.replace(/\D/g, '').length >= 10 ? 'pointer' : 'default',
+                          whiteSpace: 'nowrap',
+                        }}>
+                        {wppEnviando ? '...' : 'Verificar'}
+                      </button>
+                    </div>
+                    {wppMensaje && (
+                      <div style={{
+                        fontSize: 11, marginTop: 4, fontWeight: 500,
+                        color: wppMensaje.includes('enviado') ? '#2E7D32' : '#E65100',
+                      }}>{wppMensaje}</div>
+                    )}
+                    {wppMensaje.includes('enviado') && !wppVerificado && (
+                      <div style={{ display: 'flex', gap: 6, marginTop: 6 }}>
+                        <input
+                          style={{ ...s.input, flex: 1, letterSpacing: 4, textAlign: 'center', fontWeight: 600 }}
+                          placeholder="000000"
+                          value={wppCodigo}
+                          onChange={e => setWppCodigo(e.target.value.replace(/\D/g, '').slice(0, 6))}
+                          maxLength={6}
+                          inputMode="numeric"
+                          onKeyDown={e => e.key === 'Enter' && wppCodigo.length === 6 && confirmarWhatsapp()}
+                        />
+                        <button onClick={confirmarWhatsapp} disabled={wppEnviando || wppCodigo.length !== 6}
+                          style={{
+                            padding: '0 14px', borderRadius: 10, border: 'none', fontSize: 12, fontWeight: 600,
+                            background: wppCodigo.length === 6 ? '#43A047' : '#e0e0e0',
+                            color: wppCodigo.length === 6 ? '#fff' : '#999',
+                            cursor: wppCodigo.length === 6 ? 'pointer' : 'default',
+                            whiteSpace: 'nowrap',
+                          }}>
+                          <Check size={14} />
+                        </button>
+                      </div>
+                    )}
+                  </>
+                )}
               </div>
             </div>
             <div style={s.row}>
