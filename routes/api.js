@@ -175,7 +175,7 @@ router.post('/registro/verificar', limitarLogin, async (req, res) => {
       db.run(
         `INSERT INTO usuarios (usuario, password_hash, salt, nombre, rol, whatsapp, negocio_id)
          VALUES (?, ?, ?, ?, 'admin', ?, ?)`,
-        [datos.usuario.trim().toLowerCase(), hash, salt, datos.nombre, datos.email, negocio.id],
+        [datos.usuario.trim().toLowerCase(), hash, salt, datos.nombre, formatearWhatsapp(datos.whatsapp_negocio), negocio.id],
         function (err) {
           if (err) reject(err);
           else resolve(this.lastID);
