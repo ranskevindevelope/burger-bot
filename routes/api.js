@@ -948,11 +948,14 @@ router.get('/usuarios', verificarToken, soloAdmin, (req, res) => {
   );
 });
 
+const ROLES_ASIGNABLES = ['admin', 'empleado'];
+
 router.post('/usuarios', verificarToken, soloAdmin, (req, res) => {
   const { usuario, password, nombre, rol, whatsapp, email } = req.body;
   const nid = req.user.negocio_id;
   if (!usuario || !password || !nombre) return res.status(400).json({ ok: false, error: 'Faltan campos' });
   if (password.length < 6) return res.status(400).json({ ok: false, error: 'Contraseña mínimo 6 caracteres' });
+  if (rol && !ROLES_ASIGNABLES.includes(rol)) return res.status(400).json({ ok: false, error: 'Rol no válido' });
 
   const salt = crypto.randomBytes(32).toString('hex');
   const hash = crypto.pbkdf2Sync(password, salt, 10000, 64, 'sha512').toString('hex');
@@ -973,6 +976,7 @@ router.post('/usuarios', verificarToken, soloAdmin, (req, res) => {
 router.put('/usuarios/:id', verificarToken, soloAdmin, (req, res) => {
   const { nombre, rol, whatsapp, email, activo, password } = req.body;
   const nid = req.user.negocio_id;
+  if (rol && !ROLES_ASIGNABLES.includes(rol)) return res.status(400).json({ ok: false, error: 'Rol no válido' });
   const sets = []; const vals = [];
   if (nombre) { sets.push('nombre=?'); vals.push(nombre); }
   if (rol) { sets.push('rol=?'); vals.push(rol); }
