@@ -5,14 +5,18 @@ import Registro from './Registro';
 import RecuperarPassword from './RecuperarPassword';
 import Dashboard from './Dashboard';
 import Terminos from './Terminos';
+import Privacidad from './Privacidad';
 import './App.css';
 
 function App() {
   const esPanel = window.location.pathname.startsWith('/panel');
+  const vistaSolicitada = new URLSearchParams(window.location.search).get('vista');
   const [vista, setVista] = useState(
-    esPanel
-      ? (localStorage.getItem('fp_token') ? 'dashboard' : 'login')
-      : 'landing'
+    ['terminos', 'privacidad'].includes(vistaSolicitada)
+      ? vistaSolicitada
+      : esPanel
+        ? (localStorage.getItem('fp_token') ? 'dashboard' : 'login')
+        : 'landing'
   );
 
   const handleLogout = () => {
@@ -22,11 +26,15 @@ function App() {
   };
 
   if (vista === 'landing') {
-    return <FlashPagoLanding onLogin={() => setVista('login')} onRegistro={() => setVista('registro')} onTerminos={() => setVista('terminos')} />;
+    return <FlashPagoLanding onLogin={() => setVista('login')} onRegistro={() => setVista('registro')} onTerminos={() => setVista('terminos')} onPrivacidad={() => setVista('privacidad')} />;
   }
 
   if (vista === 'terminos') {
     return <Terminos onVolver={() => setVista('landing')} />;
+  }
+
+  if (vista === 'privacidad') {
+    return <Privacidad onVolver={() => setVista('landing')} />;
   }
 
   if (vista === 'registro') {

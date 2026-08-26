@@ -38,6 +38,7 @@ function Registro({ onBack }) {
   const [email, setEmail] = useState('');
   const [usuario, setUsuario] = useState('');
   const [password, setPassword] = useState('');
+  const [aceptaTerminos, setAceptaTerminos] = useState(false);
 
   // Paso 4: Verificación
   const [codigoDigitos, setCodigoDigitos] = useState(['', '', '', '', '', '']);
@@ -256,7 +257,7 @@ function Registro({ onBack }) {
       const wpp = whatsappNegocio.replace(/\D/g, '');
       return nombreNegocio.trim().length >= 2 && (wpp.length === 10 || wpp.length === 12) && wppVerificado;
     }
-    if (paso === 3) return nombre.trim() && email.includes('@') && usuario.trim() && password.length >= 6;
+    if (paso === 3) return nombre.trim() && email.includes('@') && usuario.trim() && password.length >= 6 && aceptaTerminos;
     return true;
   };
 
@@ -778,18 +779,35 @@ function Registro({ onBack }) {
                   onChange={e => setPassword(e.target.value)} />
               </div>
             </div>
-            <div style={{ display: 'flex', gap: 10, marginTop: 8 }}>
+            <label style={{
+              display: 'flex', alignItems: 'flex-start', gap: 8, marginTop: 14,
+              fontSize: 12, color: '#666', lineHeight: 1.5, cursor: 'pointer',
+            }}>
+              <input
+                type="checkbox"
+                checked={aceptaTerminos}
+                onChange={e => setAceptaTerminos(e.target.checked)}
+                style={{ marginTop: 2, flexShrink: 0, width: 15, height: 15, accentColor: '#F57C00', cursor: 'pointer' }}
+              />
+              <span>
+                He leído y acepto los{' '}
+                <a href="/?vista=terminos" target="_blank" rel="noopener noreferrer" style={{ color: '#F57C00', fontWeight: 600, textDecoration: 'none' }}>
+                  Términos y Condiciones
+                </a>{' '}
+                y la{' '}
+                <a href="/?vista=privacidad" target="_blank" rel="noopener noreferrer" style={{ color: '#F57C00', fontWeight: 600, textDecoration: 'none' }}>
+                  Política de Privacidad
+                </a>{' '}
+                de FlashPago.
+              </span>
+            </label>
+            <div style={{ display: 'flex', gap: 10, marginTop: 12 }}>
               <button style={s.btnBack} onClick={() => setPaso(2)}>
                 <ArrowLeft size={14} /> Atrás
               </button>
               <button style={{ ...s.btn(puedeAvanzar() && !cargando), flex: 1 }} onClick={avanzar} disabled={!puedeAvanzar() || cargando}>
                 {cargando ? 'Enviando código...' : <><Mail size={16} /> Verificar correo</>}
               </button>
-            </div>
-            <div style={{ fontSize: 11, color: '#999', textAlign: 'center', marginTop: 14, lineHeight: 1.5 }}>
-              Al crear tu cuenta aceptas los{' '}
-              <a href="/terminos" style={{ color: '#F57C00', textDecoration: 'none' }}>términos de servicio</a>{' '}
-              y <a href="/privacidad" style={{ color: '#F57C00', textDecoration: 'none' }}>política de privacidad</a>
             </div>
           </>
         )}

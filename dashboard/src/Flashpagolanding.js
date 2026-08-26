@@ -214,7 +214,7 @@ function HubDiagram() {
 }
 
 // ─── MAIN ────────────────────────────────
-export default function FlashPagoLanding({ onLogin, onTerminos }) {
+export default function FlashPagoLanding({ onLogin, onTerminos, onPrivacidad }) {
   const handleLogin = () => {
     if (onLogin) onLogin();
   };
@@ -490,6 +490,10 @@ export default function FlashPagoLanding({ onLogin, onTerminos }) {
          © 2026 FlashPago. Todos los derechos reservados. | {' '}
          <a href="#" onClick={(e) => { e.preventDefault(); onTerminos(); }} style={{ color: "#8888a8", textDecoration: "underline", cursor: "pointer" }}>
          Términos y Condiciones
+         </a>
+         {' '}|{' '}
+         <a href="#" onClick={(e) => { e.preventDefault(); onPrivacidad(); }} style={{ color: "#8888a8", textDecoration: "underline", cursor: "pointer" }}>
+         Política de Privacidad
          </a>
         </p>
       </footer>
