@@ -87,6 +87,14 @@ router.post('/login', limitarLogin, (req, res) => {
   });
 });
 
+function formatearWhatsapp(num) {
+  if (!num) return null;
+  let limpio = num.replace(/[\s\-\+\(\)]/g, '');
+  if (limpio.includes('@')) return limpio;
+  if (limpio.startsWith('3') && limpio.length === 10) limpio = '57' + limpio;
+  return limpio + '@c.us';
+}
+
 // ═══════════════════════════════════════════════════════════
 //  REGISTRO (público, sin auth)
 // ═══════════════════════════════════════════════════════════
