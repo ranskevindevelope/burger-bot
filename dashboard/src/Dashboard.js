@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid } from 'recharts';
-import { CreditCard, TrendingUp, Search, Download, DollarSign, Calendar, CheckCircle, Shield, Trophy, BarChart3, Eye, X, Moon, Mail, Users, UserPlus, UserX, UserCheck, Edit, Trash2, Save, XCircle, AlertTriangle, Clock, Bell, Activity, Zap, Wifi, WifiOff, ShoppingBag, Receipt, Wallet, PlusCircle, MinusCircle, ArrowDownUp, Settings } from 'lucide-react';
+import { CreditCard, TrendingUp, Search, Download, DollarSign, Calendar, CheckCircle, Shield, Trophy, BarChart3, Eye, X, Moon, Mail, Users, UserPlus, UserX, UserCheck, Edit, Trash2, Save, XCircle, AlertTriangle, Clock, Bell, Activity, Zap, Wifi, WifiOff, ShoppingBag, Receipt, Wallet, PlusCircle, MinusCircle, ArrowDownUp, Settings, Building2, MailCheck } from 'lucide-react';
 import { createApiClient } from './services/api';
 import Sidebar from './components/Sidebar';
 import DashboardHeader from './components/DashboardHeader';
@@ -10,7 +10,7 @@ function Dashboard({ onLogout }) {
     if (typeof window === 'undefined') return 'panel';
     const params = new URLSearchParams(window.location.search);
     const seccion = params.get('seccion');
-    return ['panel', 'pagos', 'ventas', 'estadisticas', 'buscar', 'exportar', 'duplicados', 'usuarios', 'configuracion'].includes(seccion)
+    return ['panel', 'pagos', 'ventas', 'estadisticas', 'buscar', 'exportar', 'duplicados', 'usuarios', 'configuracion', 'negocios'].includes(seccion)
       ? seccion
       : 'panel';
   };
@@ -18,7 +18,8 @@ function Dashboard({ onLogout }) {
   const [diasGrafica, setDiasGrafica] = useState(30);
   const [totales, setTotales] = useState({ dia: { total: 0, cantidad: 0 }, mes: { total: 0, cantidad: 0 } });
   const userGuardado = JSON.parse(localStorage.getItem('fp_user') || '{}');
-  const esAdmin = userGuardado.rol === 'admin';
+  const esSuperAdmin = userGuardado.rol === 'superadmin';
+  const esAdmin = userGuardado.rol === 'admin' || esSuperAdmin;
   const [pagos, setPagos] = useState([]);
   const [duplicados, setDuplicados] = useState([]);
   const [duplicadosPendientes, setDuplicadosPendientes] = useState([]);
@@ -57,6 +58,15 @@ function Dashboard({ onLogout }) {
   const [guardandoConfig, setGuardandoConfig] = useState(false);
   const [errorConfig, setErrorConfig] = useState('');
   const [exitoConfig, setExitoConfig] = useState('');
+
+  // ─── Estado para Negocios (superadmin) ─────────────────
+  const [negocios, setNegocios] = useState([]);
+  const [cargandoNegocios, setCargandoNegocios] = useState(false);
+  const [mostrarFormNegocio, setMostrarFormNegocio] = useState(false);
+  const [editandoNegocio, setEditandoNegocio] = useState(null);
+  const [formNegocio, setFormNegocio] = useState({ nombre: '', whatsapp: '', plan: 'basico' });
+  const [errorNegocio, setErrorNegocio] = useState('');
+  const [exitoNegocio, setExitoNegocio] = useState('');
 
   // ─── Estado para Plan y Gmail ──────────────────────────
   const [planInfo, setPlanInfo] = useState(null);
@@ -179,6 +189,10 @@ function Dashboard({ onLogout }) {
   }, [seccionActiva]);
 
   useEffect(() => {
+    if (seccionActiva === 'negocios') cargarNegocios();
+  }, [seccionActiva]);
+
+  useEffect(() => {
     if (seccionActiva === 'ventas') cargarVentas();
   }, [seccionActiva]);
 
@@ -288,6 +302,104 @@ function Dashboard({ onLogout }) {
       setErrorConfig('Error de conexión');
     }
     setGuardandoConfig(false);
+  };
+
+  // ─── Funciones de Negocios (superadmin) ────────────────
+  const cargarNegocios = async () => {
+    setCargandoNegocios(true);
+    try {
+      const data = await api.request('/api/negocios');
+      if (data.ok) setNegocios(Array.isArray(data.negocios) ? data.negocios : []);
+    } catch (err) {
+      console.error('Error cargando negocios:', err);
+    }
+    setCargandoNegocios(false);
+  };
+
+  const crearNegocio = async () => {
+    setErrorNegocio('');
+    setExitoNegocio('');
+    if (!formNegocio.nombre.trim()) {
+      setErrorNegocio('El nombre del negocio es requerido');
+      return;
+    }
+    try {
+      const data = await api.request('/api/negocios', {
+        method: 'POST',
+        body: JSON.stringify(formNegocio),
+      });
+      if (data.ok) {
+        setExitoNegocio(`Negocio "${formNegocio.nombre}" creado exitosamente`);
+        setFormNegocio({ nombre: '', whatsapp: '', plan: 'basico' });
+        setMostrarFormNegocio(false);
+        cargarNegocios();
+        setTimeout(() => setExitoNegocio(''), 3000);
+      } else {
+        setErrorNegocio(data.error || 'Error creando negocio');
+      }
+    } catch (err) {
+      setErrorNegocio('Error de conexión');
+    }
+  };
+
+  const actualizarNegocio = async () => {
+    setErrorNegocio('');
+    try {
+      const data = await api.request(`/api/negocios/${editandoNegocio}`, {
+        method: 'PUT',
+        body: JSON.stringify({ nombre: formNegocio.nombre, whatsapp: formNegocio.whatsapp, plan: formNegocio.plan }),
+      });
+      if (data.ok) {
+        setExitoNegocio('Negocio actualizado');
+        setEditandoNegocio(null);
+        setMostrarFormNegocio(false);
+        setFormNegocio({ nombre: '', whatsapp: '', plan: 'basico' });
+        cargarNegocios();
+        setTimeout(() => setExitoNegocio(''), 3000);
+      } else {
+        setErrorNegocio(data.error || 'Error actualizando');
+      }
+    } catch (err) {
+      setErrorNegocio('Error de conexión');
+    }
+  };
+
+  const iniciarEdicionNegocio = (n) => {
+    setEditandoNegocio(n.id);
+    setFormNegocio({ nombre: n.nombre, whatsapp: n.whatsapp || '', plan: n.plan });
+    setMostrarFormNegocio(true);
+    setErrorNegocio('');
+  };
+
+  const cancelarFormNegocio = () => {
+    setMostrarFormNegocio(false);
+    setEditandoNegocio(null);
+    setFormNegocio({ nombre: '', whatsapp: '', plan: 'basico' });
+    setErrorNegocio('');
+  };
+
+  const alternarActivoNegocio = async (n) => {
+    try {
+      const data = await api.request(`/api/negocios/${n.id}`, {
+        method: 'PUT',
+        body: JSON.stringify({ activo: n.activo ? 0 : 1 }),
+      });
+      if (data.ok) {
+        setExitoNegocio(n.activo ? `"${n.nombre}" desactivado` : `"${n.nombre}" reactivado`);
+        cargarNegocios();
+        setTimeout(() => setExitoNegocio(''), 3000);
+      }
+    } catch (err) {
+      setErrorNegocio('Error de conexión');
+    }
+  };
+
+  const estadoNegocioInfo = (n) => {
+    if (n.pagado) return { label: 'Pagado', clase: 'badge-nequi' };
+    if (!n.trial_fin) return { label: 'Activo', clase: 'badge-nequi' };
+    const diasRestantes = Math.ceil((new Date(n.trial_fin) - new Date()) / (1000 * 60 * 60 * 24));
+    if (diasRestantes <= 0) return { label: 'Trial vencido', clase: 'badge-avvillas' };
+    return { label: `Trial (${diasRestantes}d)`, clase: 'badge-transfiya' };
   };
 
   const exportarPagos = async () => {
@@ -663,6 +775,7 @@ function Dashboard({ onLogout }) {
         activeSection={seccionActiva}
         isOpen={sidebarAbierto}
         isAdmin={esAdmin}
+        isSuperAdmin={esSuperAdmin}
         paymentCount={totales.dia.cantidad}
         userCount={usuarios.length}
         onSectionChange={(section) => cambiarSeccion(section)}
@@ -2207,6 +2320,174 @@ function Dashboard({ onLogout }) {
                 </div>
               )}
             </div>
+          )}
+
+          {/* ─── NEGOCIOS (superadmin) ────────────── */}
+          {seccionActiva === 'negocios' && (
+            <>
+              <div className="tarjetas-grid">
+                <div className="tarjeta tarjeta-accent">
+                  <div className="tarjeta-icon-box tarjeta-icon-naranja"><Building2 size={22} /></div>
+                  <div className="tarjeta-info">
+                    <span className="tarjeta-label">Total negocios</span>
+                    <span className="tarjeta-valor">{negocios.length}</span>
+                    <span className="tarjeta-sub">Registrados</span>
+                  </div>
+                </div>
+                <div className="tarjeta">
+                  <div className="tarjeta-icon-box tarjeta-icon-verde"><CheckCircle size={22} /></div>
+                  <div className="tarjeta-info">
+                    <span className="tarjeta-label">Pagando</span>
+                    <span className="tarjeta-valor">{negocios.filter(n => n.pagado).length}</span>
+                    <span className="tarjeta-sub">Con plan activo</span>
+                  </div>
+                </div>
+                <div className="tarjeta">
+                  <div className="tarjeta-icon-box tarjeta-icon-azul"><Clock size={22} /></div>
+                  <div className="tarjeta-info">
+                    <span className="tarjeta-label">En trial</span>
+                    <span className="tarjeta-valor">{negocios.filter(n => !n.pagado && n.trial_fin && new Date(n.trial_fin) >= new Date()).length}</span>
+                    <span className="tarjeta-sub">Prueba gratuita</span>
+                  </div>
+                </div>
+                <div className="tarjeta">
+                  <div className="tarjeta-icon-box tarjeta-icon-morado"><Mail size={22} /></div>
+                  <div className="tarjeta-info">
+                    <span className="tarjeta-label">Gmail conectado</span>
+                    <span className="tarjeta-valor">{negocios.filter(n => n.gmail_conectado).length}</span>
+                    <span className="tarjeta-sub">Verificación activa</span>
+                  </div>
+                </div>
+              </div>
+
+              {exitoNegocio && (
+                <div className="usuario-alerta usuario-exito">
+                  <CheckCircle size={16} /> {exitoNegocio}
+                </div>
+              )}
+              {errorNegocio && (
+                <div className="usuario-alerta usuario-error">
+                  <XCircle size={16} /> {errorNegocio}
+                </div>
+              )}
+
+              <div className="seccion">
+                <div className="seccion-header">
+                  <h2 className="seccion-titulo"><Building2 size={18} /> Negocios de la plataforma</h2>
+                  {!mostrarFormNegocio && (
+                    <button className="exportar-btn" onClick={() => { setMostrarFormNegocio(true); setEditandoNegocio(null); setFormNegocio({ nombre: '', whatsapp: '', plan: 'basico' }); }}>
+                      <Building2 size={14} /> Nuevo negocio
+                    </button>
+                  )}
+                </div>
+
+                {mostrarFormNegocio && (
+                  <div className="usuario-form">
+                    <h3 className="usuario-form-titulo">
+                      {editandoNegocio ? <><Edit size={16} /> Editar negocio</> : <><Building2 size={16} /> Crear nuevo negocio</>}
+                    </h3>
+                    <div className="usuario-form-grid">
+                      <div className="usuario-form-campo">
+                        <label>Nombre del negocio</label>
+                        <input type="text" placeholder="Ej: Pizzería Don Mario" value={formNegocio.nombre} onChange={(e) => setFormNegocio({ ...formNegocio, nombre: e.target.value })} />
+                      </div>
+                      <div className="usuario-form-campo">
+                        <label>WhatsApp (opcional)</label>
+                        <input type="text" placeholder="Ej: 573001234567" value={formNegocio.whatsapp} onChange={(e) => setFormNegocio({ ...formNegocio, whatsapp: e.target.value })} />
+                      </div>
+                      <div className="usuario-form-campo">
+                        <label>Plan</label>
+                        <select value={formNegocio.plan} onChange={(e) => setFormNegocio({ ...formNegocio, plan: e.target.value })}>
+                          <option value="basico">Básico (300/mes)</option>
+                          <option value="premium">Premium (1,000/mes)</option>
+                          <option value="empresarial">Empresarial (ilimitado)</option>
+                        </select>
+                      </div>
+                    </div>
+                    <div className="usuario-form-acciones">
+                      <button className="usuario-btn-guardar" onClick={editandoNegocio ? actualizarNegocio : crearNegocio}>
+                        <Save size={15} /> {editandoNegocio ? 'Guardar cambios' : 'Crear negocio'}
+                      </button>
+                      <button className="usuario-btn-cancelar" onClick={cancelarFormNegocio}>
+                        <X size={15} /> Cancelar
+                      </button>
+                    </div>
+                  </div>
+                )}
+
+                {cargandoNegocios ? (
+                  <p style={{ textAlign: 'center', padding: '2rem', color: '#888' }}>Cargando negocios...</p>
+                ) : (
+                  <div className="tabla-container">
+                    <table className="tabla-pagos">
+                      <thead>
+                        <tr>
+                          <th>Negocio</th>
+                          <th>Plan</th>
+                          <th>Estado</th>
+                          <th>Uso del plan</th>
+                          <th>Gmail</th>
+                          <th>Estado cuenta</th>
+                          <th>Acciones</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {negocios.map(n => {
+                          const estado = estadoNegocioInfo(n);
+                          const porcentaje = n.limite_comprobantes ? Math.min(100, Math.round((n.comprobantes_usados / n.limite_comprobantes) * 100)) : 0;
+                          return (
+                            <tr key={n.id} style={!n.activo ? { opacity: 0.5 } : {}}>
+                              <td className="td-cliente">{n.nombre}</td>
+                              <td>
+                                <span className="banco-badge badge-otro">{getPlanLabel(n.plan)}</span>
+                              </td>
+                              <td>
+                                <span className={`banco-badge ${estado.clase}`}>{estado.label}</span>
+                              </td>
+                              <td style={{ minWidth: 140 }}>
+                                <div style={{ height: 6, background: '#f0f0f5', borderRadius: 4, overflow: 'hidden', marginBottom: 4 }}>
+                                  <div style={{ width: `${porcentaje}%`, height: '100%', background: getPlanColor(porcentaje), borderRadius: 4 }} />
+                                </div>
+                                <span style={{ fontSize: '0.75rem', color: '#999' }}>
+                                  {n.comprobantes_usados} / {n.limite_comprobantes === 999999 ? '∞' : n.limite_comprobantes}
+                                </span>
+                              </td>
+                              <td>
+                                {n.gmail_conectado ? (
+                                  <span className="fuente-badge fuente-gmail" title={n.gmail_email}><MailCheck size={11} /> Conectado</span>
+                                ) : (
+                                  <span className="sin-foto">Sin conectar</span>
+                                )}
+                              </td>
+                              <td>
+                                <span className={`fuente-badge ${n.activo ? 'fuente-gmail' : 'fuente-nocturna'}`}>
+                                  {n.activo ? <><UserCheck size={11} /> Activo</> : <><UserX size={11} /> Inactivo</>}
+                                </span>
+                              </td>
+                              <td>
+                                <div style={{ display: 'flex', gap: '0.4rem' }}>
+                                  <button className="ver-foto-btn" onClick={() => iniciarEdicionNegocio(n)} title="Editar">
+                                    <Edit size={13} />
+                                  </button>
+                                  <button
+                                    className="ver-foto-btn"
+                                    onClick={() => alternarActivoNegocio(n)}
+                                    title={n.activo ? 'Desactivar' : 'Reactivar'}
+                                    style={{ color: n.activo ? '#E53935' : '#43A047' }}
+                                  >
+                                    {n.activo ? <Trash2 size={13} /> : <UserCheck size={13} />}
+                                  </button>
+                                </div>
+                              </td>
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
+              </div>
+            </>
           )}
 
           </>

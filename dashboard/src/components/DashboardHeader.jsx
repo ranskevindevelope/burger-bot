@@ -1,5 +1,5 @@
 import React from 'react';
-import { AlertTriangle, CreditCard, Download, LayoutDashboard, Menu, Search, TrendingUp, Users, Settings } from 'lucide-react';
+import { AlertTriangle, CreditCard, Download, LayoutDashboard, Menu, Search, TrendingUp, Users, Settings, Building2 } from 'lucide-react';
 
 const titles = {
   panel: ['Panel general', LayoutDashboard],
@@ -10,6 +10,7 @@ const titles = {
   duplicados: ['Duplicados detectados', AlertTriangle],
   usuarios: ['Gestión de usuarios', Users],
   configuracion: ['Configuración', Settings],
+  negocios: ['Negocios', Building2],
 };
 
 function DashboardHeader({ activeSection, onToggleSidebar }) {
