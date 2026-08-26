@@ -362,16 +362,15 @@ function Login({ onLogin , onRegistro, onRecuperar }) {
         .logo-reveal {
           opacity: 0;
           transform: translate(-50%,-50%) scale(0.2);
+          box-shadow: 0 0 80px rgba(245,124,0,0.25), 0 0 30px rgba(245,124,0,0.15);
           animation: logoSmash 0.5s cubic-bezier(0.34, 1.56, 0.64, 1) forwards;
           animation-delay: 1.35s;
+          will-change: transform, opacity;
         }
         @keyframes logoSmash {
-          0%   { opacity: 0; transform: translate(-50%,-50%) scale(0.2);
-                 box-shadow: 0 0 0px rgba(245,124,0,0); }
-          50%  { opacity: 1; transform: translate(-50%,-50%) scale(1.12);
-                 box-shadow: 0 0 60px rgba(245,124,0,0.5); }
-          100% { opacity: 1; transform: translate(-50%,-50%) scale(1);
-                 box-shadow: 0 0 80px rgba(245,124,0,0.25), 0 0 30px rgba(245,124,0,0.15); }
+          0%   { opacity: 0; transform: translate(-50%,-50%) scale(0.2); }
+          50%  { opacity: 1; transform: translate(-50%,-50%) scale(1.12); }
+          100% { opacity: 1; transform: translate(-50%,-50%) scale(1); }
         }
 
         /* ═══ Logo aparece tras el impacto ═══ */
@@ -404,6 +403,9 @@ function Login({ onLogin , onRegistro, onRecuperar }) {
         /* ═══ Puntos flotantes con movimiento sutil ═══ */
         .floating-dot {
           animation: floatDot 4s ease-in-out infinite alternate;
+          will-change: transform;
+          transform: translate3d(0, 0, 0);
+          backface-visibility: hidden;
         }
         .dot-1 { animation-delay: 0s; }
         .dot-2 { animation-delay: 0.5s; }
@@ -412,8 +414,8 @@ function Login({ onLogin , onRegistro, onRecuperar }) {
         .dot-5 { animation-delay: 2s; }
         .dot-6 { animation-delay: 2.5s; }
         @keyframes floatDot {
-          0%   { transform: translate(0, 0); }
-          100% { transform: translate(6px, -8px); }
+          0%   { transform: translate3d(0, 0, 0); }
+          100% { transform: translate3d(6px, -8px, 0); }
         }
 
         /* ═══ Botón hover ═══ */
