@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import FlashPagoLanding from './Flashpagolanding';
 import Login from './Login';
 import Registro from './Registro';
+import RecuperarPassword from './RecuperarPassword';
 import Dashboard from './Dashboard';
 import Terminos from './Terminos';
 import './App.css';
@@ -33,7 +34,11 @@ function App() {
   }
 
   if (vista === 'login') {
-    return <Login onLogin={() => setVista('dashboard')} onRegistro={() => setVista('registro')} />;
+    return <Login onLogin={() => setVista('dashboard')} onRegistro={() => setVista('registro')} onRecuperar={() => setVista('recuperar')} />;
+  }
+
+  if (vista === 'recuperar') {
+    return <RecuperarPassword onVolver={() => setVista('login')} />;
   }
 
   return <Dashboard onLogout={handleLogout} />;

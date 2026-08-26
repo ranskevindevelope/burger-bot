@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Zap, Lock, User, Eye, EyeOff, ShieldCheck, Clock, BarChart3 } from 'lucide-react';
 
-function Login({ onLogin , onRegistro }) {
+function Login({ onLogin , onRegistro, onRecuperar }) {
   const [usuario, setUsuario] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
@@ -100,6 +100,14 @@ function Login({ onLogin , onRegistro }) {
                   {verPassword ? <EyeOff size={18} color="#999" /> : <Eye size={18} color="#999" />}
                 </button>
               </div>
+              <p style={{ textAlign: 'right', margin: '0.5rem 0 0' }}>
+                <button type="button" onClick={onRecuperar} style={{
+                  background: 'none', border: 'none', color: '#F57C00',
+                  fontWeight: 600, cursor: 'pointer', fontSize: '0.8rem', fontFamily: 'inherit',
+                }}>
+                  ¿Olvidaste tu contraseña?
+                </button>
+              </p>
             </div>
 
             {error && (

@@ -42,7 +42,7 @@ function Dashboard({ onLogout }) {
   const [cargandoUsuarios, setCargandoUsuarios] = useState(false);
   const [mostrarFormUsuario, setMostrarFormUsuario] = useState(false);
   const [editandoUsuario, setEditandoUsuario] = useState(null);
-  const [formUsuario, setFormUsuario] = useState({ usuario: '', password: '', nombre: '', rol: 'empleado', whatsapp: '' });
+  const [formUsuario, setFormUsuario] = useState({ usuario: '', password: '', nombre: '', rol: 'empleado', whatsapp: '', email: '' });
   const [errorUsuario, setErrorUsuario] = useState('');
   const [exitoUsuario, setExitoUsuario] = useState('');
 
@@ -281,7 +281,7 @@ function Dashboard({ onLogout }) {
 
       if (data.ok) {
         setExitoUsuario(`Usuario "${formUsuario.usuario}" creado exitosamente`);
-        setFormUsuario({ usuario: '', password: '', nombre: '', rol: 'empleado', whatsapp: '' });
+        setFormUsuario({ usuario: '', password: '', nombre: '', rol: 'empleado', whatsapp: '', email: '' });
         setMostrarFormUsuario(false);
         cargarUsuarios();
         setTimeout(() => setExitoUsuario(''), 3000);
@@ -296,7 +296,7 @@ function Dashboard({ onLogout }) {
   const actualizarUsuario = async () => {
     setErrorUsuario('');
     try {
-      const body = { nombre: formUsuario.nombre, rol: formUsuario.rol, whatsapp: formUsuario.whatsapp };
+      const body = { nombre: formUsuario.nombre, rol: formUsuario.rol, whatsapp: formUsuario.whatsapp, email: formUsuario.email };
       if (formUsuario.password) body.password = formUsuario.password;
 
       const data = await api.request(`/api/usuarios/${editandoUsuario}`, {
@@ -308,7 +308,7 @@ function Dashboard({ onLogout }) {
         setExitoUsuario('Usuario actualizado');
         setEditandoUsuario(null);
         setMostrarFormUsuario(false);
-        setFormUsuario({ usuario: '', password: '', nombre: '', rol: 'empleado', whatsapp: '' });
+        setFormUsuario({ usuario: '', password: '', nombre: '', rol: 'empleado', whatsapp: '', email: '' });
         cargarUsuarios();
         setTimeout(() => setExitoUsuario(''), 3000);
       } else {
@@ -353,7 +353,7 @@ function Dashboard({ onLogout }) {
 
   const iniciarEdicion = (user) => {
     setEditandoUsuario(user.id);
-    setFormUsuario({ usuario: user.usuario, password: '', nombre: user.nombre, rol: user.rol, whatsapp: user.whatsapp || '' });
+    setFormUsuario({ usuario: user.usuario, password: '', nombre: user.nombre, rol: user.rol, whatsapp: user.whatsapp || '', email: user.email || '' });
     setMostrarFormUsuario(true);
     setErrorUsuario('');
   };
@@ -361,7 +361,7 @@ function Dashboard({ onLogout }) {
   const cancelarForm = () => {
     setMostrarFormUsuario(false);
     setEditandoUsuario(null);
-    setFormUsuario({ usuario: '', password: '', nombre: '', rol: 'empleado', whatsapp: '' });
+    setFormUsuario({ usuario: '', password: '', nombre: '', rol: 'empleado', whatsapp: '', email: '' });
     setErrorUsuario('');
   };
 
@@ -1955,7 +1955,7 @@ function Dashboard({ onLogout }) {
                 <div className="seccion-header">
                   <h2 className="seccion-titulo"><Users size={18} /> Usuarios del sistema</h2>
                   {!mostrarFormUsuario && (
-                    <button className="exportar-btn" onClick={() => { setMostrarFormUsuario(true); setEditandoUsuario(null); setFormUsuario({ usuario: '', password: '', nombre: '', rol: 'empleado', whatsapp: '' }); }}>
+                    <button className="exportar-btn" onClick={() => { setMostrarFormUsuario(true); setEditandoUsuario(null); setFormUsuario({ usuario: '', password: '', nombre: '', rol: 'empleado', whatsapp: '', email: '' }); }}>
                       <UserPlus size={14} /> Nuevo usuario
                     </button>
                   )}
@@ -1989,6 +1989,10 @@ function Dashboard({ onLogout }) {
                       <div className="usuario-form-campo">
                         <label>WhatsApp (opcional)</label>
                         <input type="text" placeholder="Ej: 573001234567@c.us" value={formUsuario.whatsapp} onChange={(e) => setFormUsuario({ ...formUsuario, whatsapp: e.target.value })} />
+                      </div>
+                      <div className="usuario-form-campo">
+                        <label>Email (para recuperar contraseña)</label>
+                        <input type="email" placeholder="Ej: kevin@negocio.com" value={formUsuario.email} onChange={(e) => setFormUsuario({ ...formUsuario, email: e.target.value })} />
                       </div>
                     </div>
                     <div className="usuario-form-acciones">

@@ -122,6 +122,14 @@ db.run(`
         console.log('[DB] Columna negocio_id en usuarios: OK');
       }
     });
+    // Migración: agregar email si la tabla ya existía sin ella (recuperación de contraseña)
+    db.run(`ALTER TABLE usuarios ADD COLUMN email TEXT`, (alterErr) => {
+      if (alterErr && !alterErr.message.includes('duplicate column')) {
+        console.error('[DB] Error migrando email en usuarios:', alterErr.message);
+      } else {
+        console.log('[DB] Columna email en usuarios: OK');
+      }
+    });
   }
 });
 
@@ -654,11 +662,14 @@ function verificarCodigo(email, codigo) {
       (err, row) => {
         if (err) return reject(err);
         if (!row) {
-          // Incrementar intentos del último código
+          // Incrementar intentos del último código (SQLite no soporta ORDER BY/LIMIT en UPDATE)
           db.run(
             `UPDATE codigos_verificacion SET intentos = intentos + 1
-             WHERE email = ? AND usado = 0 ORDER BY id DESC LIMIT 1`,
-            [email]
+             WHERE id = (SELECT id FROM codigos_verificacion WHERE email = ? AND usado = 0 ORDER BY id DESC LIMIT 1)`,
+            [email],
+            (updateErr) => {
+              if (updateErr) console.error('[DB] Error incrementando intentos:', updateErr.message);
+            }
           );
           return resolve(null);
         }

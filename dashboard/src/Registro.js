@@ -1,5 +1,5 @@
-import React, { useState } from 'react';
-import { DollarSign, ArrowRight, ArrowLeft, Check, Mail, Users, ShoppingBag, Shield, Zap } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { DollarSign, ArrowRight, ArrowLeft, Check, Mail, Users, ShoppingBag, Shield, Zap, Sparkles, Gift, Package, Rocket, Building2 } from 'lucide-react';
 
 const API_BASE = process.env.REACT_APP_API_URL || '';
 
@@ -17,6 +17,17 @@ function Registro({ onBack }) {
   const [whatsappNegocio, setWhatsappNegocio] = useState('');
   const [cantidadEmpleados, setCantidadEmpleados] = useState('1-3');
   const [bancoNegocio, setBancoNegocio] = useState('Bancolombia');
+  const [hintBancoVisible, setHintBancoVisible] = useState(true);
+
+  useEffect(() => {
+    if (bancoNegocio !== 'Bancolombia') {
+      setHintBancoVisible(false);
+      return;
+    }
+    setHintBancoVisible(true);
+    const t = setTimeout(() => setHintBancoVisible(false), 3500);
+    return () => clearTimeout(t);
+  }, [bancoNegocio]);
   const [wppVerificado, setWppVerificado] = useState(false);
   const [wppCodigo, setWppCodigo] = useState('');
   const [wppEnviando, setWppEnviando] = useState(false);
@@ -37,9 +48,9 @@ function Registro({ onBack }) {
   const [registroExitoso, setRegistroExitoso] = useState(null);
 
   const planes = [
-    { id: 'basico', nombre: 'Básico', precio: '$39.900', comprobantes: '300 comprobantes/mes', popular: false },
-    { id: 'premium', nombre: 'Premium', precio: '$79.900', comprobantes: '1,000 comprobantes/mes', popular: true },
-    { id: 'empresarial', nombre: 'Empresarial', precio: '$149.900', comprobantes: 'Ilimitado', popular: false },
+    { id: 'basico', nombre: 'Básico', precio: '$39.900', comprobantes: '300 comprobantes/mes', corto: '300/mes', popular: false, Icono: Package },
+    { id: 'premium', nombre: 'Premium', precio: '$79.900', comprobantes: '1,000 comprobantes/mes', corto: '1,000/mes', popular: true, Icono: Rocket },
+    { id: 'empresarial', nombre: 'Empresarial', precio: '$149.900', comprobantes: 'Ilimitado', corto: 'Ilimitado', popular: false, Icono: Building2 },
   ];
 
   const planActual = planes.find(p => p.id === plan);
@@ -576,20 +587,29 @@ function Registro({ onBack }) {
             <div style={s.title}>Elige tu plan</div>
             <div style={s.desc}>Prueba gratis por 15 días. Sin tarjeta de crédito.</div>
             <div style={{
-              display: 'inline-flex', alignItems: 'center', gap: 5, padding: '5px 14px',
+              display: 'inline-flex', alignItems: 'center', gap: 6, padding: '5px 14px',
               borderRadius: 50, background: '#E8F5E9', color: '#2E7D32',
               fontSize: 12, fontWeight: 600, marginBottom: 14,
             }}>
-              🎁 15 días gratis en cualquier plan
+              <Gift size={13} /> 15 días gratis en cualquier plan
             </div>
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 10, marginBottom: 16 }}>
               {planes.map(p => (
                 <div key={p.id} style={s.planCard(plan === p.id)} onClick={() => setPlan(p.id)}>
                   {p.popular && <div style={s.planTag}>Popular</div>}
+                  <div style={{
+                    width: 34, height: 34, borderRadius: 9, margin: '0 auto 8px',
+                    display: 'flex', alignItems: 'center', justifyContent: 'center',
+                    background: plan === p.id ? '#F57C00' : '#f2f2f6',
+                    transition: 'background 0.2s',
+                  }}>
+                    <p.Icono size={17} color={plan === p.id ? '#fff' : '#8888a8'} />
+                  </div>
                   <div style={{ fontSize: 14, fontWeight: 600, color: '#1A1A2E', marginBottom: 4 }}>{p.nombre}</div>
-                  <div style={{ fontSize: 20, fontWeight: 700, color: '#F57C00', marginBottom: 4 }}>{p.precio}</div>
-                  <div style={{ fontSize: 11, color: '#999', marginBottom: 6 }}>{p.comprobantes}</div>
-                  <div style={{ fontSize: 10, color: '#2E7D32', fontWeight: 600 }}>🎁 15 días gratis</div>
+                  <div style={{ fontSize: 19, fontWeight: 700, color: '#F57C00', lineHeight: 1.2 }}>{p.precio}</div>
+                  <div style={{ fontSize: 10, color: '#bbb', marginBottom: 8 }}>por mes</div>
+                  <div style={{ height: 1, background: '#eee', margin: '0 -12px 8px' }} />
+                  <div style={{ fontSize: 11, color: '#666', fontWeight: 500 }}>{p.corto}</div>
                 </div>
               ))}
             </div>
@@ -705,6 +725,20 @@ function Registro({ onBack }) {
                   <option>Otro</option>
                 </select>
               </div>
+            </div>
+            <div style={{
+              maxHeight: hintBancoVisible ? 28 : 0,
+              opacity: hintBancoVisible ? 1 : 0,
+              overflow: 'hidden',
+              transition: 'max-height 0.5s ease, opacity 0.4s ease',
+              marginTop: hintBancoVisible ? 8 : 0,
+            }}>
+              <span style={{
+                display: 'flex', alignItems: 'center', gap: 5,
+                fontSize: 12, color: '#F57C00', fontWeight: 500, lineHeight: 1.4,
+              }}>
+                <Sparkles size={13} style={{ flexShrink: 0 }} /> Bancolombia es el banco más usado por nuestros clientes
+              </span>
             </div>
             <div style={{ display: 'flex', gap: 10, marginTop: 8 }}>
               <button style={s.btnBack} onClick={() => setPaso(1)}>

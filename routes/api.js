@@ -91,7 +91,7 @@ router.post('/login', limitarLogin, (req, res) => {
 //  REGISTRO (público, sin auth)
 // ═══════════════════════════════════════════════════════════
 
-const { enviarCodigoVerificacion, enviarBienvenida } = require('../mailer');
+const { enviarCodigoVerificacion, enviarBienvenida, enviarCodigoRecuperacion } = require('../mailer');
 const { generarCodigo, guardarCodigoVerificacion, verificarCodigo } = require('../db');
 
 // Paso 1: Enviar código de verificación
@@ -123,11 +123,14 @@ router.post('/registro/enviar-codigo', limitarLogin, async (req, res) => {
 
     // Verificar que el email no esté registrado
     const existeEmail = await new Promise((resolve, reject) => {
-      db.get('SELECT id FROM usuarios WHERE whatsapp = ?', [email], (err, row) => {
+      db.get('SELECT id FROM usuarios WHERE email = ?', [email.trim().toLowerCase()], (err, row) => {
         if (err) reject(err);
         else resolve(row);
       });
     });
+    if (existeEmail) {
+      return res.status(409).json({ ok: false, error: 'Ese email ya está registrado. Usa "Recuperar contraseña" si es tu cuenta.' });
+    }
 
     // Generar y guardar código
     const codigo = generarCodigo();
@@ -173,9 +176,9 @@ router.post('/registro/verificar', limitarLogin, async (req, res) => {
 
     const userId = await new Promise((resolve, reject) => {
       db.run(
-        `INSERT INTO usuarios (usuario, password_hash, salt, nombre, rol, whatsapp, negocio_id)
-         VALUES (?, ?, ?, ?, 'admin', ?, ?)`,
-        [datos.usuario.trim().toLowerCase(), hash, salt, datos.nombre, formatearWhatsapp(datos.whatsapp_negocio), negocio.id],
+        `INSERT INTO usuarios (usuario, password_hash, salt, nombre, rol, whatsapp, negocio_id, email)
+         VALUES (?, ?, ?, ?, 'admin', ?, ?, ?)`,
+        [datos.usuario.trim().toLowerCase(), hash, salt, datos.nombre, formatearWhatsapp(datos.whatsapp_negocio), negocio.id, datos.email],
         function (err) {
           if (err) reject(err);
           else resolve(this.lastID);
@@ -312,6 +315,80 @@ router.post('/registro/confirmar-whatsapp', limitarLogin, (req, res) => {
   codigosWhatsapp.delete(numero);
   console.log(`[Registro] WhatsApp verificado: ${numero}`);
   res.json({ ok: true, mensaje: 'WhatsApp verificado' });
+});
+
+// ═══════════════════════════════════════════════════════════
+//  RECUPERAR CONTRASEÑA (público, sin auth)
+// ═══════════════════════════════════════════════════════════
+
+router.post('/recuperar/solicitar', limitarLogin, async (req, res) => {
+  try {
+    const { email } = req.body;
+    if (!email) return res.status(400).json({ ok: false, error: 'Falta el email' });
+
+    const emailLimpio = email.trim().toLowerCase();
+    const user = await new Promise((resolve, reject) => {
+      db.get(
+        'SELECT id, nombre FROM usuarios WHERE LOWER(email) = ? AND activo = 1',
+        [emailLimpio],
+        (err, row) => (err ? reject(err) : resolve(row))
+      );
+    });
+
+    // Respuesta genérica siempre, para no revelar si el email existe o no
+    if (user) {
+      const codigo = generarCodigo();
+      await guardarCodigoVerificacion(emailLimpio, codigo, { usuario_id: user.id });
+      try {
+        await enviarCodigoRecuperacion(emailLimpio, codigo, user.nombre);
+      } catch (e) {
+        console.error('[Recuperar] Error enviando correo:', e.message);
+      }
+    }
+
+    res.json({ ok: true, mensaje: 'Si el email está registrado, recibirás un código en unos minutos' });
+  } catch (err) {
+    console.error('[Recuperar] Error solicitando:', err.message);
+    res.status(500).json({ ok: false, error: 'Error del servidor' });
+  }
+});
+
+router.post('/recuperar/verificar', limitarLogin, async (req, res) => {
+  try {
+    const { email, codigo, password } = req.body;
+    if (!email || !codigo || !password) {
+      return res.status(400).json({ ok: false, error: 'Faltan datos' });
+    }
+    if (password.length < 6) {
+      return res.status(400).json({ ok: false, error: 'La contraseña debe tener al menos 6 caracteres' });
+    }
+
+    const emailLimpio = email.trim().toLowerCase();
+    const datos = await verificarCodigo(emailLimpio, codigo);
+    if (!datos) {
+      return res.status(400).json({ ok: false, error: 'Código incorrecto o expirado' });
+    }
+
+    const salt = crypto.randomBytes(32).toString('hex');
+    const hash = crypto.pbkdf2Sync(password, salt, 10000, 64, 'sha512').toString('hex');
+
+    await new Promise((resolve, reject) => {
+      db.run(
+        'UPDATE usuarios SET password_hash = ?, salt = ? WHERE id = ?',
+        [hash, salt, datos.usuario_id],
+        function (err) {
+          if (err) reject(err);
+          else if (this.changes === 0) reject(new Error('Usuario no encontrado'));
+          else resolve();
+        }
+      );
+    });
+
+    res.json({ ok: true, mensaje: 'Contraseña actualizada' });
+  } catch (err) {
+    console.error('[Recuperar] Error verificando:', err.message);
+    res.status(500).json({ ok: false, error: 'Error actualizando la contraseña' });
+  }
 });
 
 // ═══════════════════════════════════════════════════════════
@@ -803,7 +880,7 @@ router.get('/dashboard/buscar/:nombre', verificarToken, async (req, res) => {
 router.get('/usuarios', verificarToken, soloAdmin, (req, res) => {
   const nid = req.user.negocio_id;
   db.all(
-    'SELECT id, usuario, nombre, rol, whatsapp, negocio_id, activo, ultimo_login, creado_en FROM usuarios WHERE negocio_id = ? ORDER BY id',
+    'SELECT id, usuario, nombre, rol, whatsapp, email, negocio_id, activo, ultimo_login, creado_en FROM usuarios WHERE negocio_id = ? ORDER BY id',
     [nid],
     (err, filas) => {
       if (err) return res.status(500).json({ ok: false, error: err.message });
@@ -813,7 +890,7 @@ router.get('/usuarios', verificarToken, soloAdmin, (req, res) => {
 });
 
 router.post('/usuarios', verificarToken, soloAdmin, (req, res) => {
-  const { usuario, password, nombre, rol, whatsapp } = req.body;
+  const { usuario, password, nombre, rol, whatsapp, email } = req.body;
   const nid = req.user.negocio_id;
   if (!usuario || !password || !nombre) return res.status(400).json({ ok: false, error: 'Faltan campos' });
   if (password.length < 6) return res.status(400).json({ ok: false, error: 'Contraseña mínimo 6 caracteres' });
@@ -822,8 +899,8 @@ router.post('/usuarios', verificarToken, soloAdmin, (req, res) => {
   const hash = crypto.pbkdf2Sync(password, salt, 10000, 64, 'sha512').toString('hex');
 
   db.run(
-    'INSERT INTO usuarios (usuario, password_hash, salt, nombre, rol, whatsapp, negocio_id) VALUES (?,?,?,?,?,?,?)',
-    [usuario.trim().toLowerCase(), hash, salt, nombre.trim(), rol || 'empleado', whatsapp || null, nid],
+    'INSERT INTO usuarios (usuario, password_hash, salt, nombre, rol, whatsapp, negocio_id, email) VALUES (?,?,?,?,?,?,?,?)',
+    [usuario.trim().toLowerCase(), hash, salt, nombre.trim(), rol || 'empleado', whatsapp || null, nid, email ? email.trim().toLowerCase() : null],
     function (err) {
       if (err) {
         if (err.message.includes('UNIQUE')) return res.status(409).json({ ok: false, error: 'Ese usuario ya existe' });
@@ -835,12 +912,13 @@ router.post('/usuarios', verificarToken, soloAdmin, (req, res) => {
 });
 
 router.put('/usuarios/:id', verificarToken, soloAdmin, (req, res) => {
-  const { nombre, rol, whatsapp, activo, password } = req.body;
+  const { nombre, rol, whatsapp, email, activo, password } = req.body;
   const nid = req.user.negocio_id;
   const sets = []; const vals = [];
   if (nombre) { sets.push('nombre=?'); vals.push(nombre); }
   if (rol) { sets.push('rol=?'); vals.push(rol); }
   if (whatsapp !== undefined) { sets.push('whatsapp=?'); vals.push(whatsapp); }
+  if (email !== undefined) { sets.push('email=?'); vals.push(email ? email.trim().toLowerCase() : null); }
   if (activo !== undefined) { sets.push('activo=?'); vals.push(activo); }
   if (password) {
     const salt = crypto.randomBytes(32).toString('hex');
