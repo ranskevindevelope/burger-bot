@@ -421,6 +421,9 @@ router.get('/negocios', verificarToken, soloSuperAdmin, async (req, res) => {
 
 router.get('/negocios/:id', verificarToken, soloAdmin, async (req, res) => {
   try {
+    if (req.user.rol !== 'superadmin' && Number(req.params.id) !== Number(req.user.negocio_id)) {
+      return res.status(403).json({ ok: false, error: 'No autorizado para ver este negocio' });
+    }
     const negocio = await obtenerNegocio(req.params.id);
     if (!negocio) return res.status(404).json({ ok: false, error: 'Negocio no encontrado' });
     const usados = await contarComprobantesDelMes(negocio.id);
