@@ -614,6 +614,83 @@ function Dashboard({ onLogout }) {
         />
 
         <div className="main-body">
+          {/* ─── PANTALLA BLOQUEADA (trial expirado) ─── */}
+          {planInfo?.trial && !planInfo.trial.activo && !planInfo.trial.pagado ? (
+            <div style={{
+              display: 'flex', flexDirection: 'column', alignItems: 'center',
+              justifyContent: 'center', minHeight: '70vh', textAlign: 'center', padding: '2rem',
+            }}>
+              <div style={{
+                width: 72, height: 72, borderRadius: '50%', background: '#FFEBEE',
+                display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: '1.25rem',
+              }}>
+                <Shield size={36} color="#E53935" />
+              </div>
+              <h2 style={{ fontSize: '1.5rem', fontWeight: 700, color: '#1a1a2e', marginBottom: '0.5rem' }}>
+                Tu prueba gratuita ha terminado
+              </h2>
+              <p style={{ fontSize: '0.95rem', color: '#666', maxWidth: 440, lineHeight: 1.6, marginBottom: '1.5rem' }}>
+                El bot dejó de verificar comprobantes y el dashboard está suspendido. Elige un plan para reactivar tu cuenta.
+              </p>
+
+              {/* Cards de planes */}
+              <div style={{
+                display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 12,
+                maxWidth: 600, width: '100%', marginBottom: '1.5rem',
+              }}>
+                {[
+                  { nombre: 'Básico', precio: '$39.900', comprobantes: '300/mes', color: '#F57C00' },
+                  { nombre: 'Premium', precio: '$79.900', comprobantes: '1,000/mes', color: '#1A1A2E', popular: true },
+                  { nombre: 'Empresarial', precio: '$149.900', comprobantes: 'Ilimitado', color: '#7B1FA2' },
+                ].map((p) => (
+                  <div key={p.nombre} style={{
+                    border: p.popular ? '2px solid #F57C00' : '2px solid #e8e8f0',
+                    borderRadius: 14, padding: '1.25rem 1rem', position: 'relative',
+                    background: p.popular ? '#FFF8F0' : '#fff', textAlign: 'center',
+                  }}>
+                    {p.popular && (
+                      <div style={{
+                        position: 'absolute', top: -10, left: '50%', transform: 'translateX(-50%)',
+                        background: '#F57C00', color: '#fff', fontSize: 11, padding: '2px 14px',
+                        borderRadius: 10, fontWeight: 600,
+                      }}>Popular</div>
+                    )}
+                    <div style={{ fontSize: 15, fontWeight: 600, color: '#1a1a2e', marginBottom: 4 }}>{p.nombre}</div>
+                    <div style={{ fontSize: 24, fontWeight: 700, color: '#F57C00', marginBottom: 4 }}>{p.precio}</div>
+                    <div style={{ fontSize: 12, color: '#999', marginBottom: 12 }}>{p.comprobantes}</div>
+                    <button onClick={() => {
+                      alert(
+                        '💳 Para activar tu plan, transfiere a:\n\n' +
+                        'nequi\n' +
+                        'Cuenta de ahorros: 3045530381\n' +
+                        'Nombre: Kevin ramirez\n\n' +
+                        `Plan ${p.nombre}: ${p.precio}/mes\n\n` +
+                        'Envía el comprobante al WhatsApp:\n+57 304 3045530381\n\n' +
+                        'Tu cuenta se activa en minutos.'
+                      );
+                    }} style={{
+                      width: '100%', padding: '0.6rem', borderRadius: 10, border: 'none',
+                      background: p.popular ? '#F57C00' : p.color, color: '#fff',
+                      fontWeight: 600, fontSize: '0.85rem', cursor: 'pointer',
+                    }}>
+                      Activar {p.nombre}
+                    </button>
+                  </div>
+                ))}
+              </div>
+
+              <div style={{
+                background: '#f8f8fc', borderRadius: 12, padding: '1rem 1.5rem',
+                maxWidth: 440, width: '100%',
+              }}>
+                <div style={{ fontSize: '0.85rem', color: '#666', lineHeight: 1.6 }}>
+                  <Shield size={14} style={{ verticalAlign: 'middle', marginRight: 4 }} />
+                  Tus datos están seguros. Al activar un plan, todo vuelve a funcionar con tu historial intacto.
+                </div>
+              </div>
+            </div>
+          ) : (
+          <>
           {seccionActiva === 'duplicados' && (
             <div className="duplicados-layout">
               <div className="seccion duplicados-lista">
@@ -1982,6 +2059,9 @@ function Dashboard({ onLogout }) {
                 )}
               </div>
             </>
+          )}
+
+          </>
           )}
 
         </div>
