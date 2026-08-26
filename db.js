@@ -9,6 +9,11 @@ const db = new sqlite3.Database('./vinsonbot.db', (err) => {
   }
 });
 
+// WAL: lectores y escritores no se bloquean entre sí.
+// busy_timeout: si hay un lock momentáneo, reintenta hasta 5s en vez de fallar al instante.
+db.run('PRAGMA journal_mode = WAL');
+db.run('PRAGMA busy_timeout = 5000');
+
 // ═══════════════════════════════════════════════════════════
 //  TABLAS
 // ═══════════════════════════════════════════════════════════
