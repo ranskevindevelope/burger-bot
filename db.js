@@ -45,6 +45,17 @@ db.run(`
         console.error('[DB] Error migrando pagado:', err.message);
       }
     });
+    // Migración: horario del negocio (hora de cierre + días que opera)
+    db.run(`ALTER TABLE negocios ADD COLUMN hora_cierre TEXT DEFAULT '21:00'`, (err) => {
+      if (err && !err.message.includes('duplicate column')) {
+        console.error('[DB] Error migrando hora_cierre:', err.message);
+      }
+    });
+    db.run(`ALTER TABLE negocios ADD COLUMN dias_operacion TEXT DEFAULT '[0,1,2,3,4,5,6]'`, (err) => {
+      if (err && !err.message.includes('duplicate column')) {
+        console.error('[DB] Error migrando dias_operacion:', err.message);
+      }
+    });
   }
 });
 
@@ -191,6 +202,20 @@ function obtenerNegocio(id) {
       if (err) reject(err);
       else resolve(row);
     });
+  });
+}
+
+function actualizarHorarioNegocio(id, { hora_cierre, dias_operacion }) {
+  return new Promise((resolve, reject) => {
+    db.run(
+      `UPDATE negocios SET hora_cierre = ?, dias_operacion = ? WHERE id = ?`,
+      [hora_cierre, JSON.stringify(dias_operacion), id],
+      function (err) {
+        if (err) reject(err);
+        else if (this.changes === 0) reject(new Error('Negocio no encontrado'));
+        else resolve();
+      }
+    );
   });
 }
 
@@ -691,6 +716,7 @@ module.exports = {
   crearNegocio,
   obtenerNegocio,
   listarNegocios,
+  actualizarHorarioNegocio,
   contarComprobantesDelMes,
   verificarTrialActivo,
   // Gmail tokens

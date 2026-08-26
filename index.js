@@ -122,66 +122,80 @@ app.get('/', (req, res) => {
   });
 });
 
-// ─── Ejecutar para TODOS los negocios activos ─────────────
-async function ejecutarParaTodosLosNegocios(fn) {
-  try {
-    const negocios = await listarNegocios();
-    for (const neg of negocios) {
-      try {
-        await fn(neg.id);
-      } catch (err) {
-        console.error(`[Scheduler] Error en negocio ${neg.id} (${neg.nombre}):`, err.message);
-      }
-    }
-  } catch (err) {
-    console.error('[Scheduler] Error listando negocios:', err.message);
-  }
+// ─── Horario propio de cada negocio ────────────────────────
+function sumarMinutos(horaStr, minutosASumar) {
+  const [h, m] = (horaStr || '21:00').split(':').map(Number);
+  const total = (h * 60 + m + minutosASumar + 1440) % 1440;
+  const hh = String(Math.floor(total / 60)).padStart(2, '0');
+  const mm = String(total % 60).padStart(2, '0');
+  return `${hh}:${mm}`;
 }
 
-// ─── Programar reportes y verificaciones ──────────────────
+function parseDiasOperacion(json) {
+  try {
+    const dias = JSON.parse(json);
+    if (Array.isArray(dias) && dias.length) return dias;
+  } catch {
+    // valor viejo/corrupto: opera todos los días por defecto
+  }
+  return [0, 1, 2, 3, 4, 5, 6];
+}
+
+// ─── Programar reportes y verificaciones (por negocio) ────
 setInterval(async () => {
   const ahora = new Date();
   const dia = ahora.getDay();
-  const hora = ahora.getHours();
-  const minuto = ahora.getMinutes();
+  const horaActual = `${String(ahora.getHours()).padStart(2, '0')}:${String(ahora.getMinutes()).padStart(2, '0')}`;
 
   const verificOk = verificarPermitidaHoy();
   const reporteOk = reportePermitidoHoy();
 
-  // Verificación nocturna - 1ra revisión a las 21:00
-  if (hora === 21 && minuto === 0) {
-    if (verificOk) {
-      console.log('[Asincronica] Ejecutando 1ra revisión para todos los negocios...');
-      await ejecutarParaTodosLosNegocios((nid) => verificacionNocturna(1, nid));
-    } else {
-      console.log('[Asincronica] Verificación 1ra omitida (festivo/fin de semana deshabilitado).');
-    }
+  let negocios;
+  try {
+    negocios = await listarNegocios();
+  } catch (err) {
+    console.error('[Scheduler] Error listando negocios:', err.message);
+    return;
   }
 
-  // Verificación nocturna - 2da revisión a las 22:00
-  if (hora === 22 && minuto === 0) {
-    if (verificOk) {
-      console.log('[Asincronica] Ejecutando 2da revisión para todos los negocios...');
-      await ejecutarParaTodosLosNegocios((nid) => verificacionNocturna(2, nid));
-    } else {
-      console.log('[Asincronica] Verificación 2da omitida (festivo/fin de semana deshabilitado).');
+  for (const neg of negocios) {
+    const diasOperacion = parseDiasOperacion(neg.dias_operacion);
+    if (!diasOperacion.includes(dia)) continue; // el negocio no opera hoy
+
+    const horaCierre = neg.hora_cierre || '21:00';
+    const horaVerificacion2 = sumarMinutos(horaCierre, 60);
+
+    if (horaActual === horaCierre) {
+      if (verificOk) {
+        console.log(`[Asincronica] 1ra revisión — ${neg.nombre}`);
+        try { await verificacionNocturna(1, neg.id); }
+        catch (err) { console.error(`[Scheduler] Error en negocio ${neg.id} (${neg.nombre}):`, err.message); }
+      } else {
+        console.log(`[Asincronica] 1ra revisión omitida (festivo/fin de semana) — ${neg.nombre}`);
+      }
     }
-  }
 
-  // Reporte diario
-  const esHorarioReporte =
-    (dia === 4 && hora === 22 && minuto === 0) ||
-    ((dia === 5 || dia === 6) && hora === 22 && minuto === 30) ||
-    (dia === 0 && hora === 22 && minuto === 0);
+    if (horaActual === horaVerificacion2) {
+      if (verificOk) {
+        console.log(`[Asincronica] 2da revisión — ${neg.nombre}`);
+        try { await verificacionNocturna(2, neg.id); }
+        catch (err) { console.error(`[Scheduler] Error en negocio ${neg.id} (${neg.nombre}):`, err.message); }
+      } else {
+        console.log(`[Asincronica] 2da revisión omitida (festivo/fin de semana) — ${neg.nombre}`);
+      }
 
-  if (esHorarioReporte && reporteOk) {
-    console.log('[Reporte] Buscando ingresos sin comprobante antes del reporte...');
-    await ejecutarParaTodosLosNegocios(buscarIngresosSinComprobante);
-
-    console.log('[Reporte] Ejecutando reporte diario para todos los negocios...');
-    await ejecutarParaTodosLosNegocios(enviarReporteDiario);
-  } else if (esHorarioReporte) {
-    console.log('[Reporte] Reporte omitido (festivo/fin de semana deshabilitado).');
+      if (reporteOk) {
+        console.log(`[Reporte] Buscando ingresos sin comprobante y enviando reporte — ${neg.nombre}`);
+        try {
+          await buscarIngresosSinComprobante(neg.id);
+          await enviarReporteDiario(neg.id);
+        } catch (err) {
+          console.error(`[Scheduler] Error en reporte del negocio ${neg.id} (${neg.nombre}):`, err.message);
+        }
+      } else {
+        console.log(`[Reporte] Omitido (festivo/fin de semana) — ${neg.nombre}`);
+      }
+    }
   }
 }, 60000);
 

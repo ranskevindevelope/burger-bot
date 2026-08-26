@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid } from 'recharts';
-import { CreditCard, TrendingUp, Search, Download, DollarSign, Calendar, CheckCircle, Shield, Trophy, BarChart3, Eye, X, Moon, Mail, Users, UserPlus, UserX, UserCheck, Edit, Trash2, Save, XCircle, AlertTriangle, Clock, Bell, Activity, Zap, Wifi, WifiOff, ShoppingBag, Receipt, Wallet, PlusCircle, MinusCircle, ArrowDownUp } from 'lucide-react';
+import { CreditCard, TrendingUp, Search, Download, DollarSign, Calendar, CheckCircle, Shield, Trophy, BarChart3, Eye, X, Moon, Mail, Users, UserPlus, UserX, UserCheck, Edit, Trash2, Save, XCircle, AlertTriangle, Clock, Bell, Activity, Zap, Wifi, WifiOff, ShoppingBag, Receipt, Wallet, PlusCircle, MinusCircle, ArrowDownUp, Settings } from 'lucide-react';
 import { createApiClient } from './services/api';
 import Sidebar from './components/Sidebar';
 import DashboardHeader from './components/DashboardHeader';
@@ -10,7 +10,7 @@ function Dashboard({ onLogout }) {
     if (typeof window === 'undefined') return 'panel';
     const params = new URLSearchParams(window.location.search);
     const seccion = params.get('seccion');
-    return ['panel', 'pagos', 'ventas', 'estadisticas', 'buscar', 'exportar', 'duplicados', 'usuarios'].includes(seccion)
+    return ['panel', 'pagos', 'ventas', 'estadisticas', 'buscar', 'exportar', 'duplicados', 'usuarios', 'configuracion'].includes(seccion)
       ? seccion
       : 'panel';
   };
@@ -45,6 +45,18 @@ function Dashboard({ onLogout }) {
   const [formUsuario, setFormUsuario] = useState({ usuario: '', password: '', nombre: '', rol: 'empleado', whatsapp: '', email: '' });
   const [errorUsuario, setErrorUsuario] = useState('');
   const [exitoUsuario, setExitoUsuario] = useState('');
+
+  // ─── Estado para Configuración (horario del negocio) ───
+  const DIAS_SEMANA = [
+    { valor: 0, corto: 'Dom' }, { valor: 1, corto: 'Lun' }, { valor: 2, corto: 'Mar' },
+    { valor: 3, corto: 'Mié' }, { valor: 4, corto: 'Jue' }, { valor: 5, corto: 'Vie' }, { valor: 6, corto: 'Sáb' },
+  ];
+  const [horaCierre, setHoraCierre] = useState('21:00');
+  const [diasOperacion, setDiasOperacion] = useState([0, 1, 2, 3, 4, 5, 6]);
+  const [cargandoConfig, setCargandoConfig] = useState(false);
+  const [guardandoConfig, setGuardandoConfig] = useState(false);
+  const [errorConfig, setErrorConfig] = useState('');
+  const [exitoConfig, setExitoConfig] = useState('');
 
   // ─── Estado para Plan y Gmail ──────────────────────────
   const [planInfo, setPlanInfo] = useState(null);
@@ -163,6 +175,10 @@ function Dashboard({ onLogout }) {
   }, [seccionActiva]);
 
   useEffect(() => {
+    if (seccionActiva === 'configuracion') cargarConfiguracion();
+  }, [seccionActiva]);
+
+  useEffect(() => {
     if (seccionActiva === 'ventas') cargarVentas();
   }, [seccionActiva]);
 
@@ -225,6 +241,53 @@ function Dashboard({ onLogout }) {
       console.error('Error cargando usuarios:', err);
     }
     setCargandoUsuarios(false);
+  };
+
+  // ─── Funciones de Configuración ────────────────────────
+  const cargarConfiguracion = async () => {
+    setCargandoConfig(true);
+    setErrorConfig('');
+    try {
+      const data = await api.request('/api/negocio/configuracion');
+      if (data.ok) {
+        setHoraCierre(data.hora_cierre);
+        setDiasOperacion(data.dias_operacion);
+      }
+    } catch (err) {
+      setErrorConfig('Error cargando la configuración');
+    }
+    setCargandoConfig(false);
+  };
+
+  const alternarDia = (dia) => {
+    setDiasOperacion((prev) =>
+      prev.includes(dia) ? prev.filter((d) => d !== dia) : [...prev, dia].sort()
+    );
+  };
+
+  const guardarConfiguracion = async () => {
+    setErrorConfig('');
+    setExitoConfig('');
+    if (diasOperacion.length === 0) {
+      setErrorConfig('Selecciona al menos un día de operación');
+      return;
+    }
+    setGuardandoConfig(true);
+    try {
+      const data = await api.request('/api/negocio/configuracion', {
+        method: 'PUT',
+        body: JSON.stringify({ hora_cierre: horaCierre, dias_operacion: diasOperacion }),
+      });
+      if (data.ok) {
+        setExitoConfig('Configuración guardada');
+        setTimeout(() => setExitoConfig(''), 3000);
+      } else {
+        setErrorConfig(data.error || 'Error guardando la configuración');
+      }
+    } catch (err) {
+      setErrorConfig('Error de conexión');
+    }
+    setGuardandoConfig(false);
   };
 
   const exportarPagos = async () => {
@@ -2063,6 +2126,87 @@ function Dashboard({ onLogout }) {
                 )}
               </div>
             </>
+          )}
+
+          {/* ─── CONFIGURACIÓN ──────────────────── */}
+          {seccionActiva === 'configuracion' && (
+            <div className="seccion">
+              <div className="seccion-header">
+                <h2 className="seccion-titulo"><Settings size={18} /> Horario de operación</h2>
+              </div>
+
+              {exitoConfig && (
+                <div className="usuario-alerta usuario-exito">
+                  <CheckCircle size={16} /> {exitoConfig}
+                </div>
+              )}
+              {errorConfig && (
+                <div className="usuario-alerta usuario-error">
+                  <XCircle size={16} /> {errorConfig}
+                </div>
+              )}
+
+              {cargandoConfig ? (
+                <p style={{ textAlign: 'center', padding: '2rem', color: '#888' }}>Cargando configuración...</p>
+              ) : (
+                <div style={{ maxWidth: 480 }}>
+                  <p style={{ color: '#666', fontSize: '0.9rem', marginBottom: '1.5rem', lineHeight: 1.6 }}>
+                    Define a qué hora cierra tu negocio y qué días opera. El bot usa esta información para saber
+                    cuándo hacer las verificaciones nocturnas de pagos y enviar el reporte diario.
+                  </p>
+
+                  <div style={{ marginBottom: '1.5rem' }}>
+                    <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: 600, color: '#4a4a68', marginBottom: '0.5rem' }}>
+                      Hora de cierre
+                    </label>
+                    <input
+                      type="time"
+                      value={horaCierre}
+                      onChange={(e) => setHoraCierre(e.target.value)}
+                      style={{
+                        padding: '0.7rem 1rem', border: '2px solid #e8e8f0', borderRadius: 10,
+                        fontSize: '0.95rem', outline: 'none', fontFamily: 'inherit',
+                      }}
+                    />
+                    <p style={{ fontSize: '0.8rem', color: '#999', marginTop: '0.4rem' }}>
+                      Las verificaciones se hacen a esa hora y una hora después; el reporte diario se envía junto con la segunda verificación.
+                    </p>
+                  </div>
+
+                  <div style={{ marginBottom: '1.5rem' }}>
+                    <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: 600, color: '#4a4a68', marginBottom: '0.5rem' }}>
+                      Días de operación
+                    </label>
+                    <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                      {DIAS_SEMANA.map((d) => {
+                        const activo = diasOperacion.includes(d.valor);
+                        return (
+                          <button
+                            key={d.valor}
+                            type="button"
+                            onClick={() => alternarDia(d.valor)}
+                            style={{
+                              width: 48, height: 48, borderRadius: 10,
+                              border: activo ? '2px solid #F57C00' : '2px solid #e8e8f0',
+                              background: activo ? '#FFF8F0' : '#fff',
+                              color: activo ? '#F57C00' : '#999',
+                              fontWeight: 600, fontSize: '0.8rem', cursor: 'pointer',
+                              transition: 'all 0.2s',
+                            }}
+                          >
+                            {d.corto}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+
+                  <button className="usuario-btn-guardar" onClick={guardarConfiguracion} disabled={guardandoConfig}>
+                    <Save size={15} /> {guardandoConfig ? 'Guardando...' : 'Guardar configuración'}
+                  </button>
+                </div>
+              )}
+            </div>
           )}
 
           </>
