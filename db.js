@@ -81,6 +81,28 @@ db.run(`
   else console.log('[DB] Tabla "tokens_gmail" lista');
 });
 
+// ─── Pagos de suscripción a FlashPago (Wompi) ──────────────
+db.run(`
+  CREATE TABLE IF NOT EXISTS pagos_plataforma (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    negocio_id INTEGER NOT NULL,
+    referencia TEXT NOT NULL UNIQUE,
+    plan TEXT NOT NULL,
+    monto INTEGER NOT NULL,
+    estado TEXT NOT NULL DEFAULT 'PENDIENTE' CHECK (estado IN ('PENDIENTE','APROBADO','RECHAZADO','ERROR')),
+    wompi_transaction_id TEXT,
+    creado_en TEXT DEFAULT (datetime('now','localtime')),
+    actualizado_en TEXT,
+    FOREIGN KEY (negocio_id) REFERENCES negocios(id)
+  )
+`, (err) => {
+  if (err) console.error('[DB] Error creando tabla pagos_plataforma:', err.message);
+  else {
+    console.log('[DB] Tabla "pagos_plataforma" lista');
+    db.run('CREATE INDEX IF NOT EXISTS idx_pagos_plataforma_negocio ON pagos_plataforma (negocio_id)');
+  }
+});
+
 // ─── Pagos ────────────────────────────────────────────────
 db.run(`
   CREATE TABLE IF NOT EXISTS pagos (
@@ -219,6 +241,62 @@ function actualizarHorarioNegocio(id, { hora_cierre, dias_operacion }) {
         if (err) reject(err);
         else if (this.changes === 0) reject(new Error('Negocio no encontrado'));
         else resolve();
+      }
+    );
+  });
+}
+
+// ═══════════════════════════════════════════════════════════
+//  FUNCIONES — PAGOS DE SUSCRIPCIÓN (Wompi)
+// ═══════════════════════════════════════════════════════════
+
+const LIMITES_PLAN = { basico: 300, premium: 1000, empresarial: 999999 };
+const PRECIOS_CENTAVOS = { basico: 3990000, premium: 7990000, empresarial: 14990000 };
+
+function crearPagoPlataforma({ negocio_id, referencia, plan, monto }) {
+  return new Promise((resolve, reject) => {
+    db.run(
+      `INSERT INTO pagos_plataforma (negocio_id, referencia, plan, monto) VALUES (?, ?, ?, ?)`,
+      [negocio_id, referencia, plan, monto],
+      function (err) {
+        if (err) reject(err);
+        else resolve({ id: this.lastID });
+      }
+    );
+  });
+}
+
+function obtenerPagoPlataforma(referencia) {
+  return new Promise((resolve, reject) => {
+    db.get(`SELECT * FROM pagos_plataforma WHERE referencia = ?`, [referencia], (err, row) => {
+      if (err) reject(err);
+      else resolve(row);
+    });
+  });
+}
+
+function actualizarPagoPlataforma(referencia, { estado, wompi_transaction_id }) {
+  return new Promise((resolve, reject) => {
+    db.run(
+      `UPDATE pagos_plataforma SET estado = ?, wompi_transaction_id = ?, actualizado_en = datetime('now','localtime') WHERE referencia = ?`,
+      [estado, wompi_transaction_id || null, referencia],
+      function (err) {
+        if (err) reject(err);
+        else resolve({ changes: this.changes });
+      }
+    );
+  });
+}
+
+function marcarNegocioPagado(negocio_id, plan) {
+  const limite = LIMITES_PLAN[plan] || 300;
+  return new Promise((resolve, reject) => {
+    db.run(
+      `UPDATE negocios SET pagado = 1, plan = ?, limite_comprobantes = ? WHERE id = ?`,
+      [plan, limite, negocio_id],
+      function (err) {
+        if (err) reject(err);
+        else resolve({ changes: this.changes });
       }
     );
   });
@@ -724,6 +802,12 @@ module.exports = {
   actualizarHorarioNegocio,
   contarComprobantesDelMes,
   verificarTrialActivo,
+  // Pagos de suscripción (Wompi)
+  crearPagoPlataforma,
+  obtenerPagoPlataforma,
+  actualizarPagoPlataforma,
+  marcarNegocioPagado,
+  PRECIOS_CENTAVOS,
   // Gmail tokens
   guardarTokenGmail,
   obtenerTokenGmail,

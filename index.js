@@ -35,6 +35,7 @@ function reportePermitidoHoy() {
 // ─── Rutas ────────────────────────────────────────────────
 const webhookRouter = require('./routes/webhook');
 const apiRouter = require('./routes/api');
+const wompiRouter = require('./routes/wompi');
 
 const app = express();
 
@@ -85,6 +86,7 @@ app.use('/webhook', webhookRouter);
 
 // ─── API del dashboard ────────────────────────────────────
 app.use('/api', apiRouter);
+app.use('/api/wompi', wompiRouter);
 
 // ─── Exportar CSV (filtrado por negocio del token) ────────
 app.get('/exportar', verificarToken, soloAdmin, async (req, res) => {

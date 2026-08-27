@@ -14,4 +14,14 @@ module.exports = {
   OPENWA_SESSION: process.env.OPENWA_SESSION || 'vinson',
   OPENWA_KEY: process.env.OPENWA_API_KEY || 'dev-admin-key',
   NEGOCIO_NOMBRE: process.env.NEGOCIO_NOMBRE || 'Flash Pago',
+
+  // Wompi (pasarela de pagos de suscripción de FlashPago)
+  WOMPI_AMBIENTE: process.env.WOMPI_AMBIENTE || 'test', // 'test' | 'prod'
+  WOMPI_PUBLIC_KEY: process.env.WOMPI_PUBLIC_KEY || '',
+  WOMPI_PRIVATE_KEY: process.env.WOMPI_PRIVATE_KEY || '',
+  WOMPI_INTEGRITY_SECRET: process.env.WOMPI_INTEGRITY_SECRET || '',
+  WOMPI_EVENTS_SECRET: process.env.WOMPI_EVENTS_SECRET || '',
+  get WOMPI_API_URL() {
+    return this.WOMPI_AMBIENTE === 'prod' ? 'https://production.wompi.co/v1' : 'https://sandbox.wompi.co/v1';
+  },
 };

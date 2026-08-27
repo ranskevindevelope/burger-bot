@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid } from 'recharts';
-import { CreditCard, TrendingUp, Search, Download, DollarSign, Calendar, CheckCircle, Shield, Trophy, BarChart3, Eye, X, Moon, Mail, Users, UserPlus, UserX, UserCheck, Edit, Trash2, Save, XCircle, AlertTriangle, Clock, Bell, Activity, Zap, Wifi, WifiOff, ShoppingBag, Receipt, Wallet, PlusCircle, MinusCircle, ArrowDownUp, Settings, Building2, MailCheck } from 'lucide-react';
+import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid, AreaChart, Area } from 'recharts';
+import { CreditCard, TrendingUp, Search, Download, DollarSign, Calendar, CheckCircle, Shield, Trophy, BarChart3, Eye, X, Moon, Mail, Users, UserPlus, UserX, UserCheck, Edit, Trash2, Save, XCircle, AlertTriangle, Clock, Bell, Activity, Zap, Wifi, WifiOff, ShoppingBag, Receipt, Wallet, PlusCircle, MinusCircle, ArrowDownUp, Settings, Building2, MailCheck, ChevronDown, ChevronUp } from 'lucide-react';
 import { createApiClient } from './services/api';
 import Sidebar from './components/Sidebar';
 import DashboardHeader from './components/DashboardHeader';
@@ -24,6 +24,7 @@ function Dashboard({ onLogout }) {
   const esSuperAdmin = userGuardado.rol === 'superadmin';
   const esAdmin = userGuardado.rol === 'admin' || esSuperAdmin;
   const [pagos, setPagos] = useState([]);
+  const [ventasPorHora, setVentasPorHora] = useState([]);
   const [duplicados, setDuplicados] = useState([]);
   const [duplicadosPendientes, setDuplicadosPendientes] = useState([]);
   const [pendientes, setPendientes] = useState({ cantidad: 0, total: 0 });
@@ -73,6 +74,9 @@ function Dashboard({ onLogout }) {
 
   // ─── Estado para Plan y Gmail ──────────────────────────
   const [planInfo, setPlanInfo] = useState(null);
+  const [pagandoPlan, setPagandoPlan] = useState(null);
+  const [errorPago, setErrorPago] = useState('');
+  const [mensajePago, setMensajePago] = useState('');
   const [gmailEstado, setGmailEstado] = useState(null);
   const [gmailCargando, setGmailCargando] = useState(false);
   const [gmailMensaje, setGmailMensaje] = useState('');
@@ -99,6 +103,7 @@ function Dashboard({ onLogout }) {
 
   // ─── Estado para Ventas (cierre de caja) ───────────────
   const [ventasResumen, setVentasResumen] = useState(null);
+  const [ventasExpandido, setVentasExpandido] = useState(false);
   const [ventasCierres, setVentasCierres] = useState([]);
   const [ventasSemanal, setVentasSemanal] = useState(null);
   const [ventasGastosCategorias, setVentasGastosCategorias] = useState([]);
@@ -205,7 +210,7 @@ function Dashboard({ onLogout }) {
 
   const cargarDatos = async () => {
     try {
-      const [resTotales, resPagos, resStats, resPendientes, resDuplicados, resPlan, resGmail] = await Promise.all([
+      const [resTotales, resPagos, resStats, resPendientes, resDuplicados, resPlan, resGmail, resVentasHora, resVentasResumen] = await Promise.all([
         api.request('/api/dashboard/totales'),
         api.request('/api/dashboard/pagos?limite=20'),
         api.request(`/api/dashboard/stats?dias=${diasGrafica}`),
@@ -213,6 +218,8 @@ function Dashboard({ onLogout }) {
         api.request('/api/dashboard/duplicados?estado=PENDIENTE'),
         api.request('/api/negocios/uso/plan').catch(() => null),
         api.request('/api/gmail/estado').catch(() => null),
+        api.request('/api/dashboard/ventas-hoy-por-hora').catch(() => null),
+        api.request('/api/ventas/resumen').catch(() => null),
       ]);
 
       setTotales(resTotales || { dia: { total: 0, cantidad: 0 }, mes: { total: 0, cantidad: 0 } });
@@ -222,6 +229,8 @@ function Dashboard({ onLogout }) {
       setDuplicadosPendientes(Array.isArray(resDuplicados) ? resDuplicados : []);
       if (resPlan?.ok) setPlanInfo(resPlan);
       if (resGmail?.ok) setGmailEstado(resGmail);
+      if (resVentasHora?.ok) setVentasPorHora(resVentasHora.datos);
+      if (resVentasResumen?.ok) setVentasResumen(resVentasResumen);
       setCargando(false);
     } catch (err) {
       console.error('Error cargando datos:', err);
@@ -598,6 +607,49 @@ function Dashboard({ onLogout }) {
     }
   };
 
+  // ─── Funciones de pago (Wompi) ──────────────────────────
+  const pagarConWompi = async (planId, planNombre) => {
+    setErrorPago('');
+    if (typeof window.WidgetCheckout !== 'function') {
+      setErrorPago('No se pudo cargar la pasarela de pago. Recarga la página e intenta de nuevo.');
+      return;
+    }
+    setPagandoPlan(planId);
+    try {
+      const data = await api.request('/api/wompi/iniciar', {
+        method: 'POST',
+        body: JSON.stringify({ plan: planId }),
+      });
+      if (!data.ok) {
+        setErrorPago(data.error || 'No se pudo iniciar el pago');
+        setPagandoPlan(null);
+        return;
+      }
+
+      const checkout = new window.WidgetCheckout({
+        currency: data.currency,
+        amountInCents: data.amountInCents,
+        reference: data.referencia,
+        publicKey: data.publicKey,
+        signature: { integrity: data.signature },
+      });
+
+      checkout.open(async (result) => {
+        setPagandoPlan(null);
+        const estado = result?.transaction?.status;
+        if (estado === 'APPROVED') {
+          setMensajePago(`¡Pago aprobado! Tu plan ${planNombre} ya está activo.`);
+          await cargarDatos();
+        } else if (estado) {
+          setErrorPago('El pago no se completó (' + estado + '). Puedes intentarlo de nuevo.');
+        }
+      });
+    } catch (err) {
+      setErrorPago('Error de conexión al iniciar el pago');
+      setPagandoPlan(null);
+    }
+  };
+
   // ─── Funciones de Periodo ────────────────────────────────
   const cargarPeriodo = async () => {
     setCargandoPeriodo(true);
@@ -834,15 +886,26 @@ function Dashboard({ onLogout }) {
                 El bot dejó de verificar comprobantes y el dashboard está suspendido. Elige un plan para reactivar tu cuenta.
               </p>
 
+              {mensajePago && (
+                <div style={{ background: '#E8F5E9', color: '#2E7D32', padding: '0.75rem 1.1rem', borderRadius: 10, fontSize: '0.85rem', fontWeight: 600, marginBottom: '1rem', maxWidth: 440 }}>
+                  {mensajePago}
+                </div>
+              )}
+              {errorPago && (
+                <div style={{ background: '#FFEBEE', color: '#C62828', padding: '0.75rem 1.1rem', borderRadius: 10, fontSize: '0.85rem', fontWeight: 600, marginBottom: '1rem', maxWidth: 440 }}>
+                  {errorPago}
+                </div>
+              )}
+
               {/* Cards de planes */}
               <div style={{
                 display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 12,
                 maxWidth: 600, width: '100%', marginBottom: '1.5rem',
               }}>
                 {[
-                  { nombre: 'Básico', precio: '$39.900', comprobantes: '300/mes', color: '#F57C00' },
-                  { nombre: 'Premium', precio: '$79.900', comprobantes: '1,000/mes', color: '#1A1A2E', popular: true },
-                  { nombre: 'Empresarial', precio: '$149.900', comprobantes: 'Ilimitado', color: '#7B1FA2' },
+                  { id: 'basico', nombre: 'Básico', precio: '$39.900', comprobantes: '300/mes', color: '#F57C00' },
+                  { id: 'premium', nombre: 'Premium', precio: '$79.900', comprobantes: '1,000/mes', color: '#1A1A2E', popular: true },
+                  { id: 'empresarial', nombre: 'Empresarial', precio: '$149.900', comprobantes: 'Ilimitado', color: '#7B1FA2' },
                 ].map((p) => (
                   <div key={p.nombre} style={{
                     border: p.popular ? '2px solid #F57C00' : '2px solid #e8e8f0',
@@ -859,22 +922,17 @@ function Dashboard({ onLogout }) {
                     <div style={{ fontSize: 15, fontWeight: 600, color: '#1a1a2e', marginBottom: 4 }}>{p.nombre}</div>
                     <div style={{ fontSize: 24, fontWeight: 700, color: '#F57C00', marginBottom: 4 }}>{p.precio}</div>
                     <div style={{ fontSize: 12, color: '#999', marginBottom: 12 }}>{p.comprobantes}</div>
-                    <button onClick={() => {
-                      alert(
-                        '💳 Para activar tu plan, transfiere a:\n\n' +
-                        'nequi\n' +
-                        'Cuenta de ahorros: 3045530381\n' +
-                        'Nombre: Kevin ramirez\n\n' +
-                        `Plan ${p.nombre}: ${p.precio}/mes\n\n` +
-                        'Envía el comprobante al WhatsApp:\n+57 304 3045530381\n\n' +
-                        'Tu cuenta se activa en minutos.'
-                      );
-                    }} style={{
-                      width: '100%', padding: '0.6rem', borderRadius: 10, border: 'none',
-                      background: p.popular ? '#F57C00' : p.color, color: '#fff',
-                      fontWeight: 600, fontSize: '0.85rem', cursor: 'pointer',
-                    }}>
-                      Activar {p.nombre}
+                    <button
+                      onClick={() => pagarConWompi(p.id, p.nombre)}
+                      disabled={pagandoPlan === p.id}
+                      style={{
+                        width: '100%', padding: '0.6rem', borderRadius: 10, border: 'none',
+                        background: p.popular ? '#F57C00' : p.color, color: '#fff',
+                        fontWeight: 600, fontSize: '0.85rem', cursor: 'pointer',
+                        opacity: pagandoPlan === p.id ? 0.7 : 1,
+                      }}
+                    >
+                      {pagandoPlan === p.id ? 'Abriendo pago...' : `Activar ${p.nombre}`}
                     </button>
                   </div>
                 ))}
@@ -1369,6 +1427,100 @@ function Dashboard({ onLogout }) {
                     </tbody>
                   </table>
                 </div>
+              </div>
+
+              <div className="seccion">
+                <div className="seccion-header">
+                  <h2 className="seccion-titulo"><TrendingUp size={18} /> Ventas de hoy por hora</h2>
+                  <span style={{ fontSize: '0.85rem', fontWeight: 700, color: '#F57C00' }}>
+                    {formatearMonto(ventasPorHora.reduce((s, v) => s + v.total, 0))}
+                  </span>
+                </div>
+                {ventasPorHora.length > 1 ? (
+                  <div style={{ width: '100%', height: 90 }}>
+                    <ResponsiveContainer width="100%" height="100%">
+                      <AreaChart data={ventasPorHora} margin={{ top: 8, right: 8, left: 8, bottom: 0 }}>
+                        <defs>
+                          <linearGradient id="ventasHoraFill" x1="0" y1="0" x2="0" y2="1">
+                            <stop offset="0%" stopColor="#F57C00" stopOpacity={0.25} />
+                            <stop offset="100%" stopColor="#F57C00" stopOpacity={0} />
+                          </linearGradient>
+                        </defs>
+                        <XAxis dataKey="etiqueta" tick={{ fontSize: 10, fill: '#999' }} axisLine={false} tickLine={false} interval="preserveStartEnd" />
+                        <Tooltip
+                          formatter={(value) => [formatearMonto(value), 'Ventas']}
+                          labelFormatter={(label) => `Hora ${label}`}
+                          contentStyle={{ borderRadius: 8, border: '1px solid #e8e8f0', fontSize: '0.8rem' }}
+                        />
+                        <Area
+                          type="monotone" dataKey="total" stroke="#F57C00" strokeWidth={2}
+                          fill="url(#ventasHoraFill)"
+                          dot={(dotProps) => {
+                            const { cx, cy, index } = dotProps;
+                            if (index !== ventasPorHora.length - 1) return null;
+                            return <circle key={`vh-dot-${index}`} cx={cx} cy={cy} r={4} fill="#F57C00" stroke="#fff" strokeWidth={2} />;
+                          }}
+                        />
+                      </AreaChart>
+                    </ResponsiveContainer>
+                  </div>
+                ) : (
+                  <p style={{ textAlign: 'center', color: '#999', fontSize: '0.85rem', padding: '1.5rem 0' }}>
+                    Todavía no hay ventas registradas hoy.
+                  </p>
+                )}
+              </div>
+
+              <div className="seccion" style={{ padding: 0, overflow: 'hidden' }}>
+                <button
+                  onClick={() => setVentasExpandido(!ventasExpandido)}
+                  style={{
+                    width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+                    padding: '1.25rem', background: 'none', border: 'none', cursor: 'pointer', textAlign: 'left',
+                  }}
+                >
+                  <span className="seccion-titulo" style={{ margin: 0 }}>
+                    <Wallet size={18} /> Ventas y efectivo de hoy
+                  </span>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                    {ventasResumen?.cierre && (
+                      <span style={{ fontSize: '0.9rem', fontWeight: 700, color: '#2E7D32' }}>
+                        {formatearMonto(ventasResumen.cierre.total_ventas)}
+                      </span>
+                    )}
+                    {ventasExpandido ? <ChevronUp size={18} color="#999" /> : <ChevronDown size={18} color="#999" />}
+                  </div>
+                </button>
+
+                {ventasExpandido && (
+                  <div style={{ padding: '0 1.25rem 1.25rem', borderTop: '1px solid #f0f0f5' }}>
+                    {ventasResumen?.cierre ? (
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem', paddingTop: '1rem' }}>
+                        {[
+                          { label: 'Total ventas', valor: ventasResumen.cierre.total_ventas, color: '#1a1a2e' },
+                          { label: 'Transferencias', valor: ventasResumen.cierre.total_transferencias, color: '#1565C0' },
+                          { label: 'Efectivo en caja', valor: ventasResumen.cierre.total_efectivo, color: '#2E7D32' },
+                          { label: 'Gastos del día', valor: ventasResumen.cierre.total_gastos, color: '#E53935' },
+                        ].map((item, i) => (
+                          <div key={i} style={{
+                            display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+                            padding: '0.5rem 0', borderBottom: i < 3 ? '1px solid #f0f0f5' : 'none',
+                          }}>
+                            <span style={{ fontSize: '0.85rem', color: '#4a4a68' }}>{item.label}</span>
+                            <span style={{ fontSize: '1rem', fontWeight: 700, color: item.color }}>{formatearMonto(item.valor)}</span>
+                          </div>
+                        ))}
+                      </div>
+                    ) : (
+                      <p style={{ fontSize: '0.85rem', color: '#666', paddingTop: '1rem' }}>
+                        Todavía no has registrado el cierre de caja de hoy.
+                      </p>
+                    )}
+                    <button className="ver-mas-btn" style={{ marginTop: '0.75rem' }} onClick={() => cambiarSeccion('ventas')}>
+                      Ir a Ventas →
+                    </button>
+                  </div>
+                )}
               </div>
             </>
           )}

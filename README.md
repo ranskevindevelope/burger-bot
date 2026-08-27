@@ -128,6 +128,13 @@ PROMETEO_ENV=sandbox
 PROMETEO_API_KEY=tu_clave_de_prometeo
 MY_WHATSAPP=573000000000@c.us
 
+# Wompi (pasarela de pagos de la suscripción de FlashPago)
+WOMPI_AMBIENTE=test
+WOMPI_PUBLIC_KEY=pub_test_xxx
+WOMPI_PRIVATE_KEY=prv_test_xxx
+WOMPI_INTEGRITY_SECRET=tu_secreto_de_integridad
+WOMPI_EVENTS_SECRET=tu_secreto_de_eventos
+
 # Control de reportes y verificaciones en festivos / fin de semana (true/false)
 HABILITAR_VERIFICACION_FESTIVOS=true
 HABILITAR_VERIFICACION_FIN_SEMANA=true
@@ -164,6 +171,17 @@ El filtro actual busca mensajes no leidos recientes de dominios de
 Bancolombia. Cuando encuentra una coincidencia, marca el correo como leido.
 `credentials.json` y `token.json` contienen material sensible y estan
 excluidos por `.gitignore`.
+
+## Configurar Wompi
+
+Se usa para cobrar automáticamente la suscripción de cada negocio a FlashPago (no los pagos de los clientes de cada negocio, eso sigue siendo por Gmail/Prometeo).
+
+1. Crea una cuenta de comercio en [Wompi](https://wompi.co) (persona natural o jurídica, con RUT).
+2. En el panel de Wompi (Desarrolladores), copia la llave pública, la llave privada, el secreto de integridad y el secreto de eventos, y ponlos en tu `.env`.
+3. Registra la URL del webhook en el panel de Wompi: `https://tu-dominio.com/api/wompi/webhook`.
+4. Mientras esperas la aprobación de tu cuenta, puedes usar las llaves de `WOMPI_AMBIENTE=test` (sandbox) sin restricciones.
+
+El monto de cada plan lo decide el servidor (`db.js`, `PRECIOS_CENTAVOS`), nunca el navegador — así nadie puede manipular el precio antes de pagar. La verificación del webhook usa un checksum SHA256 con el secreto de eventos; una petición sin ese secreto correcto se rechaza.
 
 ## Configurar OpenWA
 

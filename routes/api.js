@@ -635,6 +635,37 @@ router.get('/dashboard/totales', verificarToken, async (req, res) => {
   }
 });
 
+// ─── Ventas de hoy por hora (sparkline del panel) ───────
+router.get('/dashboard/ventas-hoy-por-hora', verificarToken, (req, res) => {
+  const nid = req.user.negocio_id;
+  db.all(
+    `SELECT CAST(strftime('%H', creado_en) AS INTEGER) AS hora, SUM(monto) AS total, COUNT(*) AS cantidad
+     FROM pagos
+     WHERE negocio_id = ? AND estado = 'REAL' AND date(creado_en) = date('now','localtime')
+     GROUP BY hora
+     ORDER BY hora`,
+    [nid],
+    (err, filas) => {
+      if (err) return res.status(500).json({ ok: false, error: err.message });
+
+      const horaActual = new Date().getHours();
+      const porHora = {};
+      filas.forEach((f) => { porHora[f.hora] = { total: f.total, cantidad: f.cantidad }; });
+
+      const datos = [];
+      for (let h = 0; h <= horaActual; h++) {
+        datos.push({
+          hora: h,
+          etiqueta: `${String(h).padStart(2, '0')}:00`,
+          total: porHora[h]?.total || 0,
+          cantidad: porHora[h]?.cantidad || 0,
+        });
+      }
+      res.json({ ok: true, datos });
+    }
+  );
+});
+
 router.get('/comprobantes/:foto', verificarToken, (req, res) => {
   const foto = req.params.foto.replace(/[^a-zA-Z0-9._-]/g, '');
   const ruta = path.join(__dirname, '..', 'comprobantes', foto);
