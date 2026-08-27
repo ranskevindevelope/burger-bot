@@ -44,7 +44,12 @@ function NotificacionesEnVivo({ onLogout }) {
       if (!('speechSynthesis' in window)) return;
       const texto = `Pago confirmado${nombreCliente ? ' de ' + nombreCliente : ''}. ${monto} pesos.`;
       const utterance = new SpeechSynthesisUtterance(texto);
-      utterance.lang = 'es-CO';
+      const nombreVozGuardada = localStorage.getItem('fp_voz_notificacion');
+      const voz = nombreVozGuardada
+        ? window.speechSynthesis.getVoices().find((v) => v.name === nombreVozGuardada)
+        : null;
+      utterance.voice = voz || null;
+      utterance.lang = voz ? voz.lang : 'es-CO';
       utterance.rate = 1;
       window.speechSynthesis.speak(utterance);
     } catch (err) {

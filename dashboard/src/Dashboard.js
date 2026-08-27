@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid, AreaChart, Area } from 'recharts';
-import { CreditCard, TrendingUp, Search, Download, DollarSign, Calendar, CheckCircle, Shield, Trophy, BarChart3, Eye, X, Moon, Mail, Users, UserPlus, UserX, UserCheck, Edit, Trash2, Save, XCircle, AlertTriangle, Clock, Bell, Activity, Zap, Wifi, WifiOff, ShoppingBag, Receipt, Wallet, PlusCircle, MinusCircle, ArrowDownUp, Settings, Building2, MailCheck, ChevronDown, ChevronUp } from 'lucide-react';
+import { CreditCard, TrendingUp, Search, Download, DollarSign, Calendar, CheckCircle, Shield, Trophy, BarChart3, Eye, X, Moon, Mail, Users, UserPlus, UserX, UserCheck, Edit, Trash2, Save, XCircle, AlertTriangle, Clock, Bell, Activity, Zap, Wifi, WifiOff, ShoppingBag, Receipt, Wallet, PlusCircle, MinusCircle, ArrowDownUp, Settings, Building2, MailCheck, ChevronDown, ChevronUp, Volume2 } from 'lucide-react';
 import { createApiClient } from './services/api';
 import Sidebar from './components/Sidebar';
 import DashboardHeader from './components/DashboardHeader';
@@ -60,6 +60,10 @@ function Dashboard({ onLogout }) {
   const [diasOperacion, setDiasOperacion] = useState([0, 1, 2, 3, 4, 5, 6]);
   const [cargandoConfig, setCargandoConfig] = useState(false);
   const [guardandoConfig, setGuardandoConfig] = useState(false);
+
+  // ─── Estado para la voz de las notificaciones de pago ───
+  const [vocesDisponibles, setVocesDisponibles] = useState([]);
+  const [vozSeleccionada, setVozSeleccionada] = useState(() => localStorage.getItem('fp_voz_notificacion') || '');
 
   // ─── Estado para Negocios (superadmin) ─────────────────
   const [negocios, setNegocios] = useState([]);
@@ -300,6 +304,34 @@ function Dashboard({ onLogout }) {
       toast.error('Error de conexión');
     }
     setGuardandoConfig(false);
+  };
+
+  // ─── Funciones de voz de notificaciones ────────────────
+  useEffect(() => {
+    if (!('speechSynthesis' in window)) return;
+    const cargarVoces = () => {
+      const todas = window.speechSynthesis.getVoices();
+      const hispanas = todas.filter((v) => v.lang && v.lang.toLowerCase().startsWith('es'));
+      setVocesDisponibles(hispanas.length > 0 ? hispanas : todas);
+    };
+    cargarVoces();
+    window.speechSynthesis.addEventListener('voiceschanged', cargarVoces);
+    return () => window.speechSynthesis.removeEventListener('voiceschanged', cargarVoces);
+  }, []);
+
+  const seleccionarVoz = (nombreVoz) => {
+    setVozSeleccionada(nombreVoz);
+    localStorage.setItem('fp_voz_notificacion', nombreVoz);
+  };
+
+  const probarVoz = () => {
+    if (!('speechSynthesis' in window)) return;
+    window.speechSynthesis.cancel();
+    const utterance = new SpeechSynthesisUtterance('Pago confirmado de Juan Pérez. Cincuenta mil pesos.');
+    const voz = vocesDisponibles.find((v) => v.name === vozSeleccionada);
+    if (voz) utterance.voice = voz;
+    utterance.lang = voz ? voz.lang : 'es-CO';
+    window.speechSynthesis.speak(utterance);
   };
 
   // ─── Funciones de Negocios (superadmin) ────────────────
@@ -2441,6 +2473,41 @@ function Dashboard({ onLogout }) {
                   {gmailCargando ? 'Conectando...' : gmailEstado?.conectado ? <><X size={15} /> Desconectar</> : <><Mail size={15} /> Conectar Gmail</>}
                 </button>
               </div>
+            </div>
+
+            {/* ─── Voz de notificaciones ────────────── */}
+            <div className="seccion">
+              <div className="seccion-header">
+                <h2 className="seccion-titulo"><Volume2 size={18} /> Voz de las notificaciones</h2>
+              </div>
+              <p style={{ color: '#666', fontSize: '0.9rem', marginBottom: '1.25rem', lineHeight: 1.6, maxWidth: 520 }}>
+                Cuando llega un pago verificado, el dashboard lo anuncia en voz alta. Elige qué voz usar
+                (depende de las voces instaladas en este computador) y pruébala antes de guardarla.
+              </p>
+              {vocesDisponibles.length === 0 ? (
+                <p style={{ color: '#999', fontSize: '0.85rem' }}>
+                  Este navegador no tiene voces disponibles. Se usará la voz por defecto del sistema.
+                </p>
+              ) : (
+                <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
+                  <select
+                    value={vozSeleccionada}
+                    onChange={(e) => seleccionarVoz(e.target.value)}
+                    style={{
+                      padding: '0.7rem 1rem', border: '2px solid #e8e8f0', borderRadius: 10,
+                      fontSize: '0.9rem', outline: 'none', fontFamily: 'inherit', minWidth: 260,
+                    }}
+                  >
+                    <option value="">Voz por defecto del sistema</option>
+                    {vocesDisponibles.map((v) => (
+                      <option key={v.name} value={v.name}>{v.name} ({v.lang})</option>
+                    ))}
+                  </select>
+                  <button type="button" className="usuario-btn-guardar" onClick={probarVoz}>
+                    <Volume2 size={15} /> Probar voz
+                  </button>
+                </div>
+              )}
             </div>
 
             {/* ─── Zona de peligro ────────────────── */}

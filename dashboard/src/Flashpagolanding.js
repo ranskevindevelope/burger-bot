@@ -3,7 +3,7 @@ import {
   Zap, MessageCircle, Lock, Camera, Bot, CheckCircle2, Shield, BarChart3,
   Search, RefreshCw, Clock, AlertTriangle, Building2, Wallet, Database,
   FileText, Landmark, Smartphone, TrendingUp, Users, FileSpreadsheet,
-  Headphones, Star, Check, Minus, Hourglass, ArrowRight
+  Headphones, Star, Check, Minus, Hourglass, ArrowRight, Volume2
 } from "lucide-react";
 
 const COLORS = {
@@ -283,6 +283,8 @@ export default function FlashPagoLanding({ onLogin, onTerminos, onPrivacidad }) 
         @keyframes typingDot { 0%,60%,100%{opacity:.3;transform:scale(.8)} 30%{opacity:1;transform:scale(1.1)} }
         @keyframes popIn { 0%{transform:scale(0);opacity:0} 70%{transform:scale(1.2)} 100%{transform:scale(1);opacity:1} }
         @keyframes fadeIn { from{opacity:0} to{opacity:1} }
+        .voz-pulse-ring { position:absolute; width:100%; height:100%; border-radius:50%; border:2px solid rgba(245,124,0,0.4); animation: vozPulso 2.4s ease-out infinite; }
+        @keyframes vozPulso { 0%{ transform:scale(0.6); opacity:0.8; } 100%{ transform:scale(1.4); opacity:0; } }
         @media(max-width:1024px) {
        .hero-grid { gap:2rem !important; }
        .grid-3 { grid-template-columns:repeat(2,1fr) !important; }
@@ -298,6 +300,8 @@ export default function FlashPagoLanding({ onLogin, onTerminos, onPrivacidad }) 
   .hero-stats-wrap { justify-content:center; }
   .grid-3 { grid-template-columns:1fr !important; }
   .grid-2 { grid-template-columns:1fr !important; }
+  .voz-grid { grid-template-columns:1fr !important; text-align:center; }
+  .voz-lista { align-items:center; }
   .planes-grid-wrap { grid-template-columns:1fr !important; max-width:400px; margin:1rem auto 0; }
   .cta-h2 { font-size:1.8rem !important; }
 }
@@ -402,6 +406,45 @@ export default function FlashPagoLanding({ onLogin, onTerminos, onPrivacidad }) 
                 </div>
               </div>
             ))}
+          </div>
+        </div>
+      </section>
+
+      {/* ─── VOZ (NUEVO) ─── */}
+      <section style={{ padding: "6rem 2rem", background: `linear-gradient(135deg, ${COLORS.oscuro} 0%, ${COLORS.oscuro2} 100%)`, boxSizing: "border-box", position: "relative", overflow: "hidden" }}>
+        <div style={{ position: "absolute", top: "-30%", left: "-10%", width: "50vw", height: "50vw", background: "radial-gradient(circle, rgba(245,124,0,0.12) 0%, transparent 70%)", borderRadius: "50%" }} />
+        <div className="voz-grid" style={{ maxWidth: 1100, margin: "0 auto", display: "grid", gridTemplateColumns: "auto 1fr", gap: "3.5rem", alignItems: "center", position: "relative", zIndex: 1 }}>
+          <div style={{ display: "flex", justifyContent: "center" }}>
+            <div style={{ position: "relative", width: 140, height: 140, display: "flex", alignItems: "center", justifyContent: "center" }}>
+              <span className="voz-pulse-ring" style={{ animationDelay: "0s" }} />
+              <span className="voz-pulse-ring" style={{ animationDelay: "0.8s" }} />
+              <span className="voz-pulse-ring" style={{ animationDelay: "1.6s" }} />
+              <div style={{ width: 84, height: 84, borderRadius: "50%", background: `linear-gradient(135deg, ${COLORS.naranja}, ${COLORS.naranjaFuerte})`, display: "flex", alignItems: "center", justifyContent: "center", position: "relative", zIndex: 2, boxShadow: "0 8px 30px rgba(245,124,0,0.4)" }}>
+                <Volume2 size={36} color="#fff" strokeWidth={2} />
+              </div>
+            </div>
+          </div>
+          <div>
+            <span style={{ display: "inline-block", background: "rgba(245,124,0,0.15)", color: COLORS.naranjaSuave, fontFamily: "'Space Grotesk',sans-serif", fontSize: "0.75rem", fontWeight: 700, letterSpacing: 1.5, textTransform: "uppercase", padding: "0.4rem 0.9rem", borderRadius: 50, marginBottom: "1rem" }}>Nuevo</span>
+            <h2 style={{ fontFamily: "'Space Grotesk',sans-serif", fontSize: "2.2rem", fontWeight: 700, color: COLORS.blanco, marginBottom: "1rem", marginTop: 0, lineHeight: 1.2 }}>
+              Tu negocio ahora también <span style={{ color: COLORS.naranjaSuave }}>habla</span>
+            </h2>
+            <p style={{ fontSize: "1.05rem", color: "#b0b0c8", marginBottom: "1.5rem", maxWidth: 560 }}>
+              Cada vez que se confirma un pago, FlashPago lo anuncia en voz alta al instante — como una caja
+              registradora inteligente. Tu equipo sabe que el pago entró sin mirar el celular.
+            </p>
+            <div className="voz-lista" style={{ display: "flex", flexDirection: "column", gap: "0.75rem" }}>
+              {[
+                "Anuncio de voz instantáneo al confirmar cada pago",
+                "Sin hardware adicional — funciona en cualquier computador",
+                "Elige entre varias voces en español",
+              ].map((txt) => (
+                <div key={txt} style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                  <CheckCircle2 size={18} color={COLORS.naranjaSuave} style={{ flexShrink: 0 }} />
+                  <span style={{ fontSize: "0.95rem", color: "#d0d0e0" }}>{txt}</span>
+                </div>
+              ))}
+            </div>
           </div>
         </div>
       </section>
