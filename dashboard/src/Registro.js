@@ -2,6 +2,8 @@ import React, { useState, useEffect } from 'react';
 import { DollarSign, ArrowRight, ArrowLeft, Check, Mail, Users, ShoppingBag, Shield, Zap, Sparkles, Gift, Package, Rocket, Building2 } from 'lucide-react';
 
 const API_BASE = process.env.REACT_APP_API_URL || '';
+const PASSWORD_VALIDA = /^(?=.*[a-z])(?=.*[A-Z]).{8,}$/;
+const PASSWORD_ERROR = 'La contraseña debe tener mínimo 8 caracteres, con mayúsculas y minúsculas';
 
 function Registro({ onBack }) {
   const [paso, setPaso] = useState(1);
@@ -115,7 +117,7 @@ function Registro({ onBack }) {
     if (!nombre.trim()) { setError('Ingresa tu nombre'); return; }
     if (!email.trim() || !email.includes('@')) { setError('Ingresa un correo válido'); return; }
     if (!usuario.trim()) { setError('Elige un usuario'); return; }
-    if (password.length < 6) { setError('La contraseña debe tener al menos 6 caracteres'); return; }
+    if (!PASSWORD_VALIDA.test(password)) { setError(PASSWORD_ERROR); return; }
 
     setCargando(true);
     try {
@@ -257,7 +259,7 @@ function Registro({ onBack }) {
       const wpp = whatsappNegocio.replace(/\D/g, '');
       return nombreNegocio.trim().length >= 2 && (wpp.length === 10 || wpp.length === 12) && wppVerificado;
     }
-    if (paso === 3) return nombre.trim() && email.includes('@') && usuario.trim() && password.length >= 6 && aceptaTerminos;
+    if (paso === 3) return nombre.trim() && email.includes('@') && usuario.trim() && PASSWORD_VALIDA.test(password) && aceptaTerminos;
     return true;
   };
 
@@ -775,8 +777,9 @@ function Registro({ onBack }) {
               </div>
               <div style={s.field}>
                 <label style={s.label}>Contraseña *</label>
-                <input style={s.input} type="password" placeholder="Mínimo 6 caracteres" value={password}
+                <input style={s.input} type="password" placeholder="Mín. 8, con Mayús. y minús." value={password}
                   onChange={e => setPassword(e.target.value)} />
+                <div style={{ fontSize: 11, color: '#999', marginTop: 4 }}>Mínimo 8 caracteres, con mayúsculas y minúsculas</div>
               </div>
             </div>
             <label style={{

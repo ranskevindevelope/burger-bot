@@ -8,6 +8,10 @@ const path = require('path');
 
 const { google } = require('googleapis');
 
+// Mínimo 8 caracteres, al menos una mayúscula y una minúscula
+const PASSWORD_VALIDA = /^(?=.*[a-z])(?=.*[A-Z]).{8,}$/;
+const PASSWORD_ERROR = 'La contraseña debe tener mínimo 8 caracteres, con mayúsculas y minúsculas';
+
 const config = require('../config');
 const { verificarToken, soloAdmin, soloSuperAdmin, limitarLogin } = require('../auth');
 const {
@@ -112,8 +116,8 @@ router.post('/registro/enviar-codigo', limitarLogin, async (req, res) => {
     if (!email || !nombre_negocio || !nombre || !usuario || !password) {
       return res.status(400).json({ ok: false, error: 'Faltan campos obligatorios' });
     }
-    if (password.length < 6) {
-      return res.status(400).json({ ok: false, error: 'La contraseña debe tener al menos 6 caracteres' });
+    if (!PASSWORD_VALIDA.test(password)) {
+      return res.status(400).json({ ok: false, error: PASSWORD_ERROR });
     }
     if (!['basico', 'premium', 'empresarial'].includes(plan)) {
       return res.status(400).json({ ok: false, error: 'Plan no válido' });
@@ -368,8 +372,8 @@ router.post('/recuperar/verificar', limitarLogin, async (req, res) => {
     if (!email || !codigo || !password) {
       return res.status(400).json({ ok: false, error: 'Faltan datos' });
     }
-    if (password.length < 6) {
-      return res.status(400).json({ ok: false, error: 'La contraseña debe tener al menos 6 caracteres' });
+    if (!PASSWORD_VALIDA.test(password)) {
+      return res.status(400).json({ ok: false, error: PASSWORD_ERROR });
     }
 
     const emailLimpio = email.trim().toLowerCase();
@@ -475,6 +479,7 @@ router.get('/negocios/uso/plan', verificarToken, async (req, res) => {
     const trial = await verificarTrialActivo(nid);
     res.json({
       ok: true,
+      nombre: negocio.nombre,
       plan: negocio.plan,
       limite: negocio.limite_comprobantes,
       usados,
@@ -932,6 +937,23 @@ router.put('/negocio/configuracion', verificarToken, soloAdmin, async (req, res)
   }
 });
 
+router.delete('/negocio', verificarToken, soloAdmin, async (req, res) => {
+  const nid = req.user.negocio_id;
+  try {
+    await new Promise((resolve, reject) => {
+      db.run('UPDATE negocios SET activo = 0 WHERE id = ?', [nid], (err) => (err ? reject(err) : resolve()));
+    });
+    await new Promise((resolve, reject) => {
+      db.run('UPDATE usuarios SET activo = 0 WHERE negocio_id = ?', [nid], (err) => (err ? reject(err) : resolve()));
+    });
+    db.run('DELETE FROM tokens_gmail WHERE negocio_id = ?', [nid]);
+    console.log(`[Negocio] Cuenta desactivada por su propio admin: negocio ${nid}`);
+    res.json({ ok: true, mensaje: 'Cuenta desactivada' });
+  } catch (err) {
+    res.status(500).json({ ok: false, error: err.message });
+  }
+});
+
 // ═══════════════════════════════════════════════════════════
 //  USUARIOS — filtrados por negocio_id
 // ═══════════════════════════════════════════════════════════
@@ -954,7 +976,7 @@ router.post('/usuarios', verificarToken, soloAdmin, (req, res) => {
   const { usuario, password, nombre, rol, whatsapp, email } = req.body;
   const nid = req.user.negocio_id;
   if (!usuario || !password || !nombre) return res.status(400).json({ ok: false, error: 'Faltan campos' });
-  if (password.length < 6) return res.status(400).json({ ok: false, error: 'Contraseña mínimo 6 caracteres' });
+  if (!PASSWORD_VALIDA.test(password)) return res.status(400).json({ ok: false, error: PASSWORD_ERROR });
   if (rol && !ROLES_ASIGNABLES.includes(rol)) return res.status(400).json({ ok: false, error: 'Rol no válido' });
 
   const salt = crypto.randomBytes(32).toString('hex');
@@ -984,6 +1006,7 @@ router.put('/usuarios/:id', verificarToken, soloAdmin, (req, res) => {
   if (email !== undefined) { sets.push('email=?'); vals.push(email ? email.trim().toLowerCase() : null); }
   if (activo !== undefined) { sets.push('activo=?'); vals.push(activo); }
   if (password) {
+    if (!PASSWORD_VALIDA.test(password)) return res.status(400).json({ ok: false, error: PASSWORD_ERROR });
     const salt = crypto.randomBytes(32).toString('hex');
     const hash = crypto.pbkdf2Sync(password, salt, 10000, 64, 'sha512').toString('hex');
     sets.push('password_hash=?', 'salt=?'); vals.push(hash, salt);

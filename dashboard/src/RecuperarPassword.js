@@ -1,6 +1,9 @@
 import React, { useState } from 'react';
 import { Zap, Mail, KeyRound, Lock, Eye, EyeOff, ArrowLeft, CheckCircle2, ShieldCheck, Clock, BarChart3 } from 'lucide-react';
 
+const PASSWORD_VALIDA = /^(?=.*[a-z])(?=.*[A-Z]).{8,}$/;
+const PASSWORD_ERROR = 'La contraseña debe tener mínimo 8 caracteres, con mayúsculas y minúsculas';
+
 function RecuperarPassword({ onVolver }) {
   const [paso, setPaso] = useState(1); // 1: email, 2: código + nueva contraseña, 3: éxito
   const [email, setEmail] = useState('');
@@ -39,8 +42,8 @@ function RecuperarPassword({ onVolver }) {
     e.preventDefault();
     setError('');
 
-    if (password.length < 6) {
-      setError('La contraseña debe tener al menos 6 caracteres');
+    if (!PASSWORD_VALIDA.test(password)) {
+      setError(PASSWORD_ERROR);
       return;
     }
     if (password !== confirmar) {
@@ -178,7 +181,7 @@ function RecuperarPassword({ onVolver }) {
                     type={verPassword ? 'text' : 'password'}
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
-                    placeholder="Mínimo 6 caracteres"
+                    placeholder="Mín. 8, con Mayús. y minús."
                     required
                     style={{ ...inputStyle, paddingRight: '3rem' }}
                     onFocus={focus}
@@ -189,6 +192,7 @@ function RecuperarPassword({ onVolver }) {
                     {verPassword ? <EyeOff size={18} color="#999" /> : <Eye size={18} color="#999" />}
                   </button>
                 </div>
+                <div style={{ fontSize: 11, color: '#999', marginTop: 4 }}>Mínimo 8 caracteres, con mayúsculas y minúsculas</div>
               </div>
 
               <div style={{ marginBottom: '1.25rem' }}>

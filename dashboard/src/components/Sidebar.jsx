@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { CreditCard, Download, LayoutDashboard, LogOut, Search, TrendingUp, Users, AlertTriangle, DollarSign, Menu, X, ShoppingBag, Settings, Building2 } from 'lucide-react';
 
-function Sidebar({ activeSection, isOpen, isAdmin, isSuperAdmin, paymentCount, userCount, onSectionChange, onLogout }) {
+function Sidebar({ activeSection, isOpen, isAdmin, isSuperAdmin, paymentCount, userCount, negocioNombre, onSectionChange, onLogout }) {
   const [fijado, setFijado] = useState(false);
   const [hover, setHover] = useState(false);
   const expandido = fijado || hover || isOpen;
@@ -44,6 +44,20 @@ function Sidebar({ activeSection, isOpen, isAdmin, isSuperAdmin, paymentCount, u
           )}
         </div>
       </div>
+
+      {negocioNombre && (
+        <div className="sidebar-negocio" style={{ justifyContent: expandido ? 'flex-start' : 'center' }}>
+          <div className="sidebar-negocio-avatar" title={!expandido ? negocioNombre : ''}>
+            {negocioNombre.trim().charAt(0).toUpperCase()}
+          </div>
+          {expandido && (
+            <div style={{ minWidth: 0 }}>
+              <div className="sidebar-negocio-label">Tu negocio</div>
+              <div className="sidebar-negocio-nombre" title={negocioNombre}>{negocioNombre}</div>
+            </div>
+          )}
+        </div>
+      )}
 
       <nav className="sidebar-nav">
         {expandido && <div className="sidebar-section-label">MENÚ</div>}

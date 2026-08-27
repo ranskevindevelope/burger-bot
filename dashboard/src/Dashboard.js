@@ -5,6 +5,9 @@ import { createApiClient } from './services/api';
 import Sidebar from './components/Sidebar';
 import DashboardHeader from './components/DashboardHeader';
 
+const PASSWORD_VALIDA = /^(?=.*[a-z])(?=.*[A-Z]).{8,}$/;
+const PASSWORD_ERROR = 'La contraseña debe tener mínimo 8 caracteres, con mayúsculas y minúsculas';
+
 function Dashboard({ onLogout }) {
   const getInitialSection = () => {
     if (typeof window === 'undefined') return 'panel';
@@ -402,6 +405,23 @@ function Dashboard({ onLogout }) {
     return { label: `Trial (${diasRestantes}d)`, clase: 'badge-transfiya' };
   };
 
+  const eliminarNegocio = async () => {
+    if (!window.confirm(
+      '¿Eliminar tu cuenta de FlashPago?\n\nEsto desactiva tu negocio y a todos sus usuarios de inmediato — nadie podrá volver a iniciar sesión ni el bot seguirá verificando pagos. Tus datos históricos se conservan; contacta soporte si necesitas reactivarla.'
+    )) return;
+    setErrorConfig('');
+    try {
+      const data = await api.request('/api/negocio', { method: 'DELETE' });
+      if (data.ok) {
+        onLogout();
+      } else {
+        setErrorConfig(data.error || 'No se pudo eliminar la cuenta');
+      }
+    } catch (err) {
+      setErrorConfig('Error de conexión');
+    }
+  };
+
   const exportarPagos = async () => {
     try {
       const blob = await api.download('/exportar');
@@ -443,8 +463,8 @@ function Dashboard({ onLogout }) {
       setErrorUsuario('Usuario, contraseña y nombre son requeridos');
       return;
     }
-    if (formUsuario.password.length < 6) {
-      setErrorUsuario('La contraseña debe tener al menos 6 caracteres');
+    if (!PASSWORD_VALIDA.test(formUsuario.password)) {
+      setErrorUsuario(PASSWORD_ERROR);
       return;
     }
 
@@ -470,6 +490,10 @@ function Dashboard({ onLogout }) {
 
   const actualizarUsuario = async () => {
     setErrorUsuario('');
+    if (formUsuario.password && !PASSWORD_VALIDA.test(formUsuario.password)) {
+      setErrorUsuario(PASSWORD_ERROR);
+      return;
+    }
     try {
       const body = { nombre: formUsuario.nombre, rol: formUsuario.rol, whatsapp: formUsuario.whatsapp, email: formUsuario.email };
       if (formUsuario.password) body.password = formUsuario.password;
@@ -776,6 +800,7 @@ function Dashboard({ onLogout }) {
         isOpen={sidebarAbierto}
         isAdmin={esAdmin}
         isSuperAdmin={esSuperAdmin}
+        negocioNombre={planInfo?.nombre}
         paymentCount={totales.dia.cantidad}
         userCount={usuarios.length}
         onSectionChange={(section) => cambiarSeccion(section)}
@@ -2153,7 +2178,7 @@ function Dashboard({ onLogout }) {
                       </div>
                       <div className="usuario-form-campo">
                         <label>{editandoUsuario ? 'Nueva contraseña (dejar vacío para no cambiar)' : 'Contraseña'}</label>
-                        <input type="password" placeholder={editandoUsuario ? '••••••' : 'Mínimo 6 caracteres'} value={formUsuario.password} onChange={(e) => setFormUsuario({ ...formUsuario, password: e.target.value })} />
+                        <input type="password" placeholder={editandoUsuario ? '••••••' : 'Mín. 8, con Mayús. y minús.'} value={formUsuario.password} onChange={(e) => setFormUsuario({ ...formUsuario, password: e.target.value })} />
                       </div>
                       <div className="usuario-form-campo">
                         <label>Rol</label>
@@ -2243,6 +2268,7 @@ function Dashboard({ onLogout }) {
 
           {/* ─── CONFIGURACIÓN ──────────────────── */}
           {seccionActiva === 'configuracion' && (
+            <>
             <div className="seccion">
               <div className="seccion-header">
                 <h2 className="seccion-titulo"><Settings size={18} /> Horario de operación</h2>
@@ -2297,14 +2323,12 @@ function Dashboard({ onLogout }) {
                           <button
                             key={d.valor}
                             type="button"
+                            className="dia-chip"
                             onClick={() => alternarDia(d.valor)}
                             style={{
-                              width: 48, height: 48, borderRadius: 10,
                               border: activo ? '2px solid #F57C00' : '2px solid #e8e8f0',
                               background: activo ? '#FFF8F0' : '#fff',
                               color: activo ? '#F57C00' : '#999',
-                              fontWeight: 600, fontSize: '0.8rem', cursor: 'pointer',
-                              transition: 'all 0.2s',
                             }}
                           >
                             {d.corto}
@@ -2320,6 +2344,56 @@ function Dashboard({ onLogout }) {
                 </div>
               )}
             </div>
+
+            {/* ─── Gmail ──────────────────────────── */}
+            <div className="seccion">
+              <div className="seccion-header">
+                <h2 className="seccion-titulo"><Mail size={18} /> Verificación por Gmail</h2>
+              </div>
+              <p style={{ color: '#666', fontSize: '0.9rem', marginBottom: '1.25rem', lineHeight: 1.6, maxWidth: 520 }}>
+                La cuenta de Gmail conectada es la que el bot revisa para confirmar pagos por notificación del banco.
+              </p>
+              <div style={{
+                display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 12,
+                padding: '1rem 1.2rem', borderRadius: 12,
+                background: gmailEstado?.conectado ? '#E8F5E9' : '#FFF3E0',
+                border: `1px solid ${gmailEstado?.conectado ? '#C8E6C9' : '#FFE0B2'}`,
+              }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                  {gmailEstado?.conectado ? <Wifi size={18} color="#2E7D32" /> : <WifiOff size={18} color="#E65100" />}
+                  <div>
+                    <div style={{ fontWeight: 700, fontSize: '0.9rem', color: gmailEstado?.conectado ? '#2E7D32' : '#E65100' }}>
+                      {gmailEstado?.conectado ? 'Gmail conectado' : 'Gmail no conectado'}
+                    </div>
+                    {gmailEstado?.conectado && (
+                      <div style={{ fontSize: '0.8rem', color: '#666' }}>{gmailEstado.email}</div>
+                    )}
+                  </div>
+                </div>
+                <button
+                  className={gmailEstado?.conectado ? 'usuario-btn-cancelar' : 'usuario-btn-guardar'}
+                  onClick={gmailEstado?.conectado ? desconectarGmail : conectarGmail}
+                  disabled={gmailCargando}
+                >
+                  {gmailCargando ? 'Conectando...' : gmailEstado?.conectado ? <><X size={15} /> Desconectar</> : <><Mail size={15} /> Conectar Gmail</>}
+                </button>
+              </div>
+            </div>
+
+            {/* ─── Zona de peligro ────────────────── */}
+            <div className="seccion" style={{ border: '1px solid #FFCDD2' }}>
+              <div className="seccion-header">
+                <h2 className="seccion-titulo" style={{ color: '#C62828' }}><AlertTriangle size={18} /> Zona de peligro</h2>
+              </div>
+              <p style={{ color: '#666', fontSize: '0.9rem', marginBottom: '1.25rem', lineHeight: 1.6, maxWidth: 520 }}>
+                Eliminar tu cuenta desactiva tu negocio y a todos sus usuarios de inmediato. El bot deja de verificar
+                pagos y nadie podrá volver a iniciar sesión. Tu historial de pagos se conserva.
+              </p>
+              <button className="btn-peligro" onClick={eliminarNegocio}>
+                <Trash2 size={15} /> Eliminar mi cuenta
+              </button>
+            </div>
+            </>
           )}
 
           {/* ─── NEGOCIOS (superadmin) ────────────── */}

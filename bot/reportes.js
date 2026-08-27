@@ -11,9 +11,14 @@ function obtenerAdminsNegocio(negocio_id) {
       `SELECT whatsapp FROM usuarios WHERE negocio_id = ? AND rol = 'admin' AND activo = 1 AND whatsapp IS NOT NULL`,
       [negocio_id],
       (err, rows) => {
-        if (err || !rows || rows.length === 0) {
-          // Fallback: lista vieja
-          resolve(['573044372639@c.us', '573045530381@c.us']);
+        if (err) {
+          console.error(`[Reporte] Error consultando admins del negocio ${negocio_id}:`, err.message);
+          resolve([]);
+          return;
+        }
+        if (!rows || rows.length === 0) {
+          console.warn(`[Reporte] Negocio ${negocio_id} no tiene ningún admin con WhatsApp registrado; no se envía reporte.`);
+          resolve([]);
           return;
         }
         resolve(rows.map(r => r.whatsapp.includes('@') ? r.whatsapp : `${r.whatsapp}@c.us`));
@@ -181,9 +186,6 @@ async function verificacionNocturna(revision, negocio_id) {
 }
 
 // ─── Buscar transferencias recibidas SIN comprobante ───────
-//  1) Lista los ingresos de Bancolombia del día (Gmail).
-//  2) Compara contra los montos de pagos REAL ya registrados del día.
-//  3) Lo que llegó al banco pero NO tiene pago registrado = sin comprobante.
 async function buscarIngresosSinComprobante(negocio_id = 1) {
   try {
     // 1) Ingresos vistos en el banco (Gmail)
