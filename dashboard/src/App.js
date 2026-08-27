@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { Toaster } from 'react-hot-toast';
 import FlashPagoLanding from './Flashpagolanding';
 import Login from './Login';
 import Registro from './Registro';
@@ -25,31 +26,29 @@ function App() {
     setVista('login');
   };
 
+  let pantalla;
   if (vista === 'landing') {
-    return <FlashPagoLanding onLogin={() => setVista('login')} onRegistro={() => setVista('registro')} onTerminos={() => setVista('terminos')} onPrivacidad={() => setVista('privacidad')} />;
+    pantalla = <FlashPagoLanding onLogin={() => setVista('login')} onRegistro={() => setVista('registro')} onTerminos={() => setVista('terminos')} onPrivacidad={() => setVista('privacidad')} />;
+  } else if (vista === 'terminos') {
+    pantalla = <Terminos onVolver={() => setVista('landing')} />;
+  } else if (vista === 'privacidad') {
+    pantalla = <Privacidad onVolver={() => setVista('landing')} />;
+  } else if (vista === 'registro') {
+    pantalla = <Registro onBack={() => setVista('login')} />;
+  } else if (vista === 'login') {
+    pantalla = <Login onLogin={() => setVista('dashboard')} onRegistro={() => setVista('registro')} onRecuperar={() => setVista('recuperar')} />;
+  } else if (vista === 'recuperar') {
+    pantalla = <RecuperarPassword onVolver={() => setVista('login')} />;
+  } else {
+    pantalla = <Dashboard onLogout={handleLogout} />;
   }
 
-  if (vista === 'terminos') {
-    return <Terminos onVolver={() => setVista('landing')} />;
-  }
-
-  if (vista === 'privacidad') {
-    return <Privacidad onVolver={() => setVista('landing')} />;
-  }
-
-  if (vista === 'registro') {
-    return <Registro onBack={() => setVista('login')} />;
-  }
-
-  if (vista === 'login') {
-    return <Login onLogin={() => setVista('dashboard')} onRegistro={() => setVista('registro')} onRecuperar={() => setVista('recuperar')} />;
-  }
-
-  if (vista === 'recuperar') {
-    return <RecuperarPassword onVolver={() => setVista('login')} />;
-  }
-
-  return <Dashboard onLogout={handleLogout} />;
+  return (
+    <>
+      {pantalla}
+      <Toaster position="top-right" toastOptions={{ duration: 3500 }} />
+    </>
+  );
 }
 
 export default App;

@@ -4,6 +4,8 @@ import { CreditCard, TrendingUp, Search, Download, DollarSign, Calendar, CheckCi
 import { createApiClient } from './services/api';
 import Sidebar from './components/Sidebar';
 import DashboardHeader from './components/DashboardHeader';
+import NotificacionesEnVivo from './components/NotificacionesEnVivo';
+import toast from 'react-hot-toast';
 
 const PASSWORD_VALIDA = /^(?=.*[a-z])(?=.*[A-Z]).{8,}$/;
 const PASSWORD_ERROR = 'La contraseña debe tener mínimo 8 caracteres, con mayúsculas y minúsculas';
@@ -48,8 +50,6 @@ function Dashboard({ onLogout }) {
   const [mostrarFormUsuario, setMostrarFormUsuario] = useState(false);
   const [editandoUsuario, setEditandoUsuario] = useState(null);
   const [formUsuario, setFormUsuario] = useState({ usuario: '', password: '', nombre: '', rol: 'empleado', whatsapp: '', email: '' });
-  const [errorUsuario, setErrorUsuario] = useState('');
-  const [exitoUsuario, setExitoUsuario] = useState('');
 
   // ─── Estado para Configuración (horario del negocio) ───
   const DIAS_SEMANA = [
@@ -60,8 +60,6 @@ function Dashboard({ onLogout }) {
   const [diasOperacion, setDiasOperacion] = useState([0, 1, 2, 3, 4, 5, 6]);
   const [cargandoConfig, setCargandoConfig] = useState(false);
   const [guardandoConfig, setGuardandoConfig] = useState(false);
-  const [errorConfig, setErrorConfig] = useState('');
-  const [exitoConfig, setExitoConfig] = useState('');
 
   // ─── Estado para Negocios (superadmin) ─────────────────
   const [negocios, setNegocios] = useState([]);
@@ -69,32 +67,25 @@ function Dashboard({ onLogout }) {
   const [mostrarFormNegocio, setMostrarFormNegocio] = useState(false);
   const [editandoNegocio, setEditandoNegocio] = useState(null);
   const [formNegocio, setFormNegocio] = useState({ nombre: '', whatsapp: '', plan: 'basico' });
-  const [errorNegocio, setErrorNegocio] = useState('');
-  const [exitoNegocio, setExitoNegocio] = useState('');
 
   // ─── Estado para Plan y Gmail ──────────────────────────
   const [planInfo, setPlanInfo] = useState(null);
   const [pagandoPlan, setPagandoPlan] = useState(null);
-  const [errorPago, setErrorPago] = useState('');
-  const [mensajePago, setMensajePago] = useState('');
   const [gmailEstado, setGmailEstado] = useState(null);
   const [gmailCargando, setGmailCargando] = useState(false);
-  const [gmailMensaje, setGmailMensaje] = useState('');
 
   // Detectar redirect de Gmail OAuth
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
     const gmailResult = params.get('gmail');
     if (gmailResult === 'conectado') {
-      setGmailMensaje('Gmail conectado exitosamente');
-      setTimeout(() => setGmailMensaje(''), 4000);
+      toast.success('Gmail conectado exitosamente');
       // Limpiar URL
       const url = new URL(window.location.href);
       url.searchParams.delete('gmail');
       window.history.replaceState({}, '', url.toString());
     } else if (gmailResult === 'error') {
-      setGmailMensaje('Error conectando Gmail. Intenta de nuevo.');
-      setTimeout(() => setGmailMensaje(''), 4000);
+      toast.error('Error conectando Gmail. Intenta de nuevo.');
       const url = new URL(window.location.href);
       url.searchParams.delete('gmail');
       window.history.replaceState({}, '', url.toString());
@@ -114,7 +105,6 @@ function Dashboard({ onLogout }) {
   const [gastoDescripcion, setGastoDescripcion] = useState('');
   const [guardandoCierre, setGuardandoCierre] = useState(false);
   const [guardandoGasto, setGuardandoGasto] = useState(false);
-  const [ventasMensaje, setVentasMensaje] = useState({ tipo: '', texto: '' });
   const [ventasTab, setVentasTab] = useState('hoy');
 
   // ─── Estado para filtro por periodo ────────────────────
@@ -272,7 +262,6 @@ function Dashboard({ onLogout }) {
   // ─── Funciones de Configuración ────────────────────────
   const cargarConfiguracion = async () => {
     setCargandoConfig(true);
-    setErrorConfig('');
     try {
       const data = await api.request('/api/negocio/configuracion');
       if (data.ok) {
@@ -280,7 +269,7 @@ function Dashboard({ onLogout }) {
         setDiasOperacion(data.dias_operacion);
       }
     } catch (err) {
-      setErrorConfig('Error cargando la configuración');
+      toast.error('Error cargando la configuración');
     }
     setCargandoConfig(false);
   };
@@ -292,10 +281,8 @@ function Dashboard({ onLogout }) {
   };
 
   const guardarConfiguracion = async () => {
-    setErrorConfig('');
-    setExitoConfig('');
     if (diasOperacion.length === 0) {
-      setErrorConfig('Selecciona al menos un día de operación');
+      toast.error('Selecciona al menos un día de operación');
       return;
     }
     setGuardandoConfig(true);
@@ -305,13 +292,12 @@ function Dashboard({ onLogout }) {
         body: JSON.stringify({ hora_cierre: horaCierre, dias_operacion: diasOperacion }),
       });
       if (data.ok) {
-        setExitoConfig('Configuración guardada');
-        setTimeout(() => setExitoConfig(''), 3000);
+        toast.success('Configuración guardada');
       } else {
-        setErrorConfig(data.error || 'Error guardando la configuración');
+        toast.error(data.error || 'Error guardando la configuración');
       }
     } catch (err) {
-      setErrorConfig('Error de conexión');
+      toast.error('Error de conexión');
     }
     setGuardandoConfig(false);
   };
@@ -329,10 +315,8 @@ function Dashboard({ onLogout }) {
   };
 
   const crearNegocio = async () => {
-    setErrorNegocio('');
-    setExitoNegocio('');
     if (!formNegocio.nombre.trim()) {
-      setErrorNegocio('El nombre del negocio es requerido');
+      toast.error('El nombre del negocio es requerido');
       return;
     }
     try {
@@ -341,38 +325,35 @@ function Dashboard({ onLogout }) {
         body: JSON.stringify(formNegocio),
       });
       if (data.ok) {
-        setExitoNegocio(`Negocio "${formNegocio.nombre}" creado exitosamente`);
+        toast.success(`Negocio "${formNegocio.nombre}" creado exitosamente`);
         setFormNegocio({ nombre: '', whatsapp: '', plan: 'basico' });
         setMostrarFormNegocio(false);
         cargarNegocios();
-        setTimeout(() => setExitoNegocio(''), 3000);
       } else {
-        setErrorNegocio(data.error || 'Error creando negocio');
+        toast.error(data.error || 'Error creando negocio');
       }
     } catch (err) {
-      setErrorNegocio('Error de conexión');
+      toast.error('Error de conexión');
     }
   };
 
   const actualizarNegocio = async () => {
-    setErrorNegocio('');
     try {
       const data = await api.request(`/api/negocios/${editandoNegocio}`, {
         method: 'PUT',
         body: JSON.stringify({ nombre: formNegocio.nombre, whatsapp: formNegocio.whatsapp, plan: formNegocio.plan }),
       });
       if (data.ok) {
-        setExitoNegocio('Negocio actualizado');
+        toast.success('Negocio actualizado');
         setEditandoNegocio(null);
         setMostrarFormNegocio(false);
         setFormNegocio({ nombre: '', whatsapp: '', plan: 'basico' });
         cargarNegocios();
-        setTimeout(() => setExitoNegocio(''), 3000);
       } else {
-        setErrorNegocio(data.error || 'Error actualizando');
+        toast.error(data.error || 'Error actualizando');
       }
     } catch (err) {
-      setErrorNegocio('Error de conexión');
+      toast.error('Error de conexión');
     }
   };
 
@@ -380,14 +361,12 @@ function Dashboard({ onLogout }) {
     setEditandoNegocio(n.id);
     setFormNegocio({ nombre: n.nombre, whatsapp: n.whatsapp || '', plan: n.plan });
     setMostrarFormNegocio(true);
-    setErrorNegocio('');
   };
 
   const cancelarFormNegocio = () => {
     setMostrarFormNegocio(false);
     setEditandoNegocio(null);
     setFormNegocio({ nombre: '', whatsapp: '', plan: 'basico' });
-    setErrorNegocio('');
   };
 
   const alternarActivoNegocio = async (n) => {
@@ -397,12 +376,11 @@ function Dashboard({ onLogout }) {
         body: JSON.stringify({ activo: n.activo ? 0 : 1 }),
       });
       if (data.ok) {
-        setExitoNegocio(n.activo ? `"${n.nombre}" desactivado` : `"${n.nombre}" reactivado`);
+        toast.success(n.activo ? `"${n.nombre}" desactivado` : `"${n.nombre}" reactivado`);
         cargarNegocios();
-        setTimeout(() => setExitoNegocio(''), 3000);
       }
     } catch (err) {
-      setErrorNegocio('Error de conexión');
+      toast.error('Error de conexión');
     }
   };
 
@@ -418,16 +396,15 @@ function Dashboard({ onLogout }) {
     if (!window.confirm(
       '¿Eliminar tu cuenta de FlashPago?\n\nEsto desactiva tu negocio y a todos sus usuarios de inmediato — nadie podrá volver a iniciar sesión ni el bot seguirá verificando pagos. Tus datos históricos se conservan; contacta soporte si necesitas reactivarla.'
     )) return;
-    setErrorConfig('');
     try {
       const data = await api.request('/api/negocio', { method: 'DELETE' });
       if (data.ok) {
         onLogout();
       } else {
-        setErrorConfig(data.error || 'No se pudo eliminar la cuenta');
+        toast.error(data.error || 'No se pudo eliminar la cuenta');
       }
     } catch (err) {
-      setErrorConfig('Error de conexión');
+      toast.error('Error de conexión');
     }
   };
 
@@ -465,15 +442,12 @@ function Dashboard({ onLogout }) {
   };
 
   const crearUsuario = async () => {
-    setErrorUsuario('');
-    setExitoUsuario('');
-
     if (!formUsuario.usuario || !formUsuario.password || !formUsuario.nombre) {
-      setErrorUsuario('Usuario, contraseña y nombre son requeridos');
+      toast.error('Usuario, contraseña y nombre son requeridos');
       return;
     }
     if (!PASSWORD_VALIDA.test(formUsuario.password)) {
-      setErrorUsuario(PASSWORD_ERROR);
+      toast.error(PASSWORD_ERROR);
       return;
     }
 
@@ -484,23 +458,21 @@ function Dashboard({ onLogout }) {
       });
 
       if (data.ok) {
-        setExitoUsuario(`Usuario "${formUsuario.usuario}" creado exitosamente`);
+        toast.success(`Usuario "${formUsuario.usuario}" creado exitosamente`);
         setFormUsuario({ usuario: '', password: '', nombre: '', rol: 'empleado', whatsapp: '', email: '' });
         setMostrarFormUsuario(false);
         cargarUsuarios();
-        setTimeout(() => setExitoUsuario(''), 3000);
       } else {
-        setErrorUsuario(data.error || 'Error creando usuario');
+        toast.error(data.error || 'Error creando usuario');
       }
     } catch (err) {
-      setErrorUsuario('Error de conexión');
+      toast.error('Error de conexión');
     }
   };
 
   const actualizarUsuario = async () => {
-    setErrorUsuario('');
     if (formUsuario.password && !PASSWORD_VALIDA.test(formUsuario.password)) {
-      setErrorUsuario(PASSWORD_ERROR);
+      toast.error(PASSWORD_ERROR);
       return;
     }
     try {
@@ -513,17 +485,16 @@ function Dashboard({ onLogout }) {
       });
 
       if (data.ok) {
-        setExitoUsuario('Usuario actualizado');
+        toast.success('Usuario actualizado');
         setEditandoUsuario(null);
         setMostrarFormUsuario(false);
         setFormUsuario({ usuario: '', password: '', nombre: '', rol: 'empleado', whatsapp: '', email: '' });
         cargarUsuarios();
-        setTimeout(() => setExitoUsuario(''), 3000);
       } else {
-        setErrorUsuario(data.error || 'Error actualizando');
+        toast.error(data.error || 'Error actualizando');
       }
     } catch (err) {
-      setErrorUsuario('Error de conexión');
+      toast.error('Error de conexión');
     }
   };
 
@@ -532,14 +503,13 @@ function Dashboard({ onLogout }) {
     try {
       const data = await api.request(`/api/usuarios/${id}`, { method: 'DELETE' });
       if (data.ok) {
-        setExitoUsuario(`Usuario "${nombre}" desactivado`);
+        toast.success(`Usuario "${nombre}" desactivado`);
         cargarUsuarios();
-        setTimeout(() => setExitoUsuario(''), 3000);
       } else {
-        setErrorUsuario(data.error);
+        toast.error(data.error);
       }
     } catch (err) {
-      setErrorUsuario('Error de conexión');
+      toast.error('Error de conexión');
     }
   };
 
@@ -550,12 +520,11 @@ function Dashboard({ onLogout }) {
         body: JSON.stringify({ activo: 1 }),
       });
       if (data.ok) {
-        setExitoUsuario('Usuario reactivado');
+        toast.success('Usuario reactivado');
         cargarUsuarios();
-        setTimeout(() => setExitoUsuario(''), 3000);
       }
     } catch (err) {
-      setErrorUsuario('Error de conexión');
+      toast.error('Error de conexión');
     }
   };
 
@@ -563,14 +532,12 @@ function Dashboard({ onLogout }) {
     setEditandoUsuario(user.id);
     setFormUsuario({ usuario: user.usuario, password: '', nombre: user.nombre, rol: user.rol, whatsapp: user.whatsapp || '', email: user.email || '' });
     setMostrarFormUsuario(true);
-    setErrorUsuario('');
   };
 
   const cancelarForm = () => {
     setMostrarFormUsuario(false);
     setEditandoUsuario(null);
     setFormUsuario({ usuario: '', password: '', nombre: '', rol: 'empleado', whatsapp: '', email: '' });
-    setErrorUsuario('');
   };
 
   // ─── Funciones de Gmail ──────────────────────────────────
@@ -582,12 +549,10 @@ function Dashboard({ onLogout }) {
       if (data.ok && data.url) {
         window.location.href = data.url;
       } else {
-        setGmailMensaje('Error obteniendo URL de Google');
-        setTimeout(() => setGmailMensaje(''), 3000);
+        toast.error('Error obteniendo URL de Google');
       }
     } catch (err) {
-      setGmailMensaje('Error de conexión');
-      setTimeout(() => setGmailMensaje(''), 3000);
+      toast.error('Error de conexión');
     }
     setGmailCargando(false);
   };
@@ -598,20 +563,17 @@ function Dashboard({ onLogout }) {
       const data = await api.request('/api/gmail/desconectar', { method: 'DELETE' });
       if (data.ok) {
         setGmailEstado({ ok: true, conectado: false, email: null });
-        setGmailMensaje('Gmail desconectado');
-        setTimeout(() => setGmailMensaje(''), 3000);
+        toast.success('Gmail desconectado');
       }
     } catch (err) {
-      setGmailMensaje('Error desconectando');
-      setTimeout(() => setGmailMensaje(''), 3000);
+      toast.error('Error desconectando');
     }
   };
 
   // ─── Funciones de pago (Wompi) ──────────────────────────
   const pagarConWompi = async (planId, planNombre) => {
-    setErrorPago('');
     if (typeof window.WidgetCheckout !== 'function') {
-      setErrorPago('No se pudo cargar la pasarela de pago. Recarga la página e intenta de nuevo.');
+      toast.error('No se pudo cargar la pasarela de pago. Recarga la página e intenta de nuevo.');
       return;
     }
     setPagandoPlan(planId);
@@ -621,7 +583,7 @@ function Dashboard({ onLogout }) {
         body: JSON.stringify({ plan: planId }),
       });
       if (!data.ok) {
-        setErrorPago(data.error || 'No se pudo iniciar el pago');
+        toast.error(data.error || 'No se pudo iniciar el pago');
         setPagandoPlan(null);
         return;
       }
@@ -638,14 +600,14 @@ function Dashboard({ onLogout }) {
         setPagandoPlan(null);
         const estado = result?.transaction?.status;
         if (estado === 'APPROVED') {
-          setMensajePago(`¡Pago aprobado! Tu plan ${planNombre} ya está activo.`);
+          toast.success(`¡Pago aprobado! Tu plan ${planNombre} ya está activo.`, { duration: 6000 });
           await cargarDatos();
         } else if (estado) {
-          setErrorPago('El pago no se completó (' + estado + '). Puedes intentarlo de nuevo.');
+          toast.error('El pago no se completó (' + estado + '). Puedes intentarlo de nuevo.');
         }
       });
     } catch (err) {
-      setErrorPago('Error de conexión al iniciar el pago');
+      toast.error('Error de conexión al iniciar el pago');
       setPagandoPlan(null);
     }
   };
@@ -704,7 +666,7 @@ function Dashboard({ onLogout }) {
   const hacerCierre = async () => {
     const monto = parseInt(montoVentas.replace(/[.,\s]/g, ''));
     if (!monto || monto <= 0) {
-      setVentasMensaje({ tipo: 'error', texto: 'Ingresa el total de ventas del día' });
+      toast.error('Ingresa el total de ventas del día');
       return;
     }
     setGuardandoCierre(true);
@@ -714,16 +676,15 @@ function Dashboard({ onLogout }) {
         body: JSON.stringify({ total_ventas: monto, nota: notaCierre.trim() || null }),
       });
       if (data.ok) {
-        setVentasMensaje({ tipo: 'exito', texto: `Cierre guardado: $${monto.toLocaleString('es-CO')} en ventas` });
+        toast.success(`Cierre guardado: $${monto.toLocaleString('es-CO')} en ventas`);
         setMontoVentas('');
         setNotaCierre('');
         cargarVentas();
-        setTimeout(() => setVentasMensaje({ tipo: '', texto: '' }), 4000);
       } else {
-        setVentasMensaje({ tipo: 'error', texto: data.error });
+        toast.error(data.error);
       }
     } catch (err) {
-      setVentasMensaje({ tipo: 'error', texto: 'Error guardando el cierre' });
+      toast.error('Error guardando el cierre');
     }
     setGuardandoCierre(false);
   };
@@ -731,11 +692,11 @@ function Dashboard({ onLogout }) {
   const agregarGasto = async () => {
     const monto = parseInt(gastoMonto.replace(/[.,\s]/g, ''));
     if (!monto || monto <= 0) {
-      setVentasMensaje({ tipo: 'error', texto: 'Ingresa el monto del gasto' });
+      toast.error('Ingresa el monto del gasto');
       return;
     }
     if (!gastoDescripcion.trim()) {
-      setVentasMensaje({ tipo: 'error', texto: 'Agrega una descripción del gasto' });
+      toast.error('Agrega una descripción del gasto');
       return;
     }
     setGuardandoGasto(true);
@@ -745,17 +706,16 @@ function Dashboard({ onLogout }) {
         body: JSON.stringify({ monto, categoria: gastoCategoria, descripcion: gastoDescripcion.trim() }),
       });
       if (data.ok) {
-        setVentasMensaje({ tipo: 'exito', texto: `Gasto de $${monto.toLocaleString('es-CO')} registrado` });
+        toast.success(`Gasto de $${monto.toLocaleString('es-CO')} registrado`);
         setGastoMonto('');
         setGastoDescripcion('');
         setGastoCategoria('general');
         cargarVentas();
-        setTimeout(() => setVentasMensaje({ tipo: '', texto: '' }), 3000);
       } else {
-        setVentasMensaje({ tipo: 'error', texto: data.error });
+        toast.error(data.error);
       }
     } catch (err) {
-      setVentasMensaje({ tipo: 'error', texto: 'Error registrando gasto' });
+      toast.error('Error registrando gasto');
     }
     setGuardandoGasto(false);
   };
@@ -846,6 +806,7 @@ function Dashboard({ onLogout }) {
 
   return (
     <div className="layout">
+      <NotificacionesEnVivo onLogout={onLogout} />
       {sidebarAbierto && <div className="sidebar-overlay" onClick={() => setSidebarAbierto(false)} />}
       <Sidebar
         activeSection={seccionActiva}
@@ -885,17 +846,6 @@ function Dashboard({ onLogout }) {
               <p style={{ fontSize: '0.95rem', color: '#666', maxWidth: 440, lineHeight: 1.6, marginBottom: '1.5rem' }}>
                 El bot dejó de verificar comprobantes y el dashboard está suspendido. Elige un plan para reactivar tu cuenta.
               </p>
-
-              {mensajePago && (
-                <div style={{ background: '#E8F5E9', color: '#2E7D32', padding: '0.75rem 1.1rem', borderRadius: 10, fontSize: '0.85rem', fontWeight: 600, marginBottom: '1rem', maxWidth: 440 }}>
-                  {mensajePago}
-                </div>
-              )}
-              {errorPago && (
-                <div style={{ background: '#FFEBEE', color: '#C62828', padding: '0.75rem 1.1rem', borderRadius: 10, fontSize: '0.85rem', fontWeight: 600, marginBottom: '1rem', maxWidth: 440 }}>
-                  {errorPago}
-                </div>
-              )}
 
               {/* Cards de planes */}
               <div style={{
@@ -1164,19 +1114,6 @@ function Dashboard({ onLogout }) {
                   }}>
                     {planInfo.usados} / {planInfo.limite} comprobantes ({planInfo.porcentaje}%)
                   </span>
-                </div>
-              )}
-
-              {/* Mensaje de Gmail */}
-              {gmailMensaje && (
-                <div style={{
-                  padding: '0.75rem 1rem', borderRadius: 10, marginBottom: '1rem',
-                  background: gmailMensaje.includes('Error') || gmailMensaje.includes('error') ? '#FFEBEE' : '#E8F5E9',
-                  color: gmailMensaje.includes('Error') || gmailMensaje.includes('error') ? '#C62828' : '#2E7D32',
-                  fontSize: '0.85rem', fontWeight: 500, display: 'flex', alignItems: 'center', gap: '0.5rem',
-                }}>
-                  {gmailMensaje.includes('Error') || gmailMensaje.includes('error') ? <WifiOff size={16} /> : <Wifi size={16} />}
-                  {gmailMensaje}
                 </div>
               )}
 
@@ -1804,12 +1741,6 @@ function Dashboard({ onLogout }) {
           {/* ─── VENTAS (Cierre de Caja) ────────── */}
           {seccionActiva === 'ventas' && (
             <>
-              {/* Mensajes */}
-              {ventasMensaje.texto && (
-                <div className={`usuario-alerta ${ventasMensaje.tipo === 'exito' ? 'usuario-exito' : 'usuario-error'}`}>
-                  {ventasMensaje.tipo === 'exito' ? <CheckCircle size={16} /> : <XCircle size={16} />} {ventasMensaje.texto}
-                </div>
-              )}
 
               {/* Tabs */}
               <div style={{ display: 'flex', gap: '0.5rem', marginBottom: '1.25rem' }}>
@@ -2293,16 +2224,6 @@ function Dashboard({ onLogout }) {
                 </div>
               </div>
 
-              {exitoUsuario && (
-                <div className="usuario-alerta usuario-exito">
-                  <CheckCircle size={16} /> {exitoUsuario}
-                </div>
-              )}
-              {errorUsuario && (
-                <div className="usuario-alerta usuario-error">
-                  <XCircle size={16} /> {errorUsuario}
-                </div>
-              )}
 
               <div className="seccion">
                 <div className="seccion-header">
@@ -2426,16 +2347,6 @@ function Dashboard({ onLogout }) {
                 <h2 className="seccion-titulo"><Settings size={18} /> Horario de operación</h2>
               </div>
 
-              {exitoConfig && (
-                <div className="usuario-alerta usuario-exito">
-                  <CheckCircle size={16} /> {exitoConfig}
-                </div>
-              )}
-              {errorConfig && (
-                <div className="usuario-alerta usuario-error">
-                  <XCircle size={16} /> {errorConfig}
-                </div>
-              )}
 
               {cargandoConfig ? (
                 <p style={{ textAlign: 'center', padding: '2rem', color: '#888' }}>Cargando configuración...</p>
@@ -2586,16 +2497,6 @@ function Dashboard({ onLogout }) {
                 </div>
               </div>
 
-              {exitoNegocio && (
-                <div className="usuario-alerta usuario-exito">
-                  <CheckCircle size={16} /> {exitoNegocio}
-                </div>
-              )}
-              {errorNegocio && (
-                <div className="usuario-alerta usuario-error">
-                  <XCircle size={16} /> {errorNegocio}
-                </div>
-              )}
 
               <div className="seccion">
                 <div className="seccion-header">

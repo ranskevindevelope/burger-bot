@@ -38,18 +38,33 @@ function NotificacionesEnVivo({ onLogout }) {
     }
   }, []);
 
-  // Mostrar un toast (y sonar para pagos REAL verificados)
-  const mostrarNotificacion = useCallback(({ tipo, titulo, detalle }) => {
+  // Anunciar el pago en voz alta (como una caja registradora con voz)
+  const anunciarPagoEnVoz = useCallback((monto, nombreCliente) => {
+    try {
+      if (!('speechSynthesis' in window)) return;
+      const texto = `Pago confirmado${nombreCliente ? ' de ' + nombreCliente : ''}. ${monto} pesos.`;
+      const utterance = new SpeechSynthesisUtterance(texto);
+      utterance.lang = 'es-CO';
+      utterance.rate = 1;
+      window.speechSynthesis.speak(utterance);
+    } catch (err) {
+      console.debug('Anuncio de voz no disponible en este navegador');
+    }
+  }, []);
+
+  // Mostrar un toast (y sonar/anunciar en voz para pagos REAL verificados)
+  const mostrarNotificacion = useCallback(({ tipo, titulo, detalle, monto, nombreCliente }) => {
     const id = Date.now() + Math.random();
     setNotificaciones((prev) => [...prev, { id, tipo, titulo, detalle }]);
     if (tipo === 'real') {
       reproducirSonido();
+      if (monto) anunciarPagoEnVoz(monto, nombreCliente);
     }
     // auto-ocultar después de 5s
     setTimeout(() => {
       setNotificaciones((prev) => prev.filter((n) => n.id !== id));
     }, 5000);
-  }, [reproducirSonido]);
+  }, [reproducirSonido, anunciarPagoEnVoz]);
 
   // Detección de novedades
   const revisarNovedades = useCallback(async () => {
@@ -68,6 +83,8 @@ function NotificacionesEnVivo({ onLogout }) {
               tipo: 'real',
               titulo: 'Nuevo pago verificado',
               detalle: `${p.nombre_cliente || 'Cliente'} pagó ${formatearMonto(p.monto)} · ${p.banco || ''}`,
+              monto: p.monto,
+              nombreCliente: p.nombre_cliente,
             });
           });
         }
