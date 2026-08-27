@@ -277,6 +277,7 @@ body { font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Robo
   .dashboard-overview-grid { grid-template-columns: 1fr; gap: 0; }
   .alertas-card { min-height: auto; }
   .duplicados-layout { grid-template-columns: 1fr; }
+  .planes-bloqueo-grid { grid-template-columns: 1fr !important; max-width: 340px !important; }
 }
 
 @media (max-width: 480px) {

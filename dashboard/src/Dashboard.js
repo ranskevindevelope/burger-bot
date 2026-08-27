@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid, AreaChart, Area } from 'recharts';
-import { CreditCard, TrendingUp, Search, Download, DollarSign, Calendar, CheckCircle, Shield, Trophy, BarChart3, Eye, X, Moon, Mail, Users, UserPlus, UserX, UserCheck, Edit, Trash2, Save, XCircle, AlertTriangle, Clock, Bell, Activity, Zap, Wifi, WifiOff, ShoppingBag, Receipt, Wallet, PlusCircle, MinusCircle, ArrowDownUp, Settings, Building2, MailCheck, ChevronDown, ChevronUp, Volume2 } from 'lucide-react';
+import { CreditCard, TrendingUp, Search, Download, DollarSign, Calendar, CheckCircle, Shield, Trophy, BarChart3, Eye, X, Moon, Mail, Users, UserPlus, UserX, UserCheck, Edit, Trash2, Save, XCircle, AlertTriangle, Clock, Bell, Activity, Zap, Wifi, WifiOff, ShoppingBag, Receipt, Wallet, PlusCircle, MinusCircle, ArrowDownUp, Settings, Building2, MailCheck, ChevronDown, ChevronUp, Volume2, Package, Rocket, Lock } from 'lucide-react';
 import { createApiClient } from './services/api';
 import Sidebar from './components/Sidebar';
 import DashboardHeader from './components/DashboardHeader';
@@ -632,7 +632,7 @@ function Dashboard({ onLogout }) {
         setPagandoPlan(null);
         const estado = result?.transaction?.status;
         if (estado === 'APPROVED') {
-          toast.success(`¡Pago aprobado! Tu plan ${planNombre} ya está activo.`, { duration: 6000 });
+          toast.success(`¡Gracias por tu pago! Tu plan ${planNombre} ya está activo. Bienvenido de nuevo a FlashPago.`, { duration: 7000 });
           await cargarDatos();
         } else if (estado) {
           toast.error('El pago no se completó (' + estado + '). Puedes intentarlo de nuevo.');
@@ -864,54 +864,87 @@ function Dashboard({ onLogout }) {
           {planInfo?.trial && !planInfo.trial.activo && !planInfo.trial.pagado ? (
             <div style={{
               display: 'flex', flexDirection: 'column', alignItems: 'center',
-              justifyContent: 'center', minHeight: '70vh', textAlign: 'center', padding: '2rem',
+              justifyContent: 'center', minHeight: '80vh', textAlign: 'center', padding: '2rem',
             }}>
-              <div style={{
-                width: 72, height: 72, borderRadius: '50%', background: '#FFEBEE',
-                display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: '1.25rem',
+              <span style={{
+                display: 'inline-flex', alignItems: 'center', gap: 6,
+                background: '#FFF3E0', color: '#E65100', fontSize: 11, fontWeight: 700,
+                letterSpacing: 0.8, textTransform: 'uppercase', padding: '0.35rem 0.9rem',
+                borderRadius: 50, marginBottom: '1.25rem',
               }}>
-                <Shield size={36} color="#E53935" />
+                <Lock size={12} /> Acceso suspendido
+              </span>
+
+              <div style={{
+                width: 76, height: 76, borderRadius: '50%',
+                background: 'linear-gradient(135deg, #F57C00, #E65100)',
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                marginBottom: '1.5rem', boxShadow: '0 10px 30px rgba(245,124,0,0.3)',
+              }}>
+                <Clock size={34} color="#fff" strokeWidth={2} />
               </div>
-              <h2 style={{ fontSize: '1.5rem', fontWeight: 700, color: '#1a1a2e', marginBottom: '0.5rem' }}>
-                Tu prueba gratuita ha terminado
+              <h2 style={{ fontFamily: "'Space Grotesk',sans-serif", fontSize: '1.7rem', fontWeight: 700, color: '#1a1a2e', marginBottom: '0.6rem' }}>
+                Tu prueba gratuita terminó
               </h2>
-              <p style={{ fontSize: '0.95rem', color: '#666', maxWidth: 440, lineHeight: 1.6, marginBottom: '1.5rem' }}>
-                El bot dejó de verificar comprobantes y el dashboard está suspendido. Elige un plan para reactivar tu cuenta.
+              <p style={{ fontSize: '0.95rem', color: '#666', maxWidth: 460, lineHeight: 1.6, marginBottom: '2.5rem' }}>
+                El bot dejó de verificar comprobantes y el dashboard está suspendido. Elige un plan para
+                reactivar tu cuenta al instante — tu historial de pagos queda intacto.
               </p>
 
               {/* Cards de planes */}
-              <div style={{
-                display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 12,
-                maxWidth: 600, width: '100%', marginBottom: '1.5rem',
+              <div className="planes-bloqueo-grid" style={{
+                display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 18,
+                maxWidth: 780, width: '100%', marginBottom: '2rem', alignItems: 'stretch',
               }}>
                 {[
-                  { id: 'basico', nombre: 'Básico', precio: '$39.900', comprobantes: '300/mes', color: '#F57C00' },
-                  { id: 'premium', nombre: 'Premium', precio: '$79.900', comprobantes: '1,000/mes', color: '#1A1A2E', popular: true },
-                  { id: 'empresarial', nombre: 'Empresarial', precio: '$149.900', comprobantes: 'Ilimitado', color: '#7B1FA2' },
+                  { id: 'basico', nombre: 'Básico', precio: '$39.900', comprobantes: '300 comprobantes/mes', Icono: Package,
+                    features: ['Verificación por WhatsApp', 'IA para lectura de bancos', '300 comprobantes/mes'] },
+                  { id: 'premium', nombre: 'Premium', precio: '$79.900', comprobantes: '1,000 comprobantes/mes', Icono: Rocket, popular: true,
+                    features: ['Todo lo de Básico', 'Reportes diarios automáticos', 'Dashboard completo'] },
+                  { id: 'empresarial', nombre: 'Empresarial', precio: '$149.900', comprobantes: 'Comprobantes ilimitados', Icono: Building2,
+                    features: ['Todo lo de Premium', 'Multi-sucursal', 'Soporte dedicado'] },
                 ].map((p) => (
                   <div key={p.nombre} style={{
-                    border: p.popular ? '2px solid #F57C00' : '2px solid #e8e8f0',
-                    borderRadius: 14, padding: '1.25rem 1rem', position: 'relative',
-                    background: p.popular ? '#FFF8F0' : '#fff', textAlign: 'center',
+                    display: 'flex', flexDirection: 'column',
+                    border: p.popular ? `2px solid #F57C00` : '1px solid #e8e8f0',
+                    borderRadius: 18, padding: '1.75rem 1.25rem', position: 'relative',
+                    background: p.popular ? 'linear-gradient(180deg, rgba(245,124,0,0.04) 0%, #fff 100%)' : '#fff',
+                    boxShadow: p.popular ? '0 12px 34px rgba(245,124,0,0.16)' : '0 4px 16px rgba(20,20,40,0.05)',
+                    transform: p.popular ? 'translateY(-6px)' : 'none',
                   }}>
                     {p.popular && (
                       <div style={{
-                        position: 'absolute', top: -10, left: '50%', transform: 'translateX(-50%)',
-                        background: '#F57C00', color: '#fff', fontSize: 11, padding: '2px 14px',
-                        borderRadius: 10, fontWeight: 600,
-                      }}>Popular</div>
+                        position: 'absolute', top: -12, left: '50%', transform: 'translateX(-50%)',
+                        background: '#F57C00', color: '#fff', fontSize: 11, padding: '3px 16px',
+                        borderRadius: 10, fontWeight: 700, letterSpacing: 0.4,
+                      }}>MÁS ELEGIDO</div>
                     )}
-                    <div style={{ fontSize: 15, fontWeight: 600, color: '#1a1a2e', marginBottom: 4 }}>{p.nombre}</div>
-                    <div style={{ fontSize: 24, fontWeight: 700, color: '#F57C00', marginBottom: 4 }}>{p.precio}</div>
-                    <div style={{ fontSize: 12, color: '#999', marginBottom: 12 }}>{p.comprobantes}</div>
+                    <div style={{
+                      width: 44, height: 44, borderRadius: 12, margin: '0 auto 1rem',
+                      display: 'flex', alignItems: 'center', justifyContent: 'center',
+                      background: p.popular ? '#F57C00' : '#FFF3E0',
+                    }}>
+                      <p.Icono size={21} color={p.popular ? '#fff' : '#F57C00'} strokeWidth={2} />
+                    </div>
+                    <div style={{ fontFamily: "'Space Grotesk',sans-serif", fontSize: 16, fontWeight: 600, color: '#1a1a2e', marginBottom: 4 }}>{p.nombre}</div>
+                    <div style={{ fontFamily: "'Space Grotesk',sans-serif", fontSize: 28, fontWeight: 700, color: '#1a1a2e', lineHeight: 1.2 }}>{p.precio}</div>
+                    <div style={{ fontSize: 11, color: '#999', marginBottom: '1.1rem' }}>por mes</div>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginBottom: '1.5rem', flexGrow: 1, textAlign: 'left' }}>
+                      {p.features.map((f) => (
+                        <div key={f} style={{ display: 'flex', alignItems: 'flex-start', gap: 8 }}>
+                          <CheckCircle size={14} color="#43A047" style={{ flexShrink: 0, marginTop: 2 }} />
+                          <span style={{ fontSize: 12.5, color: '#555', lineHeight: 1.4 }}>{f}</span>
+                        </div>
+                      ))}
+                    </div>
                     <button
                       onClick={() => pagarConWompi(p.id, p.nombre)}
                       disabled={pagandoPlan === p.id}
                       style={{
-                        width: '100%', padding: '0.6rem', borderRadius: 10, border: 'none',
-                        background: p.popular ? '#F57C00' : p.color, color: '#fff',
-                        fontWeight: 600, fontSize: '0.85rem', cursor: 'pointer',
-                        opacity: pagandoPlan === p.id ? 0.7 : 1,
+                        width: '100%', padding: '0.75rem', borderRadius: 10, border: 'none',
+                        background: p.popular ? '#F57C00' : '#1a1a2e', color: '#fff',
+                        fontWeight: 600, fontSize: '0.88rem', cursor: 'pointer',
+                        opacity: pagandoPlan === p.id ? 0.7 : 1, transition: 'opacity 0.15s',
                       }}
                     >
                       {pagandoPlan === p.id ? 'Abriendo pago...' : `Activar ${p.nombre}`}
@@ -921,13 +954,13 @@ function Dashboard({ onLogout }) {
               </div>
 
               <div style={{
-                background: '#f8f8fc', borderRadius: 12, padding: '1rem 1.5rem',
-                maxWidth: 440, width: '100%',
+                display: 'inline-flex', alignItems: 'center', gap: 8,
+                background: '#f8f8fc', borderRadius: 50, padding: '0.7rem 1.5rem',
               }}>
-                <div style={{ fontSize: '0.85rem', color: '#666', lineHeight: 1.6 }}>
-                  <Shield size={14} style={{ verticalAlign: 'middle', marginRight: 4 }} />
-                  Tus datos están seguros. Al activar un plan, todo vuelve a funcionar con tu historial intacto.
-                </div>
+                <Shield size={15} color="#999" style={{ flexShrink: 0 }} />
+                <span style={{ fontSize: '0.82rem', color: '#666' }}>
+                  Pago seguro procesado por Wompi. Tus datos están protegidos.
+                </span>
               </div>
             </div>
           ) : (
