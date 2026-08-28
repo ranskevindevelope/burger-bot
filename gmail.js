@@ -56,8 +56,8 @@ function getCredentials() {
 // ─── Obtener auth OAuth2 por negocio ────────────────────
 async function getAuth(negocio_id) {
   const credentials = getCredentials();
-  const { client_secret, client_id, redirect_uris } = credentials.installed;
-  const oAuth2Client = new google.auth.OAuth2(client_id, client_secret, redirect_uris[0]);
+  const { client_secret, client_id, redirect_uris } = credentials.installed || credentials.web;
+  const oAuth2Client = new google.auth.OAuth2(client_id, client_secret, redirect_uris?.[0]);
 
   // Intentar token de BD para este negocio
   const tokenDB = await obtenerTokenGmail(negocio_id);
