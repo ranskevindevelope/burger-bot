@@ -438,8 +438,8 @@ function Registro({ onBack }) {
               display: 'flex', justifyContent: 'space-between', alignItems: 'center',
               opacity: plan ? 1 : 0.3, transition: 'all 0.4s ease',
             }}>
-              <span style={{ fontSize: 12, color: 'rgba(255,255,255,0.5)' }}>Comprobantes</span>
-              <span style={{ fontSize: 12, color: 'rgba(255,255,255,0.7)' }}>{planActual?.comprobantes || '—'}</span>
+              <span style={{ fontSize: 12, color: 'rgba(255,255,255,0.5)' }}>Comprobantes en el trial</span>
+              <span style={{ fontSize: 12, color: 'rgba(255,255,255,0.7)' }}>{plan ? '300/mes' : '—'}</span>
             </div>
 
             {/* Ciudad - aparece cuando la llena */}

@@ -175,13 +175,15 @@ router.post('/registro/verificar', limitarLogin, async (req, res) => {
       return res.status(400).json({ ok: false, error: 'Código incorrecto o expirado' });
     }
 
-    // Crear negocio
-    const limites = { basico: 300, premium: 1000, empresarial: 999999 };
+    // Crear negocio — durante el trial gratis el límite siempre es el del plan Básico
+    // (300 comprobantes), sin importar qué plan haya elegido. El límite real de su
+    // plan se activa recién cuando paga (ver marcarNegocioPagado).
+    const LIMITE_TRIAL = 300;
     const negocio = await crearNegocio({
       nombre: datos.nombre_negocio,
       whatsapp: datos.whatsapp_negocio || null,
       plan: datos.plan,
-      limite_comprobantes: limites[datos.plan],
+      limite_comprobantes: LIMITE_TRIAL,
     });
 
     // Crear usuario admin

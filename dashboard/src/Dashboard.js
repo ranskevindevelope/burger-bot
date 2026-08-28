@@ -2539,6 +2539,19 @@ function Dashboard({ onLogout }) {
                   {gmailCargando ? 'Conectando...' : gmailEstado?.conectado ? <><X size={15} /> Desconectar</> : <><Mail size={15} /> Conectar Gmail</>}
                 </button>
               </div>
+              {!gmailEstado?.conectado && (
+                <div style={{
+                  display: 'flex', gap: 10, marginTop: '0.9rem',
+                  padding: '0.9rem 1.1rem', borderRadius: 10,
+                  background: '#FFF8F0', border: '1px solid #FFE0B2',
+                }}>
+                  <AlertTriangle size={16} color="#E65100" style={{ flexShrink: 0, marginTop: 1 }} />
+                  <p style={{ fontSize: '0.83rem', color: '#7a5a3a', lineHeight: 1.6, margin: 0 }}>
+                    Elige la cuenta que te avisa cuando te pagan — sin la corriente correcta,
+                    tu <strong>rayo</strong> no tiene cómo avisarte.
+                  </p>
+                </div>
+              )}
             </div>
 
             {/* ─── Voz de notificaciones ────────────── */}

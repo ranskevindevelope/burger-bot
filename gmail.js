@@ -1,10 +1,45 @@
-// gmail.js — Verificación de pagos vía correos de Bancolombia (multi-negocio)
+// gmail.js — Verificación de pagos vía correos de Bancolombia y Nequi (multi-negocio)
 const { google } = require('googleapis');
 const fs = require('fs');
 const path = require('path');
 const { obtenerTokenGmail, guardarTokenGmail } = require('./db');
 
 const CREDENTIALS_PATH = path.join(__dirname, 'credentials.json');
+
+// Remitentes de notificación de cada banco soportado
+const REMITENTES_BANCOS = ['notificacionesbancolombia.com', 'notificaciones@nequi.com.co'];
+const QUERY_REMITENTES = `{${REMITENTES_BANCOS.map((r) => `from:${r}`).join(' ')}}`;
+
+// Extrae { monto, nombre } del snippet de un correo, según el banco remitente.
+// Cada banco redacta distinto: Bancolombia usa "$60.800" y "pago de X por",
+// Nequi usa "Recibiste 554 de X el" (sin signo $).
+function extraerMontoYNombre(snippet, remitente) {
+  if (/nequi\.com\.co/i.test(remitente || '')) {
+    const match = snippet.match(/Recibiste\s+\$?\s?([\d.,]+)\s+de\s+(.+?)\s+el\s/i);
+    if (!match) return null;
+    let montoTexto = match[1];
+    if (/\.\d{2}$/.test(montoTexto)) montoTexto = montoTexto.slice(0, -3);
+    const monto = parseInt(montoTexto.replace(/[.,]/g, ''));
+    if (isNaN(monto)) return null;
+    return { monto, nombre: match[2].trim() };
+  }
+
+  // Bancolombia (por defecto)
+  const match = snippet.match(/\$\s?([\d.,]+)/);
+  if (!match) return null;
+  let montoTexto = match[1];
+  if (/\.\d{2}$/.test(montoTexto)) montoTexto = montoTexto.slice(0, -3);
+  const monto = parseInt(montoTexto.replace(/[.,]/g, ''));
+  if (isNaN(monto)) return null;
+  const matchNombre = snippet.match(/pago de (.+?) por/i);
+  return { monto, nombre: matchNombre ? matchNombre[1].trim() : null };
+}
+
+function obtenerRemitente(mensajeDetalle) {
+  const headers = mensajeDetalle?.data?.payload?.headers || [];
+  const from = headers.find((h) => h.name === 'From');
+  return from ? from.value : '';
+}
 
 // Fallback: token.json del archivo para negocio 1 (retrocompatibilidad)
 const TOKEN_PATH = path.join(__dirname, 'token.json');
@@ -105,12 +140,12 @@ async function buscarEnGmail(auth, montoEsperado) {
 
     const res = await gmail.users.messages.list({
       userId: 'me',
-      q: 'from:notificacionesbancolombia.com is:unread newer_than:1d',
+      q: `${QUERY_REMITENTES} is:unread newer_than:1d`,
       maxResults: 10,
     });
 
     if (!res.data.messages || res.data.messages.length === 0) {
-      console.log('[Gmail] No hay correos nuevos de Bancolombia');
+      console.log('[Gmail] No hay correos nuevos de bancos soportados');
       return null;
     }
 
@@ -124,26 +159,16 @@ async function buscarEnGmail(auth, montoEsperado) {
       });
 
       const snippet = detalle.data.snippet || '';
+      const remitente = obtenerRemitente(detalle);
       console.log('[Gmail] Revisando correo:', snippet);
 
-      const match = snippet.match(/\$\s?([\d.,]+)/);
-      if (!match) continue;
-
-      let montoTexto = match[1];
-      if (/\.\d{2}$/.test(montoTexto)) {
-        montoTexto = montoTexto.slice(0, -3);
-      }
-      const montoCorreo = parseInt(montoTexto.replace(/[.,]/g, ''));
+      const extraido = extraerMontoYNombre(snippet, remitente);
+      if (!extraido) continue;
+      const { monto: montoCorreo, nombre: nombreCliente } = extraido;
 
       if (montoCorreo === montoBuscado) {
         console.log(`[Gmail] ✅ Pago encontrado: $${montoCorreo}`);
-
-        let nombreCliente = null;
-        const matchNombre = snippet.match(/pago de (.+?) por/i);
-        if (matchNombre) {
-          nombreCliente = matchNombre[1].trim();
-          console.log('[Gmail] Cliente:', nombreCliente);
-        }
+        if (nombreCliente) console.log('[Gmail] Cliente:', nombreCliente);
 
         await gmail.users.messages.modify({
           userId: 'me',
@@ -164,9 +189,9 @@ async function buscarEnGmail(auth, montoEsperado) {
   }
 }
 
-// ─── Listar ingresos (transferencias recibidas) de Bancolombia del día ───
+// ─── Listar ingresos (transferencias recibidas) del día ───────
 //  No filtra por un monto específico: devuelve TODOS los ingresos detectados
-//  en notificaciones de Bancolombia de las últimas 24h para un negocio.
+//  en notificaciones de bancos soportados de las últimas 24h para un negocio.
 async function listarIngresosDelDia(negocio_id = 1) {
   const auth = await getAuth(negocio_id);
   if (!auth) {
@@ -179,12 +204,12 @@ async function listarIngresosDelDia(negocio_id = 1) {
 
     const res = await gmail.users.messages.list({
       userId: 'me',
-      q: 'from:notificacionesbancolombia.com newer_than:1d is:unread',
+      q: `${QUERY_REMITENTES} newer_than:1d is:unread`,
       maxResults: 20,
     });
 
     if (!res.data.messages || res.data.messages.length === 0) {
-      console.log('[Gmail] No hay correos de Bancolombia del día');
+      console.log('[Gmail] No hay correos de bancos soportados del día');
       return [];
     }
 
@@ -197,7 +222,8 @@ async function listarIngresosDelDia(negocio_id = 1) {
         format: 'full',
       });
 
-            const snippet = detalle.data.snippet || '';
+      const snippet = detalle.data.snippet || '';
+      const remitente = obtenerRemitente(detalle);
 
       // ❌ Excluir retiros / salidas de dinero (evitar falsos "ingresos")
       if (/retiraste|retiró|retiro|debitaste|pagaste|descont|cajero|de tu t\.deb|de tu t deb|de su t\.deb|compra|compraste|folios?|avance|retiro en/i.test(snippet)) {
@@ -209,23 +235,10 @@ async function listarIngresosDelDia(negocio_id = 1) {
         continue;
       }
 
-      const match = snippet.match(/\$\s?([\d.,]+)/);
-      if (!match) continue;
+      const extraido = extraerMontoYNombre(snippet, remitente);
+      if (!extraido) continue;
 
-      let montoTexto = match[1];
-      if (/\.\d{2}$/.test(montoTexto)) {
-        montoTexto = montoTexto.slice(0, -3);
-      }
-      const monto = parseInt(montoTexto.replace(/[.,]/g, ''));
-      if (isNaN(monto)) continue;
-
-      let nombreCliente = null;
-      const matchNombre = snippet.match(/pago de (.+?) por/i);
-      if (matchNombre) {
-        nombreCliente = matchNombre[1].trim();
-      }
-
-      ingresos.push({ monto, nombre: nombreCliente, snippet });
+      ingresos.push({ monto: extraido.monto, nombre: extraido.nombre, snippet });
     }
 
     console.log(`[Gmail] Ingresos detectados del día (negocio ${negocio_id}): ${ingresos.length}`);
