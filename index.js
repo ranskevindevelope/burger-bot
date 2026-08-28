@@ -39,6 +39,10 @@ const wompiRouter = require('./routes/wompi');
 
 const app = express();
 
+// Detrás de nginx: sin esto, req.protocol siempre da "http" aunque el
+// sitio real sea https, lo que rompe redirect_uri de OAuth (Gmail, etc.)
+app.set('trust proxy', 1);
+
 // ─── Headers de seguridad ─────────────────────────────────
 app.use((req, res, next) => {
   res.setHeader('X-Content-Type-Options', 'nosniff');
