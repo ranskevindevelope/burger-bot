@@ -170,11 +170,18 @@ async function buscarEnGmail(auth, montoEsperado) {
         console.log(`[Gmail] ✅ Pago encontrado: $${montoCorreo}`);
         if (nombreCliente) console.log('[Gmail] Cliente:', nombreCliente);
 
-        await gmail.users.messages.modify({
-          userId: 'me',
-          id: msg.id,
-          requestBody: { removeLabelIds: ['UNREAD'] },
-        });
+        // Marcar como leído es solo limpieza (evita reprocesar el mismo correo);
+        // si falla (ej. el token no tiene el scope gmail.modify) no debe tumbar
+        // un pago que ya se encontró y verificó correctamente.
+        try {
+          await gmail.users.messages.modify({
+            userId: 'me',
+            id: msg.id,
+            requestBody: { removeLabelIds: ['UNREAD'] },
+          });
+        } catch (errModify) {
+          console.error('[Gmail] No se pudo marcar el correo como leído (no afecta la verificación):', errModify.message);
+        }
 
         return { monto: montoCorreo, fuente: 'Gmail', nombre: nombreCliente };
       }

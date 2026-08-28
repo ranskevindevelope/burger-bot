@@ -529,7 +529,7 @@ router.get('/gmail/auth-url', verificarToken, soloAdmin, (req, res) => {
     const authUrl = oAuth2Client.generateAuthUrl({
       access_type: 'offline',
       prompt: 'consent',
-      scope: ['https://www.googleapis.com/auth/gmail.readonly'],
+      scope: ['https://www.googleapis.com/auth/gmail.modify'],
       state,
     });
 
