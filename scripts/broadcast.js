@@ -9,9 +9,40 @@ const { listarNegocios } = require('../db');
 const { obtenerAdminsNegocio } = require('../bot/reportes');
 const { enviarMensaje } = require('../bot/openwa');
 
-const MENSAJE = `⚡ *Actualización de FlashPago*
+const MENSAJE = `⚡ *FlashPago — Update Agosto 2026*
 
-(Escribe aquí el mensaje que quieres mandar antes de correr con --enviar)`;
+Hemos estado construyendo sin parar. Esto es lo que hay nuevo:
+
+🏢 *Multi-negocio*
+Un solo bot, múltiples negocios. Cada cliente tiene sus datos aislados.
+
+📋 *Planes con trial gratis*
+Básico ($39.900), Premium ($79.900), Empresarial ($149.900). 15 días gratis para probar.
+
+📧 *Conexión bancaria*
+Cada negocio conecta con su banco para recibir notificaciones de pagos automáticamente.
+
+💰 *Módulo de ventas*
+Cierre de caja, gastos por categoría, resumen semanal, historial mensual.
+
+📊 *Dashboard mejorado*
+Filtro por mes, estadísticas por banco, barra de uso del plan, alertas en vivo.
+
+🔊 *Notificación de voz*
+Anuncio de voz cuando llega un pago verificado, con selector de voz en Configuración.
+
+🏦 *Más bancos*
+Ahora también verifica pagos de Nequi, no solo Bancolombia.
+
+🔒 *Seguridad*
+HTTPS, JWT, rate limiting, vulnerabilidades corregidas.
+
+🏗️ *Lo que viene*
+Dominio propio, más bancos soportados.
+
+🔗 https://flashpago.duckdns.org
+
+_FlashPago — Verificación de pagos con IA_ 🚀`;
 
 async function main() {
   const enviar = process.argv.includes('--enviar');
