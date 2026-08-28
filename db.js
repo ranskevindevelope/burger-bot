@@ -232,6 +232,25 @@ function obtenerNegocio(id) {
   });
 }
 
+// hora_cierre puede ser un string legado "HH:MM" (mismo horario todos los días)
+// o un JSON { "0": "HH:MM", ..., "6": "HH:MM" } con horario distinto por día.
+function parsearHoraCierre(horaCierreRaw) {
+  if (!horaCierreRaw) return null;
+  try {
+    const obj = JSON.parse(horaCierreRaw);
+    if (obj && typeof obj === 'object' && !Array.isArray(obj)) return obj;
+  } catch {
+    // no era JSON — es el formato viejo, un string plano "HH:MM"
+  }
+  return null;
+}
+
+function horaCierreDelDia(horaCierreRaw, dia) {
+  const porDia = parsearHoraCierre(horaCierreRaw);
+  if (porDia) return porDia[String(dia)] || porDia.default || '21:00';
+  return horaCierreRaw || '21:00';
+}
+
 function actualizarHorarioNegocio(id, { hora_cierre, dias_operacion }) {
   return new Promise((resolve, reject) => {
     db.run(
@@ -800,6 +819,8 @@ module.exports = {
   obtenerNegocio,
   listarNegocios,
   actualizarHorarioNegocio,
+  parsearHoraCierre,
+  horaCierreDelDia,
   contarComprobantesDelMes,
   verificarTrialActivo,
   // Pagos de suscripción (Wompi)

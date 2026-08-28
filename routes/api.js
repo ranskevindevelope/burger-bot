@@ -23,6 +23,7 @@ const {
   obtenerNegocio,
   listarNegocios,
   actualizarHorarioNegocio,
+  parsearHoraCierre,
   contarComprobantesDelMes,
   verificarTrialActivo,
   guardarTokenGmail,
@@ -940,9 +941,18 @@ router.get('/negocio/configuracion', verificarToken, soloAdmin, async (req, res)
       dias_operacion = [0, 1, 2, 3, 4, 5, 6];
     }
 
+    // Normaliza a un objeto { "0": "HH:MM", ... } con una entrada por día operativo,
+    // aunque el negocio todavía tenga el formato viejo (un solo string para todos los días).
+    const porDia = parsearHoraCierre(negocio.hora_cierre);
+    const legado = !porDia ? (negocio.hora_cierre || '21:00') : null;
+    const hora_cierre = {};
+    for (const d of dias_operacion) {
+      hora_cierre[d] = porDia ? (porDia[String(d)] || porDia.default || '21:00') : legado;
+    }
+
     res.json({
       ok: true,
-      hora_cierre: negocio.hora_cierre || '21:00',
+      hora_cierre,
       dias_operacion,
     });
   } catch (err) {
@@ -954,14 +964,19 @@ router.put('/negocio/configuracion', verificarToken, soloAdmin, async (req, res)
   try {
     const { hora_cierre, dias_operacion } = req.body;
 
-    if (!HORA_VALIDA.test(hora_cierre || '')) {
-      return res.status(400).json({ ok: false, error: 'Hora de cierre inválida (formato HH:MM)' });
-    }
     if (!Array.isArray(dias_operacion) || dias_operacion.length === 0 || !dias_operacion.every(DIA_VALIDO)) {
       return res.status(400).json({ ok: false, error: 'Selecciona al menos un día de operación' });
     }
+    if (!hora_cierre || typeof hora_cierre !== 'object' || Array.isArray(hora_cierre)) {
+      return res.status(400).json({ ok: false, error: 'Formato de horario inválido' });
+    }
+    for (const d of dias_operacion) {
+      if (!HORA_VALIDA.test(hora_cierre[String(d)] || '')) {
+        return res.status(400).json({ ok: false, error: `Hora de cierre inválida para el día ${d} (formato HH:MM)` });
+      }
+    }
 
-    await actualizarHorarioNegocio(req.user.negocio_id, { hora_cierre, dias_operacion });
+    await actualizarHorarioNegocio(req.user.negocio_id, { hora_cierre: JSON.stringify(hora_cierre), dias_operacion });
     res.json({ ok: true, mensaje: 'Configuración actualizada' });
   } catch (err) {
     res.status(500).json({ ok: false, error: err.message });

@@ -56,7 +56,7 @@ function Dashboard({ onLogout }) {
     { valor: 0, corto: 'Dom' }, { valor: 1, corto: 'Lun' }, { valor: 2, corto: 'Mar' },
     { valor: 3, corto: 'Mié' }, { valor: 4, corto: 'Jue' }, { valor: 5, corto: 'Vie' }, { valor: 6, corto: 'Sáb' },
   ];
-  const [horaCierre, setHoraCierre] = useState('21:00');
+  const [horaCierre, setHoraCierre] = useState({ 0: '21:00', 1: '21:00', 2: '21:00', 3: '21:00', 4: '21:00', 5: '21:00', 6: '21:00' });
   const [diasOperacion, setDiasOperacion] = useState([0, 1, 2, 3, 4, 5, 6]);
   const [cargandoConfig, setCargandoConfig] = useState(false);
   const [guardandoConfig, setGuardandoConfig] = useState(false);
@@ -282,6 +282,19 @@ function Dashboard({ onLogout }) {
     setDiasOperacion((prev) =>
       prev.includes(dia) ? prev.filter((d) => d !== dia) : [...prev, dia].sort()
     );
+    setHoraCierre((prev) => (prev[dia] ? prev : { ...prev, [dia]: '21:00' }));
+  };
+
+  const cambiarHoraCierreDia = (dia, valor) => {
+    setHoraCierre((prev) => ({ ...prev, [dia]: valor }));
+  };
+
+  const aplicarHoraATodos = (valor) => {
+    setHoraCierre((prev) => {
+      const actualizado = { ...prev };
+      diasOperacion.forEach((d) => { actualizado[d] = valor; });
+      return actualizado;
+    });
   };
 
   const guardarConfiguracion = async () => {
@@ -2418,27 +2431,10 @@ function Dashboard({ onLogout }) {
               ) : (
                 <div style={{ maxWidth: 480 }}>
                   <p style={{ color: '#666', fontSize: '0.9rem', marginBottom: '1.5rem', lineHeight: 1.6 }}>
-                    Define a qué hora cierra tu negocio y qué días opera. El bot usa esta información para saber
-                    cuándo hacer las verificaciones nocturnas de pagos y enviar el reporte diario.
+                    Define qué días opera tu negocio y a qué hora cierra cada uno (puede variar, por ejemplo
+                    cerrar más tarde el fin de semana). El bot usa esta información para saber cuándo hacer
+                    las verificaciones nocturnas de pagos y enviar el reporte diario.
                   </p>
-
-                  <div style={{ marginBottom: '1.5rem' }}>
-                    <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: 600, color: '#4a4a68', marginBottom: '0.5rem' }}>
-                      Hora de cierre
-                    </label>
-                    <input
-                      type="time"
-                      value={horaCierre}
-                      onChange={(e) => setHoraCierre(e.target.value)}
-                      style={{
-                        padding: '0.7rem 1rem', border: '2px solid #e8e8f0', borderRadius: 10,
-                        fontSize: '0.95rem', outline: 'none', fontFamily: 'inherit',
-                      }}
-                    />
-                    <p style={{ fontSize: '0.8rem', color: '#999', marginTop: '0.4rem' }}>
-                      Las verificaciones se hacen a esa hora y una hora después; el reporte diario se envía junto con la segunda verificación.
-                    </p>
-                  </div>
 
                   <div style={{ marginBottom: '1.5rem' }}>
                     <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: 600, color: '#4a4a68', marginBottom: '0.5rem' }}>
@@ -2464,6 +2460,43 @@ function Dashboard({ onLogout }) {
                         );
                       })}
                     </div>
+                  </div>
+
+                  <div style={{ marginBottom: '1.5rem' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '0.5rem' }}>
+                      <label style={{ fontSize: '0.85rem', fontWeight: 600, color: '#4a4a68' }}>
+                        Hora de cierre por día
+                      </label>
+                      <button
+                        type="button"
+                        onClick={() => aplicarHoraATodos(horaCierre[diasOperacion[0]] || '21:00')}
+                        style={{
+                          background: 'none', border: 'none', color: '#F57C00', fontSize: '0.8rem',
+                          fontWeight: 600, cursor: 'pointer', padding: 0,
+                        }}
+                      >
+                        Usar la misma hora todos los días
+                      </button>
+                    </div>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                      {DIAS_SEMANA.filter((d) => diasOperacion.includes(d.valor)).map((d) => (
+                        <div key={d.valor} style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                          <span style={{ width: 40, fontSize: '0.85rem', color: '#4a4a68', fontWeight: 600 }}>{d.corto}</span>
+                          <input
+                            type="time"
+                            value={horaCierre[d.valor] || '21:00'}
+                            onChange={(e) => cambiarHoraCierreDia(d.valor, e.target.value)}
+                            style={{
+                              padding: '0.6rem 0.9rem', border: '2px solid #e8e8f0', borderRadius: 10,
+                              fontSize: '0.9rem', outline: 'none', fontFamily: 'inherit',
+                            }}
+                          />
+                        </div>
+                      ))}
+                    </div>
+                    <p style={{ fontSize: '0.8rem', color: '#999', marginTop: '0.6rem' }}>
+                      Las verificaciones se hacen a esa hora y una hora después; el reporte diario se envía junto con la segunda verificación.
+                    </p>
                   </div>
 
                   <button className="usuario-btn-guardar" onClick={guardarConfiguracion} disabled={guardandoConfig}>
