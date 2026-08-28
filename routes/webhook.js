@@ -173,8 +173,9 @@ router.post('/', async (req, res) => {
   }
 
   // ─── Verificar límite del plan ────────────────────────
+  let negocio;
   try {
-    const negocio = await obtenerNegocio(negocio_id);
+    negocio = await obtenerNegocio(negocio_id);
     if (negocio) {
       const usados = await contarComprobantesDelMes(negocio_id);
       if (usados >= negocio.limite_comprobantes) {
@@ -239,7 +240,7 @@ router.post('/', async (req, res) => {
 
     // ─── Determinar resultado final ─────────────────────
     const verificacion = pagoGmail
-      ? { estado: 'REAL', mensaje: `✅ PAGO CONFIRMADO: $${pagoGmail.monto.toLocaleString('es-CO')}  este pago es confirmado en Bancolombia` }
+      ? { estado: 'REAL', mensaje: `✅ PAGO CONFIRMADO: $${pagoGmail.monto.toLocaleString('es-CO')}  este pago es confirmado en ${negocio?.banco || 'tu banco'}` }
       : await verificarPago(datos);
 
     // ─── Guardar el pago en la base de datos ────────────

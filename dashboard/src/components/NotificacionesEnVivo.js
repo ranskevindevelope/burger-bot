@@ -158,7 +158,7 @@ function NotificacionesEnVivo({ onLogout }) {
     };
     inicial();
 
-    const intervalo = setInterval(revisarNovedades, 20000);
+    const intervalo = setInterval(revisarNovedades, 8000);
     return () => clearInterval(intervalo);
   }, [api, revisarNovedades]);
 
