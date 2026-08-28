@@ -234,4 +234,4 @@ async function buscarIngresosSinComprobante(negocio_id = 1) {
   }
 }
 
-module.exports = { enviarReporteDiario, verificacionNocturna, buscarIngresosSinComprobante };
+module.exports = { enviarReporteDiario, verificacionNocturna, buscarIngresosSinComprobante, obtenerAdminsNegocio };

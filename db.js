@@ -207,8 +207,7 @@ db.run(`
 // ═══════════════════════════════════════════════════════════
 
 function crearNegocio({ nombre, whatsapp, plan, limite_comprobantes, ciudad, banco }) {
-  const limites = { basico: 300, premium: 1000, empresarial: 999999 };
-  const limite = limite_comprobantes || limites[plan] || 300;
+  const limite = limite_comprobantes || LIMITES_PLAN[plan] || 300;
   // Trial de 15 días desde hoy
   const trial = new Date(Date.now() + 15 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
   return new Promise((resolve, reject) => {
@@ -829,6 +828,7 @@ module.exports = {
   actualizarPagoPlataforma,
   marcarNegocioPagado,
   PRECIOS_CENTAVOS,
+  LIMITES_PLAN,
   // Gmail tokens
   guardarTokenGmail,
   obtenerTokenGmail,

@@ -130,6 +130,7 @@ function Registro({ onBack }) {
           plan,
           ciudad: ciudad.trim(),
           whatsapp_negocio: whatsappNegocio.trim(),
+          banco: bancoNegocio,
           nombre: nombre.trim(),
           usuario: usuario.trim().toLowerCase(),
           password,

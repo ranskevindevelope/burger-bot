@@ -24,6 +24,7 @@ const {
   listarNegocios,
   actualizarHorarioNegocio,
   parsearHoraCierre,
+  LIMITES_PLAN,
   contarComprobantesDelMes,
   verificarTrialActivo,
   guardarTokenGmail,
@@ -111,7 +112,7 @@ const { generarCodigo, guardarCodigoVerificacion, verificarCodigo } = require('.
 // Paso 1: Enviar código de verificación
 router.post('/registro/enviar-codigo', limitarLogin, async (req, res) => {
   try {
-    const { email, nombre_negocio, plan, ciudad, whatsapp_negocio, nombre, usuario, password } = req.body;
+    const { email, nombre_negocio, plan, ciudad, whatsapp_negocio, banco, nombre, usuario, password } = req.body;
 
     // Validaciones
     if (!email || !nombre_negocio || !nombre || !usuario || !password) {
@@ -149,7 +150,7 @@ router.post('/registro/enviar-codigo', limitarLogin, async (req, res) => {
     // Generar y guardar código
     const codigo = generarCodigo();
     await guardarCodigoVerificacion(email, codigo, {
-      email, nombre_negocio, plan, ciudad, whatsapp_negocio, nombre, usuario, password,
+      email, nombre_negocio, plan, ciudad, whatsapp_negocio, banco, nombre, usuario, password,
     });
 
     // Enviar correo
@@ -184,6 +185,8 @@ router.post('/registro/verificar', limitarLogin, async (req, res) => {
       whatsapp: datos.whatsapp_negocio || null,
       plan: datos.plan,
       limite_comprobantes: LIMITE_TRIAL,
+      ciudad: datos.ciudad,
+      banco: datos.banco,
     });
 
     // Crear usuario admin
@@ -457,10 +460,9 @@ router.put('/negocios/:id', verificarToken, soloSuperAdmin, (req, res) => {
   if (nombre) { sets.push('nombre=?'); vals.push(nombre); }
   if (whatsapp !== undefined) { sets.push('whatsapp=?'); vals.push(whatsapp); }
   if (plan) {
-    const limites = { basico: 300, premium: 1000, empresarial: 999999 };
-    if (!limites[plan]) return res.status(400).json({ ok: false, error: 'Plan inválido' });
+    if (!LIMITES_PLAN[plan]) return res.status(400).json({ ok: false, error: 'Plan inválido' });
     sets.push('plan=?', 'limite_comprobantes=?');
-    vals.push(plan, limites[plan]);
+    vals.push(plan, LIMITES_PLAN[plan]);
   }
   if (activo !== undefined) { sets.push('activo=?'); vals.push(activo); }
   if (!sets.length) return res.json({ ok: false, error: 'Nada que actualizar' });
