@@ -145,9 +145,6 @@ const MASCOTA_RAYO_DORMIDO_SVG = `
   <text class="zzz z3" x="182" y="22">Z</text>
   <g class="rest">
     <polygon points="118,8 55,100 98,100 68,208 152,88 108,88" fill="#F57C00" />
-    <path d="M78,95 Q84,90 90,95" fill="none" stroke="#1A1A2E" stroke-width="4" stroke-linecap="round" />
-    <path d="M108,88 Q118,82 128,88" fill="none" stroke="#1A1A2E" stroke-width="4" stroke-linecap="round" />
-    <path d="M92,120 Q100,126 108,120" fill="none" stroke="#1A1A2E" stroke-width="4" stroke-linecap="round" />
   </g>
 </svg>`.replace(/\n\s*/g, '');
 
@@ -238,7 +235,7 @@ function paginaError(codigo, titulo, mensaje, opts = {}) {
     `<p class="codigo">${codigo}</p>` +
     `<h1>${titulo}</h1>` +
     `<p>${mensaje}</p>` +
-    '<a href="/panel">Ir al panel</a>' +
+    (opts.sinBoton ? '' : '<a href="/panel">Ir al panel</a>') +
     '</div></body></html>'
   );
 }
@@ -249,7 +246,7 @@ app.get('/panel', (req, res) => {
   res.sendFile(path.join(__dirname, 'dashboard/build', 'index.html'), (err) => {
     if (err) {
       console.error('[Dashboard] No se pudo servir index.html:', err.message);
-      res.status(503).send(paginaError(503, 'Estamos actualizando FlashPago', 'Vuelve a intentarlo en un minuto.', { mascota: 'dormido' }));
+      res.status(503).send(paginaError(503, 'Estamos actualizando FlashPago', 'Volveremos en unos minutos.', { mascota: 'dormido', sinBoton: true }));
     }
   });
 });
