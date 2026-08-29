@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { Toaster } from 'react-hot-toast';
 import FlashPagoLanding from './Flashpagolanding';
 import Login from './Login';
@@ -8,6 +9,8 @@ import Dashboard from './Dashboard';
 import Terminos from './Terminos';
 import Privacidad from './Privacidad';
 import './App.css';
+
+const queryClient = new QueryClient();
 
 function App() {
   const esPanel = window.location.pathname.startsWith('/panel');
@@ -44,10 +47,10 @@ function App() {
   }
 
   return (
-    <>
+    <QueryClientProvider client={queryClient}>
       {pantalla}
       <Toaster position="top-right" toastOptions={{ duration: 3500 }} />
-    </>
+    </QueryClientProvider>
   );
 }
 

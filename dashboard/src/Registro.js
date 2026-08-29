@@ -359,9 +359,9 @@ function Registro({ onBack }) {
   };
 
   return (
-    <div style={s.container}>
+    <div style={s.container} className="registro-container">
       {/* ─── LADO IZQUIERDO ────────────────────── */}
-      <div style={s.left}>
+      <div style={s.left} className="registro-left">
         <div style={s.logo}><img src="/logo.png" alt="FlashPago" style={{ width: 40, height: 40, objectFit: 'cover', borderRadius: 8 }} /></div>
         <div style={s.brand}>Flash<span style={s.brandSpan}>Pago</span></div>
         <div style={s.sub}>Verifica comprobantes de pago en segundos con inteligencia artificial</div>
@@ -560,7 +560,7 @@ function Registro({ onBack }) {
       </div>
 
       {/* ─── LADO DERECHO ─────────────────────── */}
-      <div style={s.right}>
+      <div style={s.right} className="registro-right">
         {/* Steps indicator */}
         {paso <= 4 && (
           <div style={s.steps}>
@@ -597,7 +597,7 @@ function Registro({ onBack }) {
             }}>
               <Gift size={13} /> 15 días gratis en cualquier plan
             </div>
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 10, marginBottom: 16 }}>
+            <div className="registro-planes-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 10, marginBottom: 16 }}>
               {planes.map(p => (
                 <div key={p.id} style={s.planCard(plan === p.id)} onClick={() => setPlan(p.id)}>
                   {p.popular && <div style={s.planTag}>Popular</div>}
@@ -723,10 +723,7 @@ function Registro({ onBack }) {
                 <select style={s.select} value={bancoNegocio} onChange={e => setBancoNegocio(e.target.value)}>
                   <option>Bancolombia</option>
                   <option>Nequi</option>
-                  <option>Daviplata</option>
-                  <option>Davivienda</option>
-                  <option>AV Villas</option>
-                  <option>Otro</option>
+                  <option>BBVA</option>
                 </select>
               </div>
             </div>

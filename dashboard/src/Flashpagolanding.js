@@ -214,7 +214,7 @@ function HubDiagram() {
 }
 
 // ─── MAIN ────────────────────────────────
-export default function FlashPagoLanding({ onLogin, onTerminos, onPrivacidad }) {
+export default function FlashPagoLanding({ onLogin, onRegistro, onTerminos, onPrivacidad }) {
   const handleLogin = () => {
     if (onLogin) onLogin();
   };
@@ -495,9 +495,9 @@ export default function FlashPagoLanding({ onLogin, onTerminos, onPrivacidad }) 
                     </li>
                   ))}
                 </ul>
-                <a href="#contacto" style={{ display: "block", width: "100%", padding: "0.9rem", borderRadius: 12, fontWeight: 600, fontSize: "1rem", textAlign: "center", textDecoration: "none", cursor: "pointer", boxSizing: "border-box", ...(plan.popular ? { background: COLORS.naranja, color: "white" } : { background: "transparent", color: COLORS.naranja, border: `2px solid ${COLORS.naranja}` }) }}>
-                  {plan.name === "Empresarial" ? "Contactar" : "Empezar"}
-                </a>
+                <button onClick={onRegistro} style={{ display: "block", width: "100%", padding: "0.9rem", borderRadius: 12, fontWeight: 600, fontSize: "1rem", textAlign: "center", textDecoration: "none", cursor: "pointer", boxSizing: "border-box", fontFamily: "'Inter',sans-serif", border: "none", ...(plan.popular ? { background: COLORS.naranja, color: "white" } : { background: "transparent", color: COLORS.naranja, border: `2px solid ${COLORS.naranja}` }) }}>
+                  Empezar
+                </button>
               </div>
             ))}
           </div>
@@ -511,7 +511,7 @@ export default function FlashPagoLanding({ onLogin, onTerminos, onPrivacidad }) 
           <h2 className="cta-h2" style={{ fontFamily: "'Space Grotesk',sans-serif", fontSize: "2.5rem", fontWeight: 700, color: COLORS.blanco, marginBottom: "1rem", marginTop: 0 }}>¿Listo para proteger tu negocio?</h2>
           <p style={{ fontSize: "1.1rem", color: "#b0b0c8", marginBottom: "2rem", maxWidth: 550, marginLeft: "auto", marginRight: "auto" }}>Escríbenos por WhatsApp y te activamos FlashPago en menos de 24 horas. Sin contratos, sin complicaciones.</p>
           <div style={{ display: "flex", gap: "1rem", justifyContent: "center", flexWrap: "wrap" }}>
-            <a href="https://wa.me/57XXXXXXXXXX?text=Hola%2C%20quiero%20conocer%20más%20sobre%20FlashPago" target="_blank" rel="noopener noreferrer" style={{ background: COLORS.naranja, color: "white", padding: "1rem 2rem", borderRadius: 12, textDecoration: "none", fontWeight: 600, fontSize: "1.05rem", display: "inline-flex", alignItems: "center", gap: 8 }}>
+            <a href={`https://wa.me/573167064671?text=${encodeURIComponent('Hola, quiero conocer más sobre FlashPago')}`} target="_blank" rel="noopener noreferrer" style={{ background: COLORS.naranja, color: "white", padding: "1rem 2rem", borderRadius: 12, textDecoration: "none", fontWeight: 600, fontSize: "1.05rem", display: "inline-flex", alignItems: "center", gap: 8 }}>
               <MessageCircle size={18} /> Escribir por WhatsApp
             </a>
             <button onClick={() => window.open('/panel', '_blank')} style={{ background: "transparent", color: COLORS.blanco, padding: "1rem 2rem", borderRadius: 12, fontWeight: 600, fontSize: "1.05rem", border: "2px solid rgba(255,255,255,0.2)", cursor: "pointer", display: "inline-flex", alignItems: "center", gap: 8, fontFamily: "'Inter',sans-serif" }}>

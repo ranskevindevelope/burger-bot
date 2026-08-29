@@ -1,10 +1,28 @@
 import React, { useState } from 'react';
-import { CreditCard, Download, LayoutDashboard, LogOut, Search, TrendingUp, Users, AlertTriangle, DollarSign, Menu, X, ShoppingBag, Settings, Building2 } from 'lucide-react';
+import { CreditCard, Download, LayoutDashboard, LogOut, Search, TrendingUp, Users, AlertTriangle, Menu, X, ShoppingBag, Settings, Building2 } from 'lucide-react';
 
 function Sidebar({ activeSection, isOpen, isAdmin, isSuperAdmin, paymentCount, userCount, negocioNombre, onSectionChange, onLogout }) {
-  const [fijado, setFijado] = useState(false);
+  const [fijado, setFijado] = useState(() => {
+    try {
+      return localStorage.getItem('fp_sidebar_fijado') === '1';
+    } catch {
+      return false;
+    }
+  });
   const [hover, setHover] = useState(false);
   const expandido = fijado || hover || isOpen;
+
+  const alternarFijado = () => {
+    setFijado((prev) => {
+      const nuevo = !prev;
+      try {
+        localStorage.setItem('fp_sidebar_fijado', nuevo ? '1' : '0');
+      } catch {
+        // localStorage no disponible (modo privado, etc.) — no pasa nada, solo no persiste
+      }
+      return nuevo;
+    });
+  };
 
   const menuItems = [
     { id: 'panel', icon: <LayoutDashboard size={18} />, label: 'Panel' },
@@ -27,14 +45,14 @@ function Sidebar({ activeSection, isOpen, isAdmin, isSuperAdmin, paymentCount, u
     >
       <div className="sidebar-header">
         <div className="sidebar-logo" style={{ justifyContent: expandido ? 'flex-start' : 'center' }}>
-          <button onClick={() => setFijado(!fijado)}
+          <button onClick={alternarFijado}
             style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#fff', padding: 4, display: 'flex', flexShrink: 0 }}>
             {fijado ? <X size={20} /> : <Menu size={20} />}
           </button>
           {expandido && (
             <>
               <div className="sidebar-logo-icon-box">
-                <DollarSign size={20} color="#fff" />
+                <img src="/logo.png" alt="FlashPago" style={{ width: '100%', height: '100%', objectFit: 'cover', borderRadius: 10 }} />
               </div>
               <div>
                 <div className="sidebar-logo-text">Flash<span>Pago</span></div>

@@ -1,11 +1,13 @@
 import React, { useState, useEffect, useMemo } from 'react';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid, AreaChart, Area } from 'recharts';
-import { CreditCard, TrendingUp, Search, Download, DollarSign, Calendar, CheckCircle, Shield, Trophy, BarChart3, Eye, X, Moon, Mail, Users, UserPlus, UserX, UserCheck, Edit, Trash2, Save, XCircle, AlertTriangle, Clock, Bell, Activity, Zap, Wifi, WifiOff, ShoppingBag, Receipt, Wallet, PlusCircle, MinusCircle, ArrowDownUp, Settings, Building2, MailCheck, ChevronDown, ChevronUp, Volume2, Package, Rocket, Lock } from 'lucide-react';
+import { CreditCard, TrendingUp, Search, Download, DollarSign, Calendar, CheckCircle, Shield, Trophy, BarChart3, Eye, X, Moon, Mail, Users, UserPlus, UserX, UserCheck, Edit, Trash2, Save, XCircle, AlertTriangle, Clock, Bell, Activity, Zap, Wifi, WifiOff, ShoppingBag, Receipt, Wallet, PlusCircle, MinusCircle, ArrowDownUp, Settings, Building2, MailCheck, ChevronDown, ChevronUp, Volume2, Package, Rocket, Lock, Inbox } from 'lucide-react';
 import { createApiClient } from './services/api';
 import Sidebar from './components/Sidebar';
 import DashboardHeader from './components/DashboardHeader';
 import NotificacionesEnVivo from './components/NotificacionesEnVivo';
 import toast from 'react-hot-toast';
+import confetti from 'canvas-confetti';
 
 const PASSWORD_VALIDA = /^(?=.*[a-z])(?=.*[A-Z]).{8,}$/;
 const PASSWORD_ERROR = 'La contraseña debe tener mínimo 8 caracteres, con mayúsculas y minúsculas';
@@ -66,8 +68,7 @@ function Dashboard({ onLogout }) {
   const [vozSeleccionada, setVozSeleccionada] = useState(() => localStorage.getItem('fp_voz_notificacion') || '');
 
   // ─── Estado para Negocios (superadmin) ─────────────────
-  const [negocios, setNegocios] = useState([]);
-  const [cargandoNegocios, setCargandoNegocios] = useState(false);
+  // negocios/cargandoNegocios: ver useQuery mas abajo, junto a `api` (ensayo con TanStack Query)
   const [mostrarFormNegocio, setMostrarFormNegocio] = useState(false);
   const [editandoNegocio, setEditandoNegocio] = useState(null);
   const [formNegocio, setFormNegocio] = useState({ nombre: '', whatsapp: '', plan: 'basico' });
@@ -83,7 +84,8 @@ function Dashboard({ onLogout }) {
     const params = new URLSearchParams(window.location.search);
     const gmailResult = params.get('gmail');
     if (gmailResult === 'conectado') {
-      toast.success('Gmail conectado exitosamente');
+      toast.success('¡Gracias por conectar! Todo quedó correcto, ya puedes verificar pagos de tu banco.', { duration: 6000 });
+      confetti({ particleCount: 150, spread: 90, origin: { y: 0.6 } });
       // Limpiar URL
       const url = new URL(window.location.href);
       url.searchParams.delete('gmail');
@@ -120,6 +122,14 @@ function Dashboard({ onLogout }) {
   const [cargandoPeriodo, setCargandoPeriodo] = useState(false);
 
   const api = useMemo(() => createApiClient(onLogout), [onLogout]);
+  const queryClient = useQueryClient();
+
+  // ─── Negocios (superadmin) — ensayo con TanStack Query ─
+  const { data: negocios = [], isLoading: cargandoNegocios } = useQuery({
+    queryKey: ['negocios'],
+    queryFn: () => api.request('/api/negocios').then((d) => (d.ok ? d.negocios || [] : [])),
+    enabled: seccionActiva === 'negocios',
+  });
 
   const cambiarSeccion = (nuevaSeccion) => {
     if (nuevaSeccion === seccionActiva) {
@@ -188,10 +198,6 @@ function Dashboard({ onLogout }) {
 
   useEffect(() => {
     if (seccionActiva === 'configuracion') cargarConfiguracion();
-  }, [seccionActiva]);
-
-  useEffect(() => {
-    if (seccionActiva === 'negocios') cargarNegocios();
   }, [seccionActiva]);
 
   useEffect(() => {
@@ -348,16 +354,7 @@ function Dashboard({ onLogout }) {
   };
 
   // ─── Funciones de Negocios (superadmin) ────────────────
-  const cargarNegocios = async () => {
-    setCargandoNegocios(true);
-    try {
-      const data = await api.request('/api/negocios');
-      if (data.ok) setNegocios(Array.isArray(data.negocios) ? data.negocios : []);
-    } catch (err) {
-      console.error('Error cargando negocios:', err);
-    }
-    setCargandoNegocios(false);
-  };
+  const refrescarNegocios = () => queryClient.invalidateQueries({ queryKey: ['negocios'] });
 
   const crearNegocio = async () => {
     if (!formNegocio.nombre.trim()) {
@@ -373,7 +370,7 @@ function Dashboard({ onLogout }) {
         toast.success(`Negocio "${formNegocio.nombre}" creado exitosamente`);
         setFormNegocio({ nombre: '', whatsapp: '', plan: 'basico' });
         setMostrarFormNegocio(false);
-        cargarNegocios();
+        refrescarNegocios();
       } else {
         toast.error(data.error || 'Error creando negocio');
       }
@@ -393,7 +390,7 @@ function Dashboard({ onLogout }) {
         setEditandoNegocio(null);
         setMostrarFormNegocio(false);
         setFormNegocio({ nombre: '', whatsapp: '', plan: 'basico' });
-        cargarNegocios();
+        refrescarNegocios();
       } else {
         toast.error(data.error || 'Error actualizando');
       }
@@ -422,7 +419,7 @@ function Dashboard({ onLogout }) {
       });
       if (data.ok) {
         toast.success(n.activo ? `"${n.nombre}" desactivado` : `"${n.nombre}" reactivado`);
-        cargarNegocios();
+        refrescarNegocios();
       }
     } catch (err) {
       toast.error('Error de conexión');
@@ -829,9 +826,14 @@ function Dashboard({ onLogout }) {
         justifyContent: 'center', height: '100vh',
         background: 'linear-gradient(135deg, #1A1A2E 0%, #16213E 100%)'
       }}>
-        <img src="/logo.png" alt="FlashPago"
-          style={{ width: 80, height: 80, animation: 'pulse 1.5s infinite', marginBottom: '1.5rem' }}
-        />
+        <div style={{ position: 'relative', width: 90, height: 90, marginBottom: '1.5rem', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+          <Inbox size={58} color="#F57C00" style={{ animation: 'bandejaImpacto 1.6s infinite' }} />
+          <div style={{ position: 'absolute', animation: 'boltAtraviesa 1.6s infinite' }}>
+            <Zap size={34} color="#FFA726" fill="#FFA726" strokeWidth={1.5}
+              style={{ transform: 'scale(0.7, 1.3)', filter: 'drop-shadow(0 0 8px rgba(255,167,38,1)) drop-shadow(0 0 18px rgba(255,140,0,0.7))' }}
+            />
+          </div>
+        </div>
         <h2 style={{ color: '#F57C00', fontFamily: "'Space Grotesk',sans-serif", fontSize: '1.5rem', marginBottom: '0.5rem' }}>
           FlashPago
         </h2>
