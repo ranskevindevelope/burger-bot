@@ -147,14 +147,14 @@ body { font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Robo
 
 /* ─── TARJETAS ───────────────────────────────── */
 .tarjetas-grid { display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 1rem; margin-bottom: 1.5rem; }
-.tarjeta { background: var(--blanco); border: 1px solid rgba(232,232,240,0.7); border-radius: 14px; padding: 1.25rem; display: flex; align-items: flex-start; gap: 1rem; box-shadow: 0 5px 18px rgba(25,31,62,0.05); transition: transform 0.2s, box-shadow 0.2s; min-width: 0; }
+.tarjeta { background: var(--blanco); border: 1px solid rgba(232,232,240,0.7); border-radius: 14px; padding: 1.25rem; display: flex; align-items: flex-start; gap: 1rem; box-shadow: 0 5px 18px rgba(25,31,62,0.05); transition: transform 0.2s, box-shadow 0.2s; min-width: 0; overflow: hidden; }
 .tarjeta:hover { transform: translateY(-2px); box-shadow: 0 8px 22px rgba(25,31,62,0.09); }
 .tarjeta-clickable { border: 1px solid rgba(232,232,240,0.7); font: inherit; text-align: left; cursor: pointer; }
 .tarjeta-accent { border-left: 4px solid var(--naranja); }
 .tarjeta-icon { font-size: 1.8rem; line-height: 1; }
-.tarjeta-info { display: flex; flex-direction: column; min-width: 0; }
+.tarjeta-info { display: flex; flex-direction: column; min-width: 0; max-width: 100%; }
 .tarjeta-label { font-size: 0.8rem; color: var(--gris-texto); font-weight: 500; }
-.tarjeta-valor { font-size: 1.5rem; font-weight: 700; color: var(--oscuro); margin: 0.15rem 0; }
+.tarjeta-valor { font-size: 1.5rem; font-weight: 700; color: var(--oscuro); margin: 0.15rem 0; max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .tarjeta-accent .tarjeta-valor { color: var(--naranja); }
 .tarjeta-sub { font-size: 0.75rem; color: #999; }
 
