@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid, AreaChart, Area } from 'recharts';
+import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid, AreaChart, Area, PieChart, Pie, Cell, LineChart, Line, Legend } from 'recharts';
 import { CreditCard, TrendingUp, Search, Download, DollarSign, Calendar, CheckCircle, Shield, Trophy, BarChart3, Eye, X, Moon, Mail, Users, UserPlus, UserX, UserCheck, Edit, Trash2, Save, XCircle, AlertTriangle, Clock, Bell, Activity, Zap, Wifi, WifiOff, ShoppingBag, Receipt, Wallet, PlusCircle, MinusCircle, ArrowDownUp, Settings, Building2, MailCheck, ChevronDown, ChevronUp, Volume2, Package, Rocket, Lock, Inbox } from 'lucide-react';
 import { createApiClient } from './services/api';
 import Sidebar from './components/Sidebar';
@@ -1454,24 +1454,31 @@ function Dashboard({ onLogout }) {
                   </span>
                 </div>
                 {ventasPorHora.length > 1 ? (
-                  <div style={{ width: '100%', height: 90 }}>
+                  <div style={{ width: '100%', height: 190 }}>
                     <ResponsiveContainer width="100%" height="100%">
-                      <AreaChart data={ventasPorHora} margin={{ top: 8, right: 8, left: 8, bottom: 0 }}>
+                      <AreaChart data={ventasPorHora} margin={{ top: 12, right: 12, left: 0, bottom: 0 }}>
                         <defs>
                           <linearGradient id="ventasHoraFill" x1="0" y1="0" x2="0" y2="1">
-                            <stop offset="0%" stopColor="#F57C00" stopOpacity={0.25} />
-                            <stop offset="100%" stopColor="#F57C00" stopOpacity={0} />
+                            <stop offset="0%" stopColor="#F57C00" stopOpacity={0.35} />
+                            <stop offset="100%" stopColor="#F57C00" stopOpacity={0.02} />
                           </linearGradient>
                         </defs>
+                        <CartesianGrid strokeDasharray="3 3" stroke="rgba(0,0,0,0.06)" vertical={false} />
                         <XAxis dataKey="etiqueta" tick={{ fontSize: 10, fill: '#999' }} axisLine={false} tickLine={false} interval="preserveStartEnd" />
+                        <YAxis
+                          tickFormatter={(v) => v >= 1000 ? `$${Math.round(v / 1000)}k` : `$${v}`}
+                          tick={{ fontSize: 10, fill: '#999' }} axisLine={false} tickLine={false} width={44}
+                        />
                         <Tooltip
                           formatter={(value) => [formatearMonto(value), 'Ventas']}
                           labelFormatter={(label) => `Hora ${label}`}
-                          contentStyle={{ borderRadius: 8, border: '1px solid #e8e8f0', fontSize: '0.8rem' }}
+                          cursor={{ stroke: '#F57C00', strokeWidth: 1, strokeDasharray: '4 4' }}
+                          contentStyle={{ borderRadius: 10, border: '1px solid #e8e8f0', fontSize: '0.8rem', boxShadow: '0 8px 20px rgba(25,31,62,0.12)' }}
                         />
                         <Area
-                          type="monotone" dataKey="total" stroke="#F57C00" strokeWidth={2}
+                          type="monotone" dataKey="total" stroke="#F57C00" strokeWidth={2.5}
                           fill="url(#ventasHoraFill)"
+                          activeDot={{ r: 5, fill: '#F57C00', stroke: '#fff', strokeWidth: 2 }}
                           dot={(dotProps) => {
                             const { cx, cy, index } = dotProps;
                             if (index !== ventasPorHora.length - 1) return null;
@@ -2145,18 +2152,25 @@ function Dashboard({ onLogout }) {
                       <h2 className="seccion-titulo"><BarChart3 size={18} /> Ventas vs Efectivo (7 días)</h2>
                       <div className="grafica-container">
                         <ResponsiveContainer width="100%" height={260}>
-                          <BarChart data={ventasSemanal.dias.map(d => ({
-                            fecha: d.fecha?.slice(0, 5) || '',
+                          <LineChart data={ventasSemanal.dias.map(d => ({
+                            fecha: (d.fecha || '').split('/').slice(0, 2).join('/'),
                             ventas: Math.round(d.total_ventas / 1000),
                             efectivo: Math.round(d.total_efectivo / 1000),
-                          }))}>
-                            <CartesianGrid strokeDasharray="3 3" stroke="rgba(0,0,0,0.06)" />
-                            <XAxis dataKey="fecha" tick={{ fontSize: 11 }} />
-                            <YAxis tickFormatter={(v) => `$${v}k`} tick={{ fontSize: 11 }} />
-                            <Tooltip formatter={(value, name) => [formatearMonto(value * 1000), name === 'ventas' ? 'Ventas' : 'Efectivo']} />
-                            <Bar dataKey="ventas" fill="#F57C00" radius={[6, 6, 0, 0]} name="ventas" />
-                            <Bar dataKey="efectivo" fill="#43A047" radius={[6, 6, 0, 0]} name="efectivo" />
-                          </BarChart>
+                          }))} margin={{ top: 8, right: 12, left: 0, bottom: 0 }}>
+                            <CartesianGrid strokeDasharray="3 3" stroke="rgba(0,0,0,0.06)" vertical={false} />
+                            <XAxis dataKey="fecha" tick={{ fontSize: 11, fill: '#999' }} axisLine={false} tickLine={false} />
+                            <YAxis tickFormatter={(v) => `$${v}k`} tick={{ fontSize: 11, fill: '#999' }} axisLine={false} tickLine={false} width={44} />
+                            <Tooltip
+                              formatter={(value, name) => [formatearMonto(value * 1000), name === 'ventas' ? 'Ventas' : 'Efectivo']}
+                              contentStyle={{ borderRadius: 10, border: '1px solid #e8e8f0', fontSize: '0.8rem', boxShadow: '0 8px 20px rgba(25,31,62,0.12)' }}
+                            />
+                            <Legend
+                              formatter={(value) => (value === 'ventas' ? 'Ventas' : 'Efectivo')}
+                              wrapperStyle={{ fontSize: '0.8rem' }}
+                            />
+                            <Line type="monotone" dataKey="ventas" name="ventas" stroke="#F57C00" strokeWidth={2.5} dot={{ r: 4, fill: '#F57C00', strokeWidth: 0 }} activeDot={{ r: 6 }} />
+                            <Line type="monotone" dataKey="efectivo" name="efectivo" stroke="#43A047" strokeWidth={2.5} dot={{ r: 4, fill: '#43A047', strokeWidth: 0 }} activeDot={{ r: 6 }} />
+                          </LineChart>
                         </ResponsiveContainer>
                       </div>
                     </div>
@@ -2208,7 +2222,7 @@ function Dashboard({ onLogout }) {
                   {/* Gastos por categoría */}
                   {ventasGastosCategorias.length > 0 && (
                     <>
-                      <div className="tarjetas-grid">
+                      <div className="tarjetas-grid" style={{ gridTemplateColumns: 'minmax(0, 320px)' }}>
                         <div className="tarjeta tarjeta-accent">
                           <div className="tarjeta-icon-box tarjeta-icon-rojo"><MinusCircle size={22} /></div>
                           <div className="tarjeta-info">
@@ -2223,34 +2237,59 @@ function Dashboard({ onLogout }) {
 
                       <div className="seccion">
                         <h2 className="seccion-titulo"><BarChart3 size={18} /> Gastos por categoría (30 días)</h2>
-                        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.6rem', marginTop: '1rem' }}>
-                          {ventasGastosCategorias.map((cat) => {
-                            const max = Math.max(...ventasGastosCategorias.map(c => c.total));
-                            const pct = max > 0 ? Math.round((cat.total / max) * 100) : 0;
-                            return (
-                              <div key={cat.categoria}>
-                                <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.25rem' }}>
-                                  <span style={{ fontSize: '0.85rem', fontWeight: 500, display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
-                                    <span style={{
-                                      width: 10, height: 10, borderRadius: '50%',
-                                      background: getCategoriaColor(cat.categoria),
-                                    }} />
+                        <div style={{ display: 'flex', gap: '2rem', flexWrap: 'wrap', alignItems: 'center', marginTop: '1rem' }}>
+                          <div style={{ position: 'relative', width: 190, height: 190, flexShrink: 0, margin: '0 auto' }}>
+                            <ResponsiveContainer width="100%" height="100%">
+                              <PieChart>
+                                <Pie
+                                  data={ventasGastosCategorias}
+                                  dataKey="total"
+                                  nameKey="categoria"
+                                  innerRadius={58}
+                                  outerRadius={85}
+                                  paddingAngle={2}
+                                  startAngle={90}
+                                  endAngle={-270}
+                                  stroke="none"
+                                >
+                                  {ventasGastosCategorias.map((cat) => (
+                                    <Cell key={cat.categoria} fill={getCategoriaColor(cat.categoria)} />
+                                  ))}
+                                </Pie>
+                                <Tooltip
+                                  formatter={(value, _name, props) => [formatearMonto(value), getCategoriaLabel(props.payload.categoria)]}
+                                  contentStyle={{ borderRadius: 8, border: '1px solid #e8e8f0', fontSize: '0.8rem' }}
+                                />
+                              </PieChart>
+                            </ResponsiveContainer>
+                            <div style={{
+                              position: 'absolute', top: '50%', left: '50%', transform: 'translate(-50%, -50%)',
+                              textAlign: 'center', pointerEvents: 'none',
+                            }}>
+                              <div style={{ fontSize: '0.7rem', color: '#999' }}>Total</div>
+                              <div style={{ fontSize: '1.05rem', fontWeight: 700, color: '#E53935' }}>
+                                {formatearMonto(ventasGastosCategorias.reduce((s, c) => s + c.total, 0))}
+                              </div>
+                            </div>
+                          </div>
+                          <div style={{ flex: 1, minWidth: 220, display: 'flex', flexDirection: 'column', gap: '0.65rem' }}>
+                            {ventasGastosCategorias.map((cat) => {
+                              const totalGeneral = ventasGastosCategorias.reduce((s, c) => s + c.total, 0);
+                              const pct = totalGeneral > 0 ? Math.round((cat.total / totalGeneral) * 100) : 0;
+                              return (
+                                <div key={cat.categoria} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                                  <span style={{ fontSize: '0.85rem', fontWeight: 500, display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                                    <span style={{ width: 10, height: 10, borderRadius: '50%', background: getCategoriaColor(cat.categoria), flexShrink: 0 }} />
                                     {getCategoriaLabel(cat.categoria)}
                                   </span>
-                                  <span style={{ fontSize: '0.85rem', fontWeight: 600, color: '#E53935' }}>
-                                    {formatearMonto(cat.total)} <span style={{ color: '#999', fontWeight: 400 }}>({cat.cantidad})</span>
+                                  <span style={{ fontSize: '0.85rem', textAlign: 'right' }}>
+                                    <strong style={{ color: '#1a1a2e' }}>{formatearMonto(cat.total)}</strong>{' '}
+                                    <span style={{ color: '#999' }}>({pct}% · {cat.cantidad})</span>
                                   </span>
                                 </div>
-                                <div style={{ height: 8, background: '#f0f0f5', borderRadius: 4, overflow: 'hidden' }}>
-                                  <div style={{
-                                    width: `${pct}%`, height: '100%',
-                                    background: getCategoriaColor(cat.categoria),
-                                    borderRadius: 4, transition: 'width 0.5s ease',
-                                  }} />
-                                </div>
-                              </div>
-                            );
-                          })}
+                              );
+                            })}
+                          </div>
                         </div>
                       </div>
                     </>
