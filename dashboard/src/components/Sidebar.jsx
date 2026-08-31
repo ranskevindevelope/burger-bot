@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
-import { CreditCard, Download, LayoutDashboard, LogOut, Search, TrendingUp, Users, AlertTriangle, Menu, X, ShoppingBag, Settings, Building2 } from 'lucide-react';
+import { CreditCard, Download, LayoutDashboard, LogOut, Search, TrendingUp, Users, AlertTriangle, Menu, X, ShoppingBag, Settings, Building2, Sun, Moon } from 'lucide-react';
 
-function Sidebar({ activeSection, isOpen, isAdmin, isSuperAdmin, paymentCount, userCount, negocioNombre, onSectionChange, onLogout }) {
+function Sidebar({ activeSection, isOpen, isAdmin, isSuperAdmin, paymentCount, userCount, negocioNombre, onSectionChange, onLogout, tema, onToggleTema }) {
   const [fijado, setFijado] = useState(() => {
     try {
       return localStorage.getItem('fp_sidebar_fijado') === '1';
@@ -97,6 +97,14 @@ function Sidebar({ activeSection, isOpen, isAdmin, isSuperAdmin, paymentCount, u
 
       <div className="sidebar-footer">
         {expandido && <div className="sidebar-section-label">CUENTA</div>}
+        <button
+          className="sidebar-item"
+          onClick={onToggleTema}
+          title={!expandido ? (tema === 'dark' ? 'Modo claro' : 'Modo oscuro') : ''}
+        >
+          <span className="sidebar-item-icon">{tema === 'dark' ? <Sun size={18} /> : <Moon size={18} />}</span>
+          {expandido && <span>{tema === 'dark' ? 'Modo claro' : 'Modo oscuro'}</span>}
+        </button>
         <button className="sidebar-item" onClick={onLogout} title={!expandido ? 'Cerrar sesión' : ''}>
           <span className="sidebar-item-icon"><LogOut size={18} /></span>
           {expandido && <span>Cerrar sesión</span>}

@@ -99,14 +99,22 @@ export default function Privacidad({ onVolver }) {
               responsables independientes):
             </p>
             <p style={{ marginTop: "0.75rem" }}>
-              <strong>Anthropic (Claude):</strong> procesa la imagen del comprobante para extraer monto, banco,
-              referencia y fecha. No se envían contraseñas ni datos financieros distintos a los del comprobante.<br />
-              <strong>Google (Gmail API):</strong> se usa, únicamente con autorización del negocio, para leer
-              notificaciones bancarias y confirmar pagos. No se accede a correos personales ni contactos.<br />
-              <strong>Prometeo:</strong> verificación bancaria complementaria, cuando el negocio la tiene activada.<br />
-              <strong>Proveedor de infraestructura de WhatsApp (OpenWA):</strong> intermediario técnico para enviar
-              y recibir los mensajes del bot.<br />
-              <strong>Proveedor de hosting (VPS):</strong> almacena la base de datos y las imágenes de comprobantes.
+              <strong>Lectura automática del comprobante:</strong> para leer el monto, el banco, la referencia y la
+              fecha de la foto que envías por WhatsApp, usamos un servicio de inteligencia artificial (Anthropic).
+              Solo procesa la imagen del comprobante — nunca contraseñas ni otros datos financieros.<br />
+              <strong>Confirmación con tu banco:</strong> para confirmar tus pagos automáticamente, comparamos los
+              comprobantes con las notificaciones que tu banco te envía por correo. Esto requiere que el negocio
+              autorice el acceso una sola vez a través de Google; FlashPago solo revisa esas notificaciones
+              bancarias, nunca correos personales ni contactos, y esa autorización se puede revocar cuando quieras.<br />
+              <strong>Verificación bancaria complementaria (Prometeo):</strong> un método adicional de confirmación
+              directa con el banco, cuando el negocio lo tiene activado.<br />
+              <strong>Cobro de tu suscripción (Wompi):</strong> el pago de tu plan de FlashPago se procesa a través
+              de Wompi, una pasarela de pagos certificada. FlashPago nunca ve ni almacena el número de tu tarjeta —
+              eso lo maneja Wompi directamente.<br />
+              <strong>Envío de mensajes (OpenWA):</strong> intermediario técnico para enviar y recibir los mensajes
+              del bot de WhatsApp.<br />
+              <strong>Hosting:</strong> el proveedor donde vive el servidor almacena la base de datos y las imágenes
+              de comprobantes de forma segura.
             </p>
             <p style={{ marginTop: "0.75rem" }}>
               Todos los encargados están obligados contractualmente o por sus propios términos de servicio a

@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid, AreaChart, Area, PieChart, Pie, Cell, LineChart, Line, Legend } from 'recharts';
-import { CreditCard, TrendingUp, Search, Download, DollarSign, Calendar, CheckCircle, Shield, Trophy, BarChart3, Eye, X, Moon, Mail, Users, UserPlus, UserX, UserCheck, Edit, Trash2, Save, XCircle, AlertTriangle, Clock, Bell, Activity, Zap, Wifi, WifiOff, ShoppingBag, Receipt, Wallet, PlusCircle, MinusCircle, ArrowDownUp, Settings, Building2, MailCheck, ChevronDown, ChevronUp, Volume2, Package, Rocket, Lock, Inbox } from 'lucide-react';
+import { CreditCard, TrendingUp, Search, Download, DollarSign, Calendar, CheckCircle, Shield, Trophy, BarChart3, Eye, X, Moon, Mail, Users, UserPlus, UserX, UserCheck, Edit, Trash2, Save, XCircle, AlertTriangle, Clock, Bell, Activity, Zap, Wifi, WifiOff, ShoppingBag, Receipt, Wallet, PlusCircle, MinusCircle, ArrowDownUp, Settings, Building2, MailCheck, ChevronDown, ChevronUp, Volume2, Package, Rocket, Lock, Inbox, Circle, ChevronRight } from 'lucide-react';
 import { createApiClient } from './services/api';
 import Sidebar from './components/Sidebar';
 import DashboardHeader from './components/DashboardHeader';
@@ -39,6 +39,26 @@ function Dashboard({ onLogout }) {
   const [fotoActiva, setFotoActiva] = useState(null);
   const [seccionActiva, setSeccionActiva] = useState(getInitialSection);
   const [sidebarAbierto, setSidebarAbierto] = useState(false);
+  const [onboardingOculto, setOnboardingOculto] = useState(() => {
+    try { return localStorage.getItem('fp_onboarding_oculto') === '1'; } catch { return false; }
+  });
+  const [configVisitada, setConfigVisitada] = useState(() => {
+    try { return localStorage.getItem('fp_config_visitada') === '1'; } catch { return false; }
+  });
+  const ocultarOnboarding = () => {
+    setOnboardingOculto(true);
+    try { localStorage.setItem('fp_onboarding_oculto', '1'); } catch { /* no disponible */ }
+  };
+  const [tema, setTema] = useState(() => {
+    try { return localStorage.getItem('fp_tema') || 'light'; } catch { return 'light'; }
+  });
+  const alternarTema = () => {
+    setTema((prev) => {
+      const nuevo = prev === 'dark' ? 'light' : 'dark';
+      try { localStorage.setItem('fp_tema', nuevo); } catch { /* localStorage no disponible */ }
+      return nuevo;
+    });
+  };
   const [sidebarFijado, setSidebarFijado] = useState(false);
   const [sidebarHover, setSidebarHover] = useState(false);
   const sidebarExpandido = sidebarFijado || sidebarHover || sidebarAbierto;
@@ -132,6 +152,11 @@ function Dashboard({ onLogout }) {
   });
 
   const cambiarSeccion = (nuevaSeccion) => {
+    if (nuevaSeccion === 'configuracion' && !configVisitada) {
+      setConfigVisitada(true);
+      try { localStorage.setItem('fp_config_visitada', '1'); } catch { /* no disponible */ }
+    }
+
     if (nuevaSeccion === seccionActiva) {
       setSidebarAbierto(false);
       return;
@@ -852,7 +877,7 @@ function Dashboard({ onLogout }) {
   }
 
   return (
-    <div className="layout">
+    <div className="layout" data-theme={tema === 'dark' ? 'dark' : undefined}>
       <NotificacionesEnVivo onLogout={onLogout} />
       {sidebarAbierto && <div className="sidebar-overlay" onClick={() => setSidebarAbierto(false)} />}
       <Sidebar
@@ -865,6 +890,8 @@ function Dashboard({ onLogout }) {
         userCount={usuarios.length}
         onSectionChange={(section) => cambiarSeccion(section)}
         onLogout={onLogout}
+        tema={tema}
+        onToggleTema={alternarTema}
       />
 
       {/* MAIN CONTENT */}
@@ -883,7 +910,7 @@ function Dashboard({ onLogout }) {
             }}>
               <span style={{
                 display: 'inline-flex', alignItems: 'center', gap: 6,
-                background: '#FFF3E0', color: '#E65100', fontSize: 11, fontWeight: 700,
+                background: 'var(--tint-orange-bg)', color: 'var(--tint-orange-fg)', fontSize: 11, fontWeight: 700,
                 letterSpacing: 0.8, textTransform: 'uppercase', padding: '0.35rem 0.9rem',
                 borderRadius: 50, marginBottom: '1.25rem',
               }}>
@@ -898,10 +925,10 @@ function Dashboard({ onLogout }) {
               }}>
                 <Clock size={34} color="#fff" strokeWidth={2} />
               </div>
-              <h2 style={{ fontFamily: "'Space Grotesk',sans-serif", fontSize: '1.7rem', fontWeight: 700, color: '#1a1a2e', marginBottom: '0.6rem' }}>
+              <h2 style={{ fontFamily: "'Space Grotesk',sans-serif", fontSize: '1.7rem', fontWeight: 700, color: 'var(--dash-text)', marginBottom: '0.6rem' }}>
                 Tu prueba gratuita terminó
               </h2>
-              <p style={{ fontSize: '0.95rem', color: '#666', maxWidth: 460, lineHeight: 1.6, marginBottom: '2.5rem' }}>
+              <p style={{ fontSize: '0.95rem', color: 'var(--dash-text-muted)', maxWidth: 460, lineHeight: 1.6, marginBottom: '2.5rem' }}>
                 El bot dejó de verificar comprobantes y el dashboard está suspendido. Elige un plan para
                 reactivar tu cuenta al instante — tu historial de pagos queda intacto.
               </p>
@@ -921,9 +948,9 @@ function Dashboard({ onLogout }) {
                 ].map((p) => (
                   <div key={p.nombre} style={{
                     display: 'flex', flexDirection: 'column',
-                    border: p.popular ? `2px solid #F57C00` : '1px solid #e8e8f0',
+                    border: p.popular ? `2px solid #F57C00` : '1px solid var(--dash-border)',
                     borderRadius: 18, padding: '1.75rem 1.25rem', position: 'relative',
-                    background: p.popular ? 'linear-gradient(180deg, rgba(245,124,0,0.04) 0%, #fff 100%)' : '#fff',
+                    background: p.popular ? 'linear-gradient(180deg, rgba(245,124,0,0.04) 0%, var(--dash-surface) 100%)' : 'var(--dash-surface)',
                     boxShadow: p.popular ? '0 12px 34px rgba(245,124,0,0.16)' : '0 4px 16px rgba(20,20,40,0.05)',
                     transform: p.popular ? 'translateY(-6px)' : 'none',
                   }}>
@@ -937,18 +964,18 @@ function Dashboard({ onLogout }) {
                     <div style={{
                       width: 44, height: 44, borderRadius: 12, margin: '0 auto 1rem',
                       display: 'flex', alignItems: 'center', justifyContent: 'center',
-                      background: p.popular ? '#F57C00' : '#FFF3E0',
+                      background: p.popular ? '#F57C00' : 'var(--tint-orange-bg)',
                     }}>
                       <p.Icono size={21} color={p.popular ? '#fff' : '#F57C00'} strokeWidth={2} />
                     </div>
-                    <div style={{ fontFamily: "'Space Grotesk',sans-serif", fontSize: 16, fontWeight: 600, color: '#1a1a2e', marginBottom: 4 }}>{p.nombre}</div>
-                    <div style={{ fontFamily: "'Space Grotesk',sans-serif", fontSize: 28, fontWeight: 700, color: '#1a1a2e', lineHeight: 1.2 }}>{p.precio}</div>
-                    <div style={{ fontSize: 11, color: '#999', marginBottom: '1.1rem' }}>por mes</div>
+                    <div style={{ fontFamily: "'Space Grotesk',sans-serif", fontSize: 16, fontWeight: 600, color: 'var(--dash-text)', marginBottom: 4 }}>{p.nombre}</div>
+                    <div style={{ fontFamily: "'Space Grotesk',sans-serif", fontSize: 28, fontWeight: 700, color: 'var(--dash-text)', lineHeight: 1.2 }}>{p.precio}</div>
+                    <div style={{ fontSize: 11, color: 'var(--dash-text-faint)', marginBottom: '1.1rem' }}>por mes</div>
                     <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginBottom: '1.5rem', flexGrow: 1, textAlign: 'left' }}>
                       {p.features.map((f) => (
                         <div key={f} style={{ display: 'flex', alignItems: 'flex-start', gap: 8 }}>
                           <CheckCircle size={14} color="#43A047" style={{ flexShrink: 0, marginTop: 2 }} />
-                          <span style={{ fontSize: 12.5, color: '#555', lineHeight: 1.4 }}>{f}</span>
+                          <span style={{ fontSize: 12.5, color: 'var(--dash-text-muted)', lineHeight: 1.4 }}>{f}</span>
                         </div>
                       ))}
                     </div>
@@ -970,10 +997,10 @@ function Dashboard({ onLogout }) {
 
               <div style={{
                 display: 'inline-flex', alignItems: 'center', gap: 8,
-                background: '#f8f8fc', borderRadius: 50, padding: '0.7rem 1.5rem',
+                background: 'var(--dash-surface-2)', borderRadius: 50, padding: '0.7rem 1.5rem',
               }}>
-                <Shield size={15} color="#999" style={{ flexShrink: 0 }} />
-                <span style={{ fontSize: '0.82rem', color: '#666' }}>
+                <Shield size={15} color="var(--dash-text-faint)" style={{ flexShrink: 0 }} />
+                <span style={{ fontSize: '0.82rem', color: 'var(--dash-text-muted)' }}>
                   Pago seguro procesado por Wompi. Tus datos están protegidos.
                 </span>
               </div>
@@ -1070,8 +1097,8 @@ function Dashboard({ onLogout }) {
                       style={{
                         display: 'flex', alignItems: 'center', gap: '0.35rem',
                         padding: '0.35rem 0.75rem', borderRadius: 8, fontSize: '0.78rem', fontWeight: 600,
-                        background: gmailEstado.conectado ? '#E8F5E9' : '#FFF3E0',
-                        color: gmailEstado.conectado ? '#2E7D32' : '#E65100',
+                        background: gmailEstado.conectado ? 'var(--tint-green-bg)' : 'var(--tint-orange-bg)',
+                        color: gmailEstado.conectado ? 'var(--tint-green-fg)' : 'var(--tint-orange-fg)',
                         border: 'none', cursor: gmailCargando ? 'wait' : 'pointer',
                         transition: 'all 0.2s',
                       }}
@@ -1084,15 +1111,104 @@ function Dashboard({ onLogout }) {
                 </div>
               </div>
 
+              {/* ─── Primeros pasos (onboarding) ─────── */}
+              {esAdmin && !onboardingOculto && (() => {
+                const pasos = [
+                  {
+                    id: 'gmail', icon: Mail, titulo: 'Conecta tu Gmail',
+                    desc: 'Verifica los pagos automáticamente comparando con las notificaciones de tu banco.',
+                    hecho: !!gmailEstado?.conectado, accion: () => cambiarSeccion('panel'),
+                  },
+                  {
+                    id: 'pago', icon: CreditCard, titulo: 'Recibe tu primer pago verificado',
+                    desc: 'Pide a un empleado que envíe un comprobante por WhatsApp para probar el flujo.',
+                    hecho: (totales?.mes?.cantidad || 0) > 0, accion: () => cambiarSeccion('pagos'),
+                  },
+                  {
+                    id: 'equipo', icon: Users, titulo: 'Agrega a tu equipo',
+                    desc: 'Invita a tus empleados para que puedan enviar comprobantes desde su WhatsApp.',
+                    hecho: usuarios.length > 1, accion: () => cambiarSeccion('usuarios'),
+                  },
+                  {
+                    id: 'horario', icon: Settings, titulo: 'Configura tu horario',
+                    desc: 'Define cuándo cierra tu negocio para los reportes y verificaciones automáticas.',
+                    hecho: configVisitada, accion: () => cambiarSeccion('configuracion'),
+                  },
+                ];
+                const completados = pasos.filter(p => p.hecho).length;
+                if (completados === pasos.length) return null;
+
+                return (
+                  <div className="seccion" style={{ marginBottom: '1.25rem' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '1rem', gap: '1rem' }}>
+                      <div>
+                        <h2 className="seccion-titulo" style={{ marginBottom: '0.3rem' }}><Rocket size={18} /> Primeros pasos</h2>
+                        <p style={{ fontSize: '0.85rem', color: 'var(--dash-text-muted)' }}>
+                          {completados} de {pasos.length} completados — dejá listo tu negocio en FlashPago.
+                        </p>
+                      </div>
+                      <button
+                        onClick={ocultarOnboarding}
+                        title="Ocultar"
+                        style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--dash-text-faint)', padding: 4, flexShrink: 0 }}
+                      >
+                        <X size={18} />
+                      </button>
+                    </div>
+
+                    <div style={{ height: 6, background: 'var(--dash-border-soft)', borderRadius: 3, marginBottom: '1.25rem', overflow: 'hidden' }}>
+                      <div style={{
+                        height: '100%', width: `${(completados / pasos.length) * 100}%`,
+                        background: '#F57C00', borderRadius: 3, transition: 'width 0.4s ease',
+                      }} />
+                    </div>
+
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: '0.9rem' }}>
+                      {pasos.map((p) => (
+                        <button
+                          key={p.id}
+                          onClick={p.accion}
+                          disabled={p.hecho}
+                          style={{
+                            display: 'flex', alignItems: 'flex-start', gap: '0.75rem', textAlign: 'left',
+                            padding: '0.9rem', borderRadius: 10, border: '1px solid var(--dash-border)',
+                            background: p.hecho ? 'var(--tint-green-bg)' : 'var(--dash-surface-2)',
+                            cursor: p.hecho ? 'default' : 'pointer', transition: 'all 0.2s', width: '100%',
+                          }}
+                        >
+                          {p.hecho
+                            ? <CheckCircle size={20} color="var(--tint-green-fg)" style={{ flexShrink: 0, marginTop: 1 }} />
+                            : <Circle size={20} color="var(--dash-text-faint)" style={{ flexShrink: 0, marginTop: 1 }} />
+                          }
+                          <div style={{ flex: 1, minWidth: 0 }}>
+                            <div style={{
+                              fontWeight: 600, fontSize: '0.85rem', display: 'flex', alignItems: 'center', gap: '0.4rem',
+                              color: p.hecho ? 'var(--tint-green-fg)' : 'var(--dash-text)',
+                              textDecoration: p.hecho ? 'line-through' : 'none',
+                            }}>
+                              <p.icon size={14} /> {p.titulo}
+                            </div>
+                            <div style={{ fontSize: '0.78rem', color: 'var(--dash-text-muted)', marginTop: 3, lineHeight: 1.4 }}>
+                              {p.desc}
+                            </div>
+                          </div>
+                          {!p.hecho && <ChevronRight size={16} color="var(--dash-text-faint)" style={{ flexShrink: 0, marginTop: 2 }} />}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                );
+              })()}
+
               {/* ─── Banner de trial ────────────────── */}
               {planInfo?.trial && !planInfo.trial.pagado && planInfo.trial.trial_fin && (
                 <div style={{
                   background: planInfo.trial.activo
-                    ? planInfo.trial.dias <= 3 ? '#FFF3E0' : '#E3F2FD'
-                    : '#FFEBEE',
+                    ? planInfo.trial.dias <= 3 ? 'var(--tint-orange-bg)' : 'var(--tint-blue-bg)'
+                    : 'var(--tint-red-bg)',
                   border: `1px solid ${planInfo.trial.activo
-                    ? planInfo.trial.dias <= 3 ? '#FFE0B2' : '#BBDEFB'
-                    : '#FFCDD2'}`,
+                    ? planInfo.trial.dias <= 3 ? 'var(--tint-orange-fg)' : 'var(--tint-blue-fg)'
+                    : 'var(--tint-red-fg)'}`,
                   borderRadius: 12, padding: '1rem 1.25rem', marginBottom: '1rem',
                   display: 'flex', alignItems: 'center', gap: '1rem', flexWrap: 'wrap',
                 }}>
@@ -1112,8 +1228,8 @@ function Dashboard({ onLogout }) {
                     <div style={{
                       fontWeight: 600, fontSize: '0.9rem',
                       color: planInfo.trial.activo
-                        ? planInfo.trial.dias <= 3 ? '#E65100' : '#0D47A1'
-                        : '#C62828',
+                        ? planInfo.trial.dias <= 3 ? 'var(--tint-orange-fg)' : 'var(--tint-blue-fg)'
+                        : 'var(--tint-red-fg)',
                     }}>
                       {planInfo.trial.activo
                         ? `Prueba gratuita — ${planInfo.trial.dias} día${planInfo.trial.dias === 1 ? '' : 's'} restante${planInfo.trial.dias === 1 ? '' : 's'}`
@@ -1123,8 +1239,8 @@ function Dashboard({ onLogout }) {
                     <div style={{
                       fontSize: '0.78rem', marginTop: 2,
                       color: planInfo.trial.activo
-                        ? planInfo.trial.dias <= 3 ? '#E65100' : '#1565C0'
-                        : '#C62828',
+                        ? planInfo.trial.dias <= 3 ? 'var(--tint-orange-fg)' : 'var(--tint-blue-fg)'
+                        : 'var(--tint-red-fg)',
                     }}>
                       {planInfo.trial.activo
                         ? planInfo.trial.dias <= 3
@@ -1165,19 +1281,19 @@ function Dashboard({ onLogout }) {
               {/* ─── Barra de progreso del plan ────── */}
               {planInfo && (
                 <div className="plan-usage-bar" style={{
-                  background: '#fff', borderRadius: 12, padding: '1rem 1.25rem',
-                  marginBottom: '1.25rem', border: '1px solid #e8e8f0',
+                  background: 'var(--dash-surface)', borderRadius: 12, padding: '1rem 1.25rem',
+                  marginBottom: '1.25rem', border: '1px solid var(--dash-border)',
                   display: 'flex', alignItems: 'center', gap: '1rem', flexWrap: 'wrap',
                 }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
                     <Zap size={18} color="#F57C00" />
-                    <span style={{ fontWeight: 700, fontSize: '0.85rem', color: '#1a1a2e' }}>
+                    <span style={{ fontWeight: 700, fontSize: '0.85rem', color: 'var(--dash-text)' }}>
                       Plan {getPlanLabel(planInfo.plan)}
                     </span>
                   </div>
                   <div style={{ flex: 1, minWidth: 150 }}>
                     <div style={{
-                      height: 8, background: '#f0f0f5', borderRadius: 4, overflow: 'hidden',
+                      height: 8, background: 'var(--dash-surface-2)', borderRadius: 4, overflow: 'hidden',
                     }}>
                       <div style={{
                         width: `${Math.min(planInfo.porcentaje, 100)}%`,
@@ -1200,21 +1316,21 @@ function Dashboard({ onLogout }) {
               {/* Tarjeta de conectar Gmail */}
               {gmailEstado && !gmailEstado.conectado && esAdmin && (
                 <div style={{
-                  background: '#fff', borderRadius: 12, padding: '1rem 1.25rem',
-                  marginBottom: '1.25rem', border: '2px solid #FFF3E0',
+                  background: 'var(--dash-surface)', borderRadius: 12, padding: '1rem 1.25rem',
+                  marginBottom: '1.25rem', border: '2px solid var(--tint-orange-bg)',
                   display: 'flex', alignItems: 'center', gap: '1rem', flexWrap: 'wrap',
                 }}>
                   <div style={{
-                    width: 44, height: 44, borderRadius: 12, background: '#FFF3E0',
+                    width: 44, height: 44, borderRadius: 12, background: 'var(--tint-orange-bg)',
                     display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0,
                   }}>
-                    <Mail size={22} color="#E65100" />
+                    <Mail size={22} color="var(--tint-orange-fg)" />
                   </div>
                   <div style={{ flex: 1, minWidth: 200 }}>
-                    <div style={{ fontWeight: 600, fontSize: '0.9rem', color: '#1a1a2e' }}>
+                    <div style={{ fontWeight: 600, fontSize: '0.9rem', color: 'var(--dash-text)' }}>
                       Conecta tu Gmail para verificar pagos
                     </div>
-                    <div style={{ fontSize: '0.78rem', color: '#666', marginTop: 2 }}>
+                    <div style={{ fontSize: '0.78rem', color: 'var(--dash-text-muted)', marginTop: 2 }}>
                       FlashPago necesita leer las notificaciones de tu banco para verificar comprobantes automáticamente.
                     </div>
                   </div>
@@ -1271,7 +1387,7 @@ function Dashboard({ onLogout }) {
                 </div>
 
                 <div className="tarjeta" style={pendientes.cantidad > 0 ? { borderLeft: '3px solid #E53935' } : {}}>
-                  <div className="tarjeta-icon-box tarjeta-icon-naranja" style={pendientes.cantidad > 0 ? { background: '#FFEBEE' } : {}}>
+                  <div className="tarjeta-icon-box tarjeta-icon-naranja" style={pendientes.cantidad > 0 ? { background: 'var(--tint-red-bg)' } : {}}>
                     <Clock size={22} color={pendientes.cantidad > 0 ? '#E53935' : '#F57C00'} />
                   </div>
                   <div className="tarjeta-info">
@@ -1308,9 +1424,9 @@ function Dashboard({ onLogout }) {
                     <h2 className="seccion-titulo"><BarChart3 size={18} /> Ventas por día</h2>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
                       <button onClick={() => cambiarMes(-1)} style={{
-                        width: 28, height: 28, borderRadius: 8, border: '2px solid #e8e8f0',
+                        width: 28, height: 28, borderRadius: 8, border: '2px solid var(--dash-border)',
                         background: 'transparent', cursor: 'pointer', display: 'flex',
-                        alignItems: 'center', justifyContent: 'center', fontSize: '0.9rem', color: '#4a4a68',
+                        alignItems: 'center', justifyContent: 'center', fontSize: '0.9rem', color: 'var(--dash-text-muted)',
                       }}>‹</button>
                       <div style={{
                         padding: '0.3rem 0.7rem', borderRadius: 8, background: '#F57C00',
@@ -1319,10 +1435,10 @@ function Dashboard({ onLogout }) {
                         {mesesNombres[periodoMes - 1]} {periodoAnio}
                       </div>
                       <button onClick={() => cambiarMes(1)} disabled={esMesActual} style={{
-                        width: 28, height: 28, borderRadius: 8, border: '2px solid #e8e8f0',
+                        width: 28, height: 28, borderRadius: 8, border: '2px solid var(--dash-border)',
                         background: 'transparent', cursor: esMesActual ? 'default' : 'pointer',
                         display: 'flex', alignItems: 'center', justifyContent: 'center',
-                        fontSize: '0.9rem', color: '#4a4a68', opacity: esMesActual ? 0.3 : 1,
+                        fontSize: '0.9rem', color: 'var(--dash-text-muted)', opacity: esMesActual ? 0.3 : 1,
                       }}>›</button>
                     </div>
                   </div>
@@ -1330,18 +1446,18 @@ function Dashboard({ onLogout }) {
                   {resumenPeriodo && (
                     <div style={{
                       display: 'flex', gap: '1rem', padding: '0.5rem 0 0.75rem',
-                      borderBottom: '1px solid #f0f0f5', marginBottom: '0.5rem', flexWrap: 'wrap',
+                      borderBottom: '1px solid var(--dash-border-soft)', marginBottom: '0.5rem', flexWrap: 'wrap',
                     }}>
-                      <div style={{ fontSize: '0.78rem', color: '#666' }}>
-                        Total: <strong style={{ color: '#1a1a2e' }}>{formatearMonto(resumenPeriodo.total)}</strong>
+                      <div style={{ fontSize: '0.78rem', color: 'var(--dash-text-muted)' }}>
+                        Total: <strong style={{ color: 'var(--dash-text)' }}>{formatearMonto(resumenPeriodo.total)}</strong>
                       </div>
-                      <div style={{ fontSize: '0.78rem', color: '#666' }}>
-                        Pagos: <strong style={{ color: '#1a1a2e' }}>{resumenPeriodo.cantidad}</strong>
+                      <div style={{ fontSize: '0.78rem', color: 'var(--dash-text-muted)' }}>
+                        Pagos: <strong style={{ color: 'var(--dash-text)' }}>{resumenPeriodo.cantidad}</strong>
                       </div>
-                      <div style={{ fontSize: '0.78rem', color: '#666' }}>
-                        Promedio: <strong style={{ color: '#1a1a2e' }}>{formatearMonto(resumenPeriodo.ticket_promedio)}</strong>
+                      <div style={{ fontSize: '0.78rem', color: 'var(--dash-text-muted)' }}>
+                        Promedio: <strong style={{ color: 'var(--dash-text)' }}>{formatearMonto(resumenPeriodo.ticket_promedio)}</strong>
                       </div>
-                      <div style={{ fontSize: '0.78rem', color: '#666' }}>
+                      <div style={{ fontSize: '0.78rem', color: 'var(--dash-text-muted)' }}>
                         Mejor: <strong style={{ color: '#2E7D32' }}>{formatearMonto(resumenPeriodo.pago_mas_alto)}</strong>
                       </div>
                     </div>
@@ -1464,32 +1580,32 @@ function Dashboard({ onLogout }) {
                           </linearGradient>
                         </defs>
                         <CartesianGrid strokeDasharray="3 3" stroke="rgba(0,0,0,0.06)" vertical={false} />
-                        <XAxis dataKey="etiqueta" tick={{ fontSize: 10, fill: '#999' }} axisLine={false} tickLine={false} interval="preserveStartEnd" />
+                        <XAxis dataKey="etiqueta" tick={{ fontSize: 10, fill: 'var(--dash-text-faint)' }} axisLine={false} tickLine={false} interval="preserveStartEnd" />
                         <YAxis
                           tickFormatter={(v) => v >= 1000 ? `$${Math.round(v / 1000)}k` : `$${v}`}
-                          tick={{ fontSize: 10, fill: '#999' }} axisLine={false} tickLine={false} width={44}
+                          tick={{ fontSize: 10, fill: 'var(--dash-text-faint)' }} axisLine={false} tickLine={false} width={44}
                         />
                         <Tooltip
                           formatter={(value) => [formatearMonto(value), 'Ventas']}
                           labelFormatter={(label) => `Hora ${label}`}
                           cursor={{ stroke: '#F57C00', strokeWidth: 1, strokeDasharray: '4 4' }}
-                          contentStyle={{ borderRadius: 10, border: '1px solid #e8e8f0', fontSize: '0.8rem', boxShadow: '0 8px 20px rgba(25,31,62,0.12)' }}
+                          contentStyle={{ borderRadius: 10, border: '1px solid var(--dash-border)', fontSize: '0.8rem', boxShadow: '0 8px 20px rgba(25,31,62,0.12)' }}
                         />
                         <Area
                           type="monotone" dataKey="total" stroke="#F57C00" strokeWidth={2.5}
                           fill="url(#ventasHoraFill)"
-                          activeDot={{ r: 5, fill: '#F57C00', stroke: '#fff', strokeWidth: 2 }}
+                          activeDot={{ r: 5, fill: '#F57C00', stroke: 'var(--dash-surface)', strokeWidth: 2 }}
                           dot={(dotProps) => {
                             const { cx, cy, index } = dotProps;
                             if (index !== ventasPorHora.length - 1) return null;
-                            return <circle key={`vh-dot-${index}`} cx={cx} cy={cy} r={4} fill="#F57C00" stroke="#fff" strokeWidth={2} />;
+                            return <circle key={`vh-dot-${index}`} cx={cx} cy={cy} r={4} fill="#F57C00" stroke="var(--dash-surface)" strokeWidth={2} />;
                           }}
                         />
                       </AreaChart>
                     </ResponsiveContainer>
                   </div>
                 ) : (
-                  <p style={{ textAlign: 'center', color: '#999', fontSize: '0.85rem', padding: '1.5rem 0' }}>
+                  <p style={{ textAlign: 'center', color: 'var(--dash-text-faint)', fontSize: '0.85rem', padding: '1.5rem 0' }}>
                     Todavía no hay ventas registradas hoy.
                   </p>
                 )}
@@ -1512,31 +1628,31 @@ function Dashboard({ onLogout }) {
                         {formatearMonto(ventasResumen.cierre.total_ventas)}
                       </span>
                     )}
-                    {ventasExpandido ? <ChevronUp size={18} color="#999" /> : <ChevronDown size={18} color="#999" />}
+                    {ventasExpandido ? <ChevronUp size={18} color="var(--dash-text-faint)" /> : <ChevronDown size={18} color="var(--dash-text-faint)" />}
                   </div>
                 </button>
 
                 {ventasExpandido && (
-                  <div style={{ padding: '0 1.25rem 1.25rem', borderTop: '1px solid #f0f0f5' }}>
+                  <div style={{ padding: '0 1.25rem 1.25rem', borderTop: '1px solid var(--dash-border-soft)' }}>
                     {ventasResumen?.cierre ? (
                       <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem', paddingTop: '1rem' }}>
                         {[
-                          { label: 'Total ventas', valor: ventasResumen.cierre.total_ventas, color: '#1a1a2e' },
+                          { label: 'Total ventas', valor: ventasResumen.cierre.total_ventas, color: 'var(--dash-text)' },
                           { label: 'Transferencias', valor: ventasResumen.cierre.total_transferencias, color: '#1565C0' },
                           { label: 'Efectivo en caja', valor: ventasResumen.cierre.total_efectivo, color: '#2E7D32' },
                           { label: 'Gastos del día', valor: ventasResumen.cierre.total_gastos, color: '#E53935' },
                         ].map((item, i) => (
                           <div key={i} style={{
                             display: 'flex', justifyContent: 'space-between', alignItems: 'center',
-                            padding: '0.5rem 0', borderBottom: i < 3 ? '1px solid #f0f0f5' : 'none',
+                            padding: '0.5rem 0', borderBottom: i < 3 ? '1px solid var(--dash-border-soft)' : 'none',
                           }}>
-                            <span style={{ fontSize: '0.85rem', color: '#4a4a68' }}>{item.label}</span>
+                            <span style={{ fontSize: '0.85rem', color: 'var(--dash-text-muted)' }}>{item.label}</span>
                             <span style={{ fontSize: '1rem', fontWeight: 700, color: item.color }}>{formatearMonto(item.valor)}</span>
                           </div>
                         ))}
                       </div>
                     ) : (
-                      <p style={{ fontSize: '0.85rem', color: '#666', paddingTop: '1rem' }}>
+                      <p style={{ fontSize: '0.85rem', color: 'var(--dash-text-muted)', paddingTop: '1rem' }}>
                         Todavía no has registrado el cierre de caja de hoy.
                       </p>
                     )}
@@ -1559,8 +1675,8 @@ function Dashboard({ onLogout }) {
               }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
                   <button onClick={() => cambiarMes(-1)} style={{
-                    width: 36, height: 36, borderRadius: 10, border: '2px solid #e8e8f0',
-                    background: '#fff', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center',
+                    width: 36, height: 36, borderRadius: 10, border: '2px solid var(--dash-border)',
+                    background: 'var(--dash-surface)', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center',
                   }}>
                     <span style={{ fontSize: '1.1rem' }}>‹</span>
                   </button>
@@ -1571,15 +1687,15 @@ function Dashboard({ onLogout }) {
                     {mesesNombres[periodoMes - 1]} {periodoAnio}
                   </div>
                   <button onClick={() => cambiarMes(1)} disabled={esMesActual} style={{
-                    width: 36, height: 36, borderRadius: 10, border: '2px solid #e8e8f0',
-                    background: esMesActual ? '#f5f5f5' : '#fff', cursor: esMesActual ? 'default' : 'pointer',
+                    width: 36, height: 36, borderRadius: 10, border: '2px solid var(--dash-border)',
+                    background: esMesActual ? 'var(--dash-surface-2)' : 'var(--dash-surface)', cursor: esMesActual ? 'default' : 'pointer',
                     display: 'flex', alignItems: 'center', justifyContent: 'center', opacity: esMesActual ? 0.4 : 1,
                   }}>
                     <span style={{ fontSize: '1.1rem' }}>›</span>
                   </button>
                 </div>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
-                  <span style={{ fontSize: '0.85rem', color: '#666', fontWeight: 500 }}>
+                  <span style={{ fontSize: '0.85rem', color: 'var(--dash-text-muted)', fontWeight: 500 }}>
                     {pagosPeriodo.length} pagos — {formatearMonto(pagosPeriodo.reduce((s, p) => s + p.monto, 0))}
                   </span>
                   <button className="exportar-btn" onClick={exportarPagos}>
@@ -1593,7 +1709,7 @@ function Dashboard({ onLogout }) {
                     <thead><tr><th>Cliente</th><th>Monto</th><th>Banco</th><th>Fecha</th><th>Hora</th><th>Fuente</th><th>Foto</th></tr></thead>
                     <tbody>
                       {pagosPeriodo.length === 0 ? (
-                        <tr><td colSpan="7" style={{ textAlign: 'center', padding: '2rem', color: '#999' }}>No hay pagos en {mesesNombres[periodoMes - 1]} {periodoAnio}</td></tr>
+                        <tr><td colSpan="7" style={{ textAlign: 'center', padding: '2rem', color: 'var(--dash-text-faint)' }}>No hay pagos en {mesesNombres[periodoMes - 1]} {periodoAnio}</td></tr>
                       ) : (
                         pagosPeriodo.map((pago) => {
                           const banco = getBancoBadge(pago.banco);
@@ -1635,8 +1751,8 @@ function Dashboard({ onLogout }) {
               }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
                   <button onClick={() => cambiarMes(-1)} style={{
-                    width: 36, height: 36, borderRadius: 10, border: '2px solid #e8e8f0',
-                    background: '#fff', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center',
+                    width: 36, height: 36, borderRadius: 10, border: '2px solid var(--dash-border)',
+                    background: 'var(--dash-surface)', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center',
                   }}>
                     <span style={{ fontSize: '1.1rem' }}>‹</span>
                   </button>
@@ -1647,15 +1763,15 @@ function Dashboard({ onLogout }) {
                     {mesesNombres[periodoMes - 1]} {periodoAnio}
                   </div>
                   <button onClick={() => cambiarMes(1)} disabled={esMesActual} style={{
-                    width: 36, height: 36, borderRadius: 10, border: '2px solid #e8e8f0',
-                    background: esMesActual ? '#f5f5f5' : '#fff', cursor: esMesActual ? 'default' : 'pointer',
+                    width: 36, height: 36, borderRadius: 10, border: '2px solid var(--dash-border)',
+                    background: esMesActual ? 'var(--dash-surface-2)' : 'var(--dash-surface)', cursor: esMesActual ? 'default' : 'pointer',
                     display: 'flex', alignItems: 'center', justifyContent: 'center', opacity: esMesActual ? 0.4 : 1,
                   }}>
                     <span style={{ fontSize: '1.1rem' }}>›</span>
                   </button>
                 </div>
                 {cargandoPeriodo && (
-                  <span style={{ fontSize: '0.8rem', color: '#999' }}>Cargando...</span>
+                  <span style={{ fontSize: '0.8rem', color: 'var(--dash-text-faint)' }}>Cargando...</span>
                 )}
               </div>
 
@@ -1747,7 +1863,7 @@ function Dashboard({ onLogout }) {
                               {formatearMonto(b.total)}
                             </span>
                           </div>
-                          <div style={{ height: 8, background: '#f0f0f5', borderRadius: 4, overflow: 'hidden' }}>
+                          <div style={{ height: 8, background: 'var(--dash-surface-2)', borderRadius: 4, overflow: 'hidden' }}>
                             <div style={{
                               width: `${pct}%`, height: '100%', background: '#F57C00',
                               borderRadius: 4, transition: 'width 0.5s ease',
@@ -1839,8 +1955,8 @@ function Dashboard({ onLogout }) {
                   <button key={tab.id} onClick={() => setVentasTab(tab.id)} style={{
                     padding: '0.5rem 1rem', borderRadius: 10, border: 'none', cursor: 'pointer',
                     display: 'flex', alignItems: 'center', gap: '0.4rem', fontSize: '0.85rem', fontWeight: 600,
-                    background: ventasTab === tab.id ? '#F57C00' : '#f0f0f5',
-                    color: ventasTab === tab.id ? '#fff' : '#4a4a68',
+                    background: ventasTab === tab.id ? '#F57C00' : 'var(--dash-surface-2)',
+                    color: ventasTab === tab.id ? '#fff' : 'var(--dash-text-muted)',
                   }}>
                     {tab.icon} {tab.label}
                   </button>
@@ -1903,7 +2019,7 @@ function Dashboard({ onLogout }) {
                       {ventasResumen?.cierre ? (
                         <div style={{ padding: '0.5rem 0' }}>
                           <div style={{
-                            background: '#E8F5E9', borderRadius: 10, padding: '1rem 1.25rem',
+                            background: 'var(--tint-green-bg)', borderRadius: 10, padding: '1rem 1.25rem',
                             marginBottom: '1rem', display: 'flex', alignItems: 'center', gap: '0.75rem',
                           }}>
                             <CheckCircle size={20} color="#2E7D32" />
@@ -1914,24 +2030,24 @@ function Dashboard({ onLogout }) {
                           </div>
                           <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
                             {[
-                              { label: 'Total ventas', valor: ventasResumen.cierre.total_ventas, color: '#1a1a2e' },
+                              { label: 'Total ventas', valor: ventasResumen.cierre.total_ventas, color: 'var(--dash-text)' },
                               { label: 'Transferencias', valor: ventasResumen.cierre.total_transferencias, color: '#1565C0' },
                               { label: 'Efectivo en caja', valor: ventasResumen.cierre.total_efectivo, color: '#2E7D32' },
                               { label: 'Gastos del día', valor: ventasResumen.cierre.total_gastos, color: '#E53935' },
                             ].map((item, i) => (
                               <div key={i} style={{
                                 display: 'flex', justifyContent: 'space-between', alignItems: 'center',
-                                padding: '0.5rem 0', borderBottom: i < 3 ? '1px solid #f0f0f5' : 'none',
+                                padding: '0.5rem 0', borderBottom: i < 3 ? '1px solid var(--dash-border-soft)' : 'none',
                               }}>
-                                <span style={{ fontSize: '0.85rem', color: '#4a4a68' }}>{item.label}</span>
+                                <span style={{ fontSize: '0.85rem', color: 'var(--dash-text-muted)' }}>{item.label}</span>
                                 <span style={{ fontSize: '1rem', fontWeight: 700, color: item.color }}>{formatearMonto(item.valor)}</span>
                               </div>
                             ))}
                           </div>
                           {ventasResumen.cierre.nota && (
                             <div style={{
-                              marginTop: '0.75rem', padding: '0.6rem 0.8rem', background: '#f8f8fc',
-                              borderRadius: 8, fontSize: '0.82rem', color: '#666',
+                              marginTop: '0.75rem', padding: '0.6rem 0.8rem', background: 'var(--dash-surface-2)',
+                              borderRadius: 8, fontSize: '0.82rem', color: 'var(--dash-text-muted)',
                             }}>
                               📝 {ventasResumen.cierre.nota}
                             </div>
@@ -1939,11 +2055,11 @@ function Dashboard({ onLogout }) {
                         </div>
                       ) : (
                         <div style={{ padding: '0.5rem 0' }}>
-                          <p style={{ fontSize: '0.85rem', color: '#666', marginBottom: '1rem' }}>
+                          <p style={{ fontSize: '0.85rem', color: 'var(--dash-text-muted)', marginBottom: '1rem' }}>
                             Ingresa el total de ventas del día (del ticket de la caja registradora). El sistema calcula el efectivo restando las transferencias verificadas.
                           </p>
                           <div style={{ marginBottom: '0.75rem' }}>
-                            <label style={{ fontSize: '0.8rem', color: '#4a4a68', fontWeight: 600, marginBottom: '0.3rem', display: 'block' }}>
+                            <label style={{ fontSize: '0.8rem', color: 'var(--dash-text-muted)', fontWeight: 600, marginBottom: '0.3rem', display: 'block' }}>
                               Total de ventas del día ($)
                             </label>
                             <input
@@ -1953,7 +2069,7 @@ function Dashboard({ onLogout }) {
                               onChange={(e) => setMontoVentas(e.target.value.replace(/[^0-9]/g, ''))}
                               style={{
                                 width: '100%', padding: '0.65rem 0.8rem', borderRadius: 8,
-                                border: '2px solid #e8e8f0', fontSize: '1.1rem', fontWeight: 600,
+                                border: '2px solid var(--dash-border)', fontSize: '1.1rem', fontWeight: 600,
                                 outline: 'none', boxSizing: 'border-box',
                               }}
                             />
@@ -1964,7 +2080,7 @@ function Dashboard({ onLogout }) {
                             )}
                           </div>
                           <div style={{ marginBottom: '0.75rem' }}>
-                            <label style={{ fontSize: '0.8rem', color: '#4a4a68', fontWeight: 600, marginBottom: '0.3rem', display: 'block' }}>
+                            <label style={{ fontSize: '0.8rem', color: 'var(--dash-text-muted)', fontWeight: 600, marginBottom: '0.3rem', display: 'block' }}>
                               Nota (opcional)
                             </label>
                             <input
@@ -1974,14 +2090,14 @@ function Dashboard({ onLogout }) {
                               onChange={(e) => setNotaCierre(e.target.value)}
                               style={{
                                 width: '100%', padding: '0.55rem 0.8rem', borderRadius: 8,
-                                border: '2px solid #e8e8f0', fontSize: '0.85rem',
+                                border: '2px solid var(--dash-border)', fontSize: '0.85rem',
                                 outline: 'none', boxSizing: 'border-box',
                               }}
                             />
                           </div>
                           <div style={{
-                            background: '#FFF3E0', borderRadius: 8, padding: '0.6rem 0.8rem',
-                            marginBottom: '1rem', fontSize: '0.8rem', color: '#E65100',
+                            background: 'var(--tint-orange-bg)', borderRadius: 8, padding: '0.6rem 0.8rem',
+                            marginBottom: '1rem', fontSize: '0.8rem', color: 'var(--tint-orange-fg)',
                             display: 'flex', alignItems: 'center', gap: '0.4rem',
                           }}>
                             <ArrowDownUp size={14} />
@@ -1992,8 +2108,8 @@ function Dashboard({ onLogout }) {
                             onClick={hacerCierre}
                             style={{
                               width: '100%', padding: '0.7rem', borderRadius: 10, border: 'none',
-                              background: montoVentas ? '#F57C00' : '#e0e0e0',
-                              color: montoVentas ? '#fff' : '#999', fontWeight: 700,
+                              background: montoVentas ? '#F57C00' : 'var(--dash-surface-2)',
+                              color: montoVentas ? '#fff' : 'var(--dash-text-faint)', fontWeight: 700,
                               fontSize: '0.9rem', cursor: montoVentas ? 'pointer' : 'default',
                               display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.4rem',
                             }}
@@ -2017,7 +2133,7 @@ function Dashboard({ onLogout }) {
                           onChange={(e) => setGastoMonto(e.target.value.replace(/[^0-9]/g, ''))}
                           style={{
                             width: '100%', padding: '0.55rem 0.8rem', borderRadius: 8,
-                            border: '2px solid #e8e8f0', fontSize: '0.95rem', fontWeight: 600,
+                            border: '2px solid var(--dash-border)', fontSize: '0.95rem', fontWeight: 600,
                             outline: 'none', marginBottom: '0.5rem', boxSizing: 'border-box',
                           }}
                         />
@@ -2026,8 +2142,8 @@ function Dashboard({ onLogout }) {
                           onChange={(e) => setGastoCategoria(e.target.value)}
                           style={{
                             width: '100%', padding: '0.5rem 0.8rem', borderRadius: 8,
-                            border: '2px solid #e8e8f0', fontSize: '0.85rem',
-                            outline: 'none', marginBottom: '0.5rem', background: '#fff', boxSizing: 'border-box',
+                            border: '2px solid var(--dash-border)', fontSize: '0.85rem',
+                            outline: 'none', marginBottom: '0.5rem', background: 'var(--dash-surface)', boxSizing: 'border-box',
                           }}
                         >
                           <option value="general">General</option>
@@ -2045,17 +2161,18 @@ function Dashboard({ onLogout }) {
                           onChange={(e) => setGastoDescripcion(e.target.value)}
                           style={{
                             width: '100%', padding: '0.55rem 0.8rem', borderRadius: 8,
-                            border: '2px solid #e8e8f0', fontSize: '0.85rem',
+                            border: '2px solid var(--dash-border)', fontSize: '0.85rem',
                             outline: 'none', marginBottom: '0.6rem', boxSizing: 'border-box',
                           }}
                         />
                         <button
+                          className="btn-registrar-gasto"
                           disabled={guardandoGasto || !gastoMonto || !gastoDescripcion.trim()}
                           onClick={agregarGasto}
                           style={{
                             width: '100%', padding: '0.6rem', borderRadius: 8, border: 'none',
-                            background: gastoMonto && gastoDescripcion.trim() ? '#E53935' : '#e0e0e0',
-                            color: gastoMonto && gastoDescripcion.trim() ? '#fff' : '#999',
+                            background: gastoMonto && gastoDescripcion.trim() ? '#E53935' : 'var(--dash-surface-2)',
+                            color: gastoMonto && gastoDescripcion.trim() ? '#fff' : 'var(--dash-text-faint)',
                             fontWeight: 600, fontSize: '0.85rem', cursor: gastoMonto ? 'pointer' : 'default',
                             display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.4rem',
                           }}
@@ -2066,14 +2183,14 @@ function Dashboard({ onLogout }) {
 
                       {/* Lista de gastos de hoy */}
                       {ventasResumen?.gastos?.lista?.length > 0 && (
-                        <div style={{ borderTop: '1px solid #f0f0f5', paddingTop: '0.6rem', marginTop: '0.3rem' }}>
-                          <div style={{ fontSize: '0.78rem', color: '#999', fontWeight: 600, marginBottom: '0.4rem' }}>
+                        <div style={{ borderTop: '1px solid var(--dash-border-soft)', paddingTop: '0.6rem', marginTop: '0.3rem' }}>
+                          <div style={{ fontSize: '0.78rem', color: 'var(--dash-text-faint)', fontWeight: 600, marginBottom: '0.4rem' }}>
                             GASTOS DE HOY
                           </div>
                           {ventasResumen.gastos.lista.map((g) => (
                             <div key={g.id} style={{
                               display: 'flex', justifyContent: 'space-between', alignItems: 'center',
-                              padding: '0.4rem 0', borderBottom: '1px solid #f8f8fc',
+                              padding: '0.4rem 0', borderBottom: '1px solid var(--dash-border-soft)',
                             }}>
                               <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
                                 <span style={{
@@ -2082,7 +2199,7 @@ function Dashboard({ onLogout }) {
                                 }} />
                                 <div>
                                   <div style={{ fontSize: '0.82rem', fontWeight: 500 }}>{g.descripcion}</div>
-                                  <div style={{ fontSize: '0.72rem', color: '#999' }}>{getCategoriaLabel(g.categoria)}</div>
+                                  <div style={{ fontSize: '0.72rem', color: 'var(--dash-text-faint)' }}>{getCategoriaLabel(g.categoria)}</div>
                                 </div>
                               </div>
                               <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
@@ -2091,7 +2208,7 @@ function Dashboard({ onLogout }) {
                                 </span>
                                 {esAdmin && (
                                   <button onClick={() => eliminarGastoHandler(g.id)}
-                                    style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 2, color: '#ccc' }}>
+                                    style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 2, color: 'var(--dash-text-faint)' }}>
                                     <Trash2 size={13} />
                                   </button>
                                 )}
@@ -2158,11 +2275,11 @@ function Dashboard({ onLogout }) {
                             efectivo: Math.round(d.total_efectivo / 1000),
                           }))} margin={{ top: 8, right: 12, left: 0, bottom: 0 }}>
                             <CartesianGrid strokeDasharray="3 3" stroke="rgba(0,0,0,0.06)" vertical={false} />
-                            <XAxis dataKey="fecha" tick={{ fontSize: 11, fill: '#999' }} axisLine={false} tickLine={false} />
-                            <YAxis tickFormatter={(v) => `$${v}k`} tick={{ fontSize: 11, fill: '#999' }} axisLine={false} tickLine={false} width={44} />
+                            <XAxis dataKey="fecha" tick={{ fontSize: 11, fill: 'var(--dash-text-faint)' }} axisLine={false} tickLine={false} />
+                            <YAxis tickFormatter={(v) => `$${v}k`} tick={{ fontSize: 11, fill: 'var(--dash-text-faint)' }} axisLine={false} tickLine={false} width={44} />
                             <Tooltip
                               formatter={(value, name) => [formatearMonto(value * 1000), name === 'ventas' ? 'Ventas' : 'Efectivo']}
-                              contentStyle={{ borderRadius: 10, border: '1px solid #e8e8f0', fontSize: '0.8rem', boxShadow: '0 8px 20px rgba(25,31,62,0.12)' }}
+                              contentStyle={{ borderRadius: 10, border: '1px solid var(--dash-border)', fontSize: '0.8rem', boxShadow: '0 8px 20px rgba(25,31,62,0.12)' }}
                             />
                             <Legend
                               formatter={(value) => (value === 'ventas' ? 'Ventas' : 'Efectivo')}
@@ -2180,7 +2297,7 @@ function Dashboard({ onLogout }) {
                   <div className="seccion">
                     <div className="seccion-header">
                       <h2 className="seccion-titulo"><Calendar size={18} /> Historial de cierres</h2>
-                      <span style={{ fontSize: '0.8rem', color: '#999' }}>{ventasCierres.length} cierres</span>
+                      <span style={{ fontSize: '0.8rem', color: 'var(--dash-text-faint)' }}>{ventasCierres.length} cierres</span>
                     </div>
                     {ventasCierres.length === 0 ? (
                       <p className="empty-state">No hay cierres registrados aún.</p>
@@ -2258,7 +2375,7 @@ function Dashboard({ onLogout }) {
                                 </Pie>
                                 <Tooltip
                                   formatter={(value, _name, props) => [formatearMonto(value), getCategoriaLabel(props.payload.categoria)]}
-                                  contentStyle={{ borderRadius: 8, border: '1px solid #e8e8f0', fontSize: '0.8rem' }}
+                                  contentStyle={{ borderRadius: 8, border: '1px solid var(--dash-border)', fontSize: '0.8rem' }}
                                 />
                               </PieChart>
                             </ResponsiveContainer>
@@ -2266,7 +2383,7 @@ function Dashboard({ onLogout }) {
                               position: 'absolute', top: '50%', left: '50%', transform: 'translate(-50%, -50%)',
                               textAlign: 'center', pointerEvents: 'none',
                             }}>
-                              <div style={{ fontSize: '0.7rem', color: '#999' }}>Total</div>
+                              <div style={{ fontSize: '0.7rem', color: 'var(--dash-text-faint)' }}>Total</div>
                               <div style={{ fontSize: '1.05rem', fontWeight: 700, color: '#E53935' }}>
                                 {formatearMonto(ventasGastosCategorias.reduce((s, c) => s + c.total, 0))}
                               </div>
@@ -2283,8 +2400,8 @@ function Dashboard({ onLogout }) {
                                     {getCategoriaLabel(cat.categoria)}
                                   </span>
                                   <span style={{ fontSize: '0.85rem', textAlign: 'right' }}>
-                                    <strong style={{ color: '#1a1a2e' }}>{formatearMonto(cat.total)}</strong>{' '}
-                                    <span style={{ color: '#999' }}>({pct}% · {cat.cantidad})</span>
+                                    <strong style={{ color: 'var(--dash-text)' }}>{formatearMonto(cat.total)}</strong>{' '}
+                                    <span style={{ color: 'var(--dash-text-faint)' }}>({pct}% · {cat.cantidad})</span>
                                   </span>
                                 </div>
                               );
@@ -2400,7 +2517,7 @@ function Dashboard({ onLogout }) {
                 )}
 
                 {cargandoUsuarios ? (
-                  <p style={{ textAlign: 'center', padding: '2rem', color: '#888' }}>Cargando usuarios...</p>
+                  <p style={{ textAlign: 'center', padding: '2rem', color: 'var(--dash-text-faint)' }}>Cargando usuarios...</p>
                 ) : (
                   <div className="tabla-container">
                     <table className="tabla-pagos">
@@ -2468,17 +2585,17 @@ function Dashboard({ onLogout }) {
 
 
               {cargandoConfig ? (
-                <p style={{ textAlign: 'center', padding: '2rem', color: '#888' }}>Cargando configuración...</p>
+                <p style={{ textAlign: 'center', padding: '2rem', color: 'var(--dash-text-faint)' }}>Cargando configuración...</p>
               ) : (
                 <div style={{ maxWidth: 480 }}>
-                  <p style={{ color: '#666', fontSize: '0.9rem', marginBottom: '1.5rem', lineHeight: 1.6 }}>
+                  <p style={{ color: 'var(--dash-text-muted)', fontSize: '0.9rem', marginBottom: '1.5rem', lineHeight: 1.6 }}>
                     Define qué días opera tu negocio y a qué hora cierra cada uno (puede variar, por ejemplo
                     cerrar más tarde el fin de semana). El bot usa esta información para saber cuándo hacer
                     las verificaciones nocturnas de pagos y enviar el reporte diario.
                   </p>
 
                   <div style={{ marginBottom: '1.5rem' }}>
-                    <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: 600, color: '#4a4a68', marginBottom: '0.5rem' }}>
+                    <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: 600, color: 'var(--dash-text-muted)', marginBottom: '0.5rem' }}>
                       Días de operación
                     </label>
                     <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
@@ -2491,9 +2608,9 @@ function Dashboard({ onLogout }) {
                             className="dia-chip"
                             onClick={() => alternarDia(d.valor)}
                             style={{
-                              border: activo ? '2px solid #F57C00' : '2px solid #e8e8f0',
-                              background: activo ? '#FFF8F0' : '#fff',
-                              color: activo ? '#F57C00' : '#999',
+                              border: activo ? '2px solid #F57C00' : '2px solid var(--dash-border)',
+                              background: activo ? 'var(--tint-orange-bg)' : 'var(--dash-surface)',
+                              color: activo ? '#F57C00' : 'var(--dash-text-faint)',
                             }}
                           >
                             {d.corto}
@@ -2505,7 +2622,7 @@ function Dashboard({ onLogout }) {
 
                   <div style={{ marginBottom: '1.5rem' }}>
                     <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '0.5rem' }}>
-                      <label style={{ fontSize: '0.85rem', fontWeight: 600, color: '#4a4a68' }}>
+                      <label style={{ fontSize: '0.85rem', fontWeight: 600, color: 'var(--dash-text-muted)' }}>
                         Hora de cierre por día
                       </label>
                       <button
@@ -2522,20 +2639,20 @@ function Dashboard({ onLogout }) {
                     <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
                       {DIAS_SEMANA.filter((d) => diasOperacion.includes(d.valor)).map((d) => (
                         <div key={d.valor} style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-                          <span style={{ width: 40, fontSize: '0.85rem', color: '#4a4a68', fontWeight: 600 }}>{d.corto}</span>
+                          <span style={{ width: 40, fontSize: '0.85rem', color: 'var(--dash-text-muted)', fontWeight: 600 }}>{d.corto}</span>
                           <input
                             type="time"
                             value={horaCierre[d.valor] || '21:00'}
                             onChange={(e) => cambiarHoraCierreDia(d.valor, e.target.value)}
                             style={{
-                              padding: '0.6rem 0.9rem', border: '2px solid #e8e8f0', borderRadius: 10,
+                              padding: '0.6rem 0.9rem', border: '2px solid var(--dash-border)', borderRadius: 10,
                               fontSize: '0.9rem', outline: 'none', fontFamily: 'inherit',
                             }}
                           />
                         </div>
                       ))}
                     </div>
-                    <p style={{ fontSize: '0.8rem', color: '#999', marginTop: '0.6rem' }}>
+                    <p style={{ fontSize: '0.8rem', color: 'var(--dash-text-faint)', marginTop: '0.6rem' }}>
                       Las verificaciones se hacen a esa hora y una hora después; el reporte diario se envía junto con la segunda verificación.
                     </p>
                   </div>
@@ -2552,23 +2669,23 @@ function Dashboard({ onLogout }) {
               <div className="seccion-header">
                 <h2 className="seccion-titulo"><Mail size={18} /> Verificación por Gmail</h2>
               </div>
-              <p style={{ color: '#666', fontSize: '0.9rem', marginBottom: '1.25rem', lineHeight: 1.6, maxWidth: 520 }}>
+              <p style={{ color: 'var(--dash-text-muted)', fontSize: '0.9rem', marginBottom: '1.25rem', lineHeight: 1.6, maxWidth: 520 }}>
                 La cuenta de Gmail conectada es la que el bot revisa para confirmar pagos por notificación del banco.
               </p>
               <div style={{
                 display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 12,
                 padding: '1rem 1.2rem', borderRadius: 12,
-                background: gmailEstado?.conectado ? '#E8F5E9' : '#FFF3E0',
-                border: `1px solid ${gmailEstado?.conectado ? '#C8E6C9' : '#FFE0B2'}`,
+                background: gmailEstado?.conectado ? 'var(--tint-green-bg)' : 'var(--tint-orange-bg)',
+                border: `1px solid ${gmailEstado?.conectado ? 'var(--tint-green-fg)' : 'var(--tint-orange-fg)'}`,
               }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                  {gmailEstado?.conectado ? <Wifi size={18} color="#2E7D32" /> : <WifiOff size={18} color="#E65100" />}
+                  {gmailEstado?.conectado ? <Wifi size={18} color="var(--tint-green-fg)" /> : <WifiOff size={18} color="var(--tint-orange-fg)" />}
                   <div>
-                    <div style={{ fontWeight: 700, fontSize: '0.9rem', color: gmailEstado?.conectado ? '#2E7D32' : '#E65100' }}>
+                    <div style={{ fontWeight: 700, fontSize: '0.9rem', color: gmailEstado?.conectado ? 'var(--tint-green-fg)' : 'var(--tint-orange-fg)' }}>
                       {gmailEstado?.conectado ? 'Gmail conectado' : 'Gmail no conectado'}
                     </div>
                     {gmailEstado?.conectado && (
-                      <div style={{ fontSize: '0.8rem', color: '#666' }}>{gmailEstado.email}</div>
+                      <div style={{ fontSize: '0.8rem', color: 'var(--dash-text-muted)' }}>{gmailEstado.email}</div>
                     )}
                   </div>
                 </div>
@@ -2584,10 +2701,10 @@ function Dashboard({ onLogout }) {
                 <div style={{
                   display: 'flex', gap: 10, marginTop: '0.9rem',
                   padding: '0.9rem 1.1rem', borderRadius: 10,
-                  background: '#FFF8F0', border: '1px solid #FFE0B2',
+                  background: 'var(--tint-orange-bg)', border: '1px solid var(--tint-orange-fg)',
                 }}>
-                  <AlertTriangle size={16} color="#E65100" style={{ flexShrink: 0, marginTop: 1 }} />
-                  <p style={{ fontSize: '0.83rem', color: '#7a5a3a', lineHeight: 1.6, margin: 0 }}>
+                  <AlertTriangle size={16} color="var(--tint-orange-fg)" style={{ flexShrink: 0, marginTop: 1 }} />
+                  <p style={{ fontSize: '0.83rem', color: 'var(--tint-orange-fg)', lineHeight: 1.6, margin: 0 }}>
                     Elige la cuenta que te avisa cuando te pagan — sin la corriente correcta,
                     tu <strong>rayo</strong> no tiene cómo avisarte.
                   </p>
@@ -2600,12 +2717,12 @@ function Dashboard({ onLogout }) {
               <div className="seccion-header">
                 <h2 className="seccion-titulo"><Volume2 size={18} /> Voz de las notificaciones</h2>
               </div>
-              <p style={{ color: '#666', fontSize: '0.9rem', marginBottom: '1.25rem', lineHeight: 1.6, maxWidth: 520 }}>
+              <p style={{ color: 'var(--dash-text-muted)', fontSize: '0.9rem', marginBottom: '1.25rem', lineHeight: 1.6, maxWidth: 520 }}>
                 Cuando llega un pago verificado, el dashboard lo anuncia en voz alta. Elige qué voz usar
                 (depende de las voces instaladas en este computador) y pruébala antes de guardarla.
               </p>
               {vocesDisponibles.length === 0 ? (
-                <p style={{ color: '#999', fontSize: '0.85rem' }}>
+                <p style={{ color: 'var(--dash-text-faint)', fontSize: '0.85rem' }}>
                   Este navegador no tiene voces disponibles. Se usará la voz por defecto del sistema.
                 </p>
               ) : (
@@ -2614,7 +2731,7 @@ function Dashboard({ onLogout }) {
                     value={vozSeleccionada}
                     onChange={(e) => seleccionarVoz(e.target.value)}
                     style={{
-                      padding: '0.7rem 1rem', border: '2px solid #e8e8f0', borderRadius: 10,
+                      padding: '0.7rem 1rem', border: '2px solid var(--dash-border)', borderRadius: 10,
                       fontSize: '0.9rem', outline: 'none', fontFamily: 'inherit', minWidth: 260,
                     }}
                   >
@@ -2635,7 +2752,7 @@ function Dashboard({ onLogout }) {
               <div className="seccion-header">
                 <h2 className="seccion-titulo" style={{ color: '#C62828' }}><AlertTriangle size={18} /> Zona de peligro</h2>
               </div>
-              <p style={{ color: '#666', fontSize: '0.9rem', marginBottom: '1.25rem', lineHeight: 1.6, maxWidth: 520 }}>
+              <p style={{ color: 'var(--dash-text-muted)', fontSize: '0.9rem', marginBottom: '1.25rem', lineHeight: 1.6, maxWidth: 520 }}>
                 Eliminar tu cuenta desactiva tu negocio y a todos sus usuarios de inmediato. El bot deja de verificar
                 pagos y nadie podrá volver a iniciar sesión. Tu historial de pagos se conserva.
               </p>
@@ -2730,7 +2847,7 @@ function Dashboard({ onLogout }) {
                 )}
 
                 {cargandoNegocios ? (
-                  <p style={{ textAlign: 'center', padding: '2rem', color: '#888' }}>Cargando negocios...</p>
+                  <p style={{ textAlign: 'center', padding: '2rem', color: 'var(--dash-text-faint)' }}>Cargando negocios...</p>
                 ) : (
                   <div className="tabla-container">
                     <table className="tabla-pagos">
@@ -2759,10 +2876,10 @@ function Dashboard({ onLogout }) {
                                 <span className={`banco-badge ${estado.clase}`}>{estado.label}</span>
                               </td>
                               <td style={{ minWidth: 140 }}>
-                                <div style={{ height: 6, background: '#f0f0f5', borderRadius: 4, overflow: 'hidden', marginBottom: 4 }}>
+                                <div style={{ height: 6, background: 'var(--dash-surface-2)', borderRadius: 4, overflow: 'hidden', marginBottom: 4 }}>
                                   <div style={{ width: `${porcentaje}%`, height: '100%', background: getPlanColor(porcentaje), borderRadius: 4 }} />
                                 </div>
-                                <span style={{ fontSize: '0.75rem', color: '#999' }}>
+                                <span style={{ fontSize: '0.75rem', color: 'var(--dash-text-faint)' }}>
                                   {n.comprobantes_usados} / {n.limite_comprobantes === 999999 ? '∞' : n.limite_comprobantes}
                                 </span>
                               </td>
