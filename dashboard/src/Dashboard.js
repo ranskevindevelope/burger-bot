@@ -1265,7 +1265,7 @@ function Dashboard({ onLogout }) {
                   </div>
                   {(planInfo.trial.dias <= 3 || !planInfo.trial.activo) && (
                     <button
-                      onClick={() => window.open('https://flashpago.duckdns.org/panel', '_self')}
+                      onClick={() => window.open('https://flashpago.co/panel', '_self')}
                       style={{
                         padding: '0.6rem 1.25rem', borderRadius: 10, border: 'none',
                         background: !planInfo.trial.activo ? '#E53935' : '#F57C00',

@@ -163,7 +163,7 @@ router.post('/', async (req, res) => {
       await enviarMensaje(from,
         `🔒 *Prueba finalizada*\n\n` +
         `Tu periodo de prueba de 15 días ha terminado. Para seguir verificando comprobantes, elige un plan en el dashboard:\n\n` +
-        `🔗 https://flashpago.duckdns.org/panel`
+        `🔗 https://flashpago.co/panel`
       );
       console.log(`[Trial] Negocio ${negocio_id} trial expirado`);
       return;

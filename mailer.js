@@ -2,13 +2,12 @@
 const nodemailer = require('nodemailer');
 
 const transporter = nodemailer.createTransport({
-  service: 'gmail',
+  host: process.env.MAIL_HOST || 'smtp.porkbun.com',
+  port: Number(process.env.MAIL_PORT) || 587,
+  secure: false, // STARTTLS en el puerto 587
   auth: {
-    user: process.env.GMAIL_USER,
-    pass: process.env.GMAIL_APP_PASSWORD,
-  },
-  tls: {
-    rejectUnauthorized: false,
+    user: process.env.MAIL_USER,
+    pass: process.env.MAIL_PASS,
   },
 });
 async function enviarCodigoVerificacion(email, codigo, nombreNegocio) {
@@ -38,7 +37,7 @@ async function enviarCodigoVerificacion(email, codigo, nombreNegocio) {
   `;
 
   await transporter.sendMail({
-    from: `"FlashPago" <${process.env.GMAIL_USER}>`,
+    from: `"FlashPago" <${process.env.MAIL_USER}>`,
     to: email,
     subject: `${codigo} — Tu código de verificación de FlashPago`,
     html,
@@ -51,7 +50,7 @@ async function enviarBienvenida(email, nombre, usuario) {
   const html = `
     <div style="font-family: -apple-system, sans-serif; max-width: 480px; margin: 0 auto; padding: 2rem;">
       <div style="text-align: center; margin-bottom: 1.5rem;">
-        <img src="https://flashpago.duckdns.org/logo.png" alt="FlashPago" style="width: 48px; height: 48px; border-radius: 12px;" />
+        <img src="https://flashpago.co/logo.png" alt="FlashPago" style="width: 48px; height: 48px; border-radius: 12px;" />
         </div>
         <h2 style="color: #1A1A2E; margin: 0.75rem 0 0; font-size: 20px;">FlashPago</h2>
       </div>
@@ -75,7 +74,7 @@ async function enviarBienvenida(email, nombre, usuario) {
   `;
 
   await transporter.sendMail({
-    from: `"FlashPago" <${process.env.GMAIL_USER}>`,
+    from: `"FlashPago" <${process.env.MAIL_USER}>`,
     to: email,
     subject: `¡Bienvenido a FlashPago, ${nombre}!`,
     html,
@@ -111,7 +110,7 @@ async function enviarCodigoRecuperacion(email, codigo, nombre) {
   `;
 
   await transporter.sendMail({
-    from: `"FlashPago" <${process.env.GMAIL_USER}>`,
+    from: `"FlashPago" <${process.env.MAIL_USER}>`,
     to: email,
     subject: `${codigo} — Recupera tu contraseña de FlashPago`,
     html,

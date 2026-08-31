@@ -40,7 +40,7 @@ HTTPS, JWT, rate limiting, vulnerabilidades corregidas.
 🏗️ *Lo que viene*
 Dominio propio, más bancos soportados.
 
-🔗 https://flashpago.duckdns.org
+🔗 https://flashpago.co
 
 _FlashPago — Verificación de pagos con IA_ 🚀`;
 
