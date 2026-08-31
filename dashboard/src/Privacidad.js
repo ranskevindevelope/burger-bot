@@ -23,9 +23,10 @@ export default function Privacidad({ onVolver }) {
           <section>
             <h2 style={{ color: "#F57C00", fontSize: "1.1rem", marginBottom: "0.5rem" }}>1. Responsable del tratamiento</h2>
             <p>
-              <strong>[RAZÓN SOCIAL / NOMBRE DEL RESPONSABLE]</strong>, identificado con NIT <strong>[NIT]</strong>,
-              con domicilio en Colombia, correo de contacto <strong>[CORREO DE CONTACTO]</strong> y WhatsApp{' '}
-              <strong>[WHATSAPP DE CONTACTO]</strong>, en calidad de responsable del tratamiento de datos personales
+              <strong>Kevin Ramírez Torres</strong>, identificado con cédula de ciudadanía No. <strong>70118928-1</strong>,
+              actuando bajo el nombre comercial <strong>Vinson Burgers</strong> (registrado ante la Cámara de Comercio),
+              con domicilio en Antioquia, Colombia, correo de contacto <strong>contacto@flashpago.co</strong> y WhatsApp{' '}
+              <strong>+57 316 7064671</strong>, en calidad de responsable del tratamiento de datos personales
               recolectados a través de la plataforma <strong>FlashPago</strong> (sitio web, panel de administración
               y bot de WhatsApp), en adelante "FlashPago" o "el Servicio".
             </p>
@@ -171,8 +172,8 @@ export default function Privacidad({ onVolver }) {
             <h2 style={{ color: "#F57C00", fontSize: "1.1rem", marginBottom: "0.5rem" }}>11. Cómo ejercer sus derechos</h2>
             <p>
               Las solicitudes relacionadas con sus datos personales (consultas, reclamos, actualización,
-              rectificación o supresión) pueden enviarse al correo <strong>[CORREO DE CONTACTO]</strong> o al
-              WhatsApp <strong>[WHATSAPP DE CONTACTO]</strong>, indicando su nombre, el negocio asociado y el motivo
+              rectificación o supresión) pueden enviarse al correo <strong>contacto@flashpago.co</strong> o al
+              WhatsApp <strong>+57 316 7064671</strong>, indicando su nombre, el negocio asociado y el motivo
               de la solicitud. Las consultas se atenderán en un plazo máximo de <strong>10 días hábiles</strong>{' '}
               (prorrogable 5 días hábiles más, informando el motivo) y los reclamos en un plazo máximo de{' '}
               <strong>15 días hábiles</strong>, conforme al artículo 14 de la Ley 1581 de 2012.
@@ -219,7 +220,7 @@ export default function Privacidad({ onVolver }) {
             <h2 style={{ color: "#F57C00", fontSize: "1.1rem", marginBottom: "0.5rem" }}>16. Contacto</h2>
             <p>
               Para preguntas sobre esta Política o el tratamiento de sus datos personales, contáctenos en{' '}
-              <strong>[CORREO DE CONTACTO]</strong> o por WhatsApp al <strong>[WHATSAPP DE CONTACTO]</strong>.
+              <strong>contacto@flashpago.co</strong> o por WhatsApp al <strong>+57 316 7064671</strong>.
             </p>
           </section>
 
