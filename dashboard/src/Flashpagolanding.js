@@ -73,14 +73,19 @@ function Nav({ onLogin }) {
         <a href={href} onClick={() => setMenuOpen(false)} style={{ color: "#b0b0c8", textDecoration: "none", fontSize: "0.9rem", fontWeight: 500 }}>{label}</a>
       </li>
     ))}
+    <li className="nav-login-mobile-item">
+      <button onClick={() => { setMenuOpen(false); window.open('/panel', '_blank'); }} style={{ background: "none", border: "none", color: "#b0b0c8", fontSize: "0.9rem", fontWeight: 500, cursor: "pointer", display: "flex", alignItems: "center", gap: 6, padding: 0 }}>
+        <Lock size={15} /> Iniciar sesión
+      </button>
+    </li>
   </ul>
 
   {/* Derecha: botones */}
   <div style={{ display: "flex", gap: "0.5rem", alignItems: "center" }}>
-    <button onClick={() => window.open('/panel', '_blank')} style={{ background: "transparent", border: "2px solid rgba(255,255,255,0.2)", color: COLORS.blanco, padding: "0.45rem 1.1rem", borderRadius: 8, cursor: "pointer", fontWeight: 600, fontSize: "0.85rem", display: "flex", alignItems: "center", gap: 6 }}>
+    <button className="nav-login-btn" onClick={() => window.open('/panel', '_blank')} style={{ background: "transparent", border: "2px solid rgba(255,255,255,0.2)", color: COLORS.blanco, padding: "0.45rem 1.1rem", borderRadius: 8, cursor: "pointer", fontWeight: 600, fontSize: "0.85rem", display: "flex", alignItems: "center", gap: 6, whiteSpace: "nowrap" }}>
   <Lock size={15} /> Iniciar sesión
     </button>
-    <a href="#contacto" style={{ background: COLORS.naranja, color: "white", padding: "0.5rem 1.1rem", borderRadius: 8, textDecoration: "none", fontWeight: 600, fontSize: "0.85rem" }}>
+    <a href="#contacto" style={{ background: COLORS.naranja, color: "white", padding: "0.5rem 1.1rem", borderRadius: 8, textDecoration: "none", fontWeight: 600, fontSize: "0.85rem", whiteSpace: "nowrap" }}>
       Contactar
     </a>
   </div>
@@ -280,6 +285,7 @@ export default function FlashPagoLanding({ onLogin, onRegistro, onTerminos, onPr
         html { scroll-behavior: smooth; }
         body { margin: 0; }
         .nav-links-list { display: flex; flex-direction: row; }
+        .nav-login-mobile-item { display: none; }
         @keyframes typingDot { 0%,60%,100%{opacity:.3;transform:scale(.8)} 30%{opacity:1;transform:scale(1.1)} }
         @keyframes popIn { 0%{transform:scale(0);opacity:0} 70%{transform:scale(1.2)} 100%{transform:scale(1);opacity:1} }
         @keyframes fadeIn { from{opacity:0} to{opacity:1} }
@@ -293,6 +299,8 @@ export default function FlashPagoLanding({ onLogin, onRegistro, onTerminos, onPr
   @media(max-width:768px) {
   .menu-toggle-btn { display:flex !important; }
   .nav-links-list { display:none; }
+  .nav-login-mobile-item { display:list-item !important; }
+  .nav-login-btn { display:none !important; }
   .hero-grid { grid-template-columns:1fr !important; text-align:center; }
   .hero-visual-wrap { order:-1; }
   .hero-h1 { font-size:2.2rem !important; }
