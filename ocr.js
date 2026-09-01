@@ -1,4 +1,4 @@
-// ocr.js — Lectura de comprobantes con Claude AI
+// ocr.js — Lectura de comprobantes con Gemini Flash
 const fetch = require('node-fetch');
 
 // ─── Prompt único ────────────────────────────
@@ -86,9 +86,9 @@ async function obtenerImagen(urlImagen, base64Data) {
 
 // ─── Función principal ───────────────────────
 async function leerComprobante(urlImagen, base64Data) {
-  const claudeKey = process.env.CLAUDE_API_KEY;
+  const geminiKey = process.env.GEMINI_API_KEY;
 
-  if (!claudeKey) {
+  if (!geminiKey) {
     return {
       error: true,
       mensaje: '⚠️ Servicio de lectura no disponible. Contacta al administrador.',
@@ -98,42 +98,47 @@ async function leerComprobante(urlImagen, base64Data) {
   try {
     const { imageBase64, mediaType } = await obtenerImagen(urlImagen, base64Data);
 
-    console.log('[OCR] Enviando a Claude...');
+    console.log('[OCR] Enviando a Gemini Flash...');
 
-    const response = await fetch('https://api.anthropic.com/v1/messages', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'x-api-key': claudeKey,
-        'anthropic-version': '2023-06-01',
-      },
-      body: JSON.stringify({
-        model: 'claude-haiku-4-5-20251001',
-        max_tokens: 300,
-        messages: [{
-          role: 'user',
-          content: [
-            { type: 'image', source: { type: 'base64', media_type: mediaType, data: imageBase64 } },
-            { type: 'text', text: PROMPT_OCR },
-          ],
-        }],
-      }),
-    });
+    const response = await fetch(
+      `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${geminiKey}`,
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          contents: [{
+            parts: [
+              {
+                inline_data: {
+                  mime_type: mediaType,
+                  data: imageBase64,
+                },
+              },
+              { text: PROMPT_OCR },
+            ],
+          }],
+          generationConfig: {
+            maxOutputTokens: 300,
+            temperature: 0.1,
+          },
+        }),
+      }
+    );
 
     const data = await response.json();
 
     if (data.error) {
-      if (data.error.message?.includes('credit') || data.error.type === 'insufficient_quota') {
+      if (data.error.message?.includes('quota') || data.error.code === 429) {
         return {
           error: true,
-          mensaje: '⚠️ Se agotaron los créditos del servicio de lectura. Contacta al administrador para recargar.',
+          mensaje: '⚠️ Se agotó la cuota del servicio de lectura. Contacta al administrador.',
         };
       }
-      throw new Error(`Claude error: ${data.error.message}`);
+      throw new Error(`Gemini error: ${data.error.message}`);
     }
 
-    const texto = data.content?.[0]?.text || '';
-    console.log('[OCR] Claude respuesta:', texto.substring(0, 300));
+    const texto = data.candidates?.[0]?.content?.parts?.[0]?.text || '';
+    console.log('[OCR] Gemini respuesta:', texto.substring(0, 300));
 
     const resultado = extraerJsonDesdeTexto(texto);
     console.log('[OCR] ✅ Resultado:', JSON.stringify(resultado));
