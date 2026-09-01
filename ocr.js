@@ -1,5 +1,6 @@
-// ocr.js — Lectura de comprobantes con Gemini Flash
+// ocr.js — Lectura de comprobantes con Claude AI
 const fetch = require('node-fetch');
+const sharp = require('sharp');
 
 // ─── Prompt único ────────────────────────────
 const PROMPT_OCR = `Eres un experto en comprobantes de pago colombianos. Analiza esta imagen y extrae los datos.
@@ -65,30 +66,51 @@ function extraerJsonDesdeTexto(texto) {
   throw new Error('No se encontró JSON en la respuesta del modelo');
 }
 
-// ─── Obtener imagen en base64 ────────────────
+// ─── Redimensionar la imagen antes de enviarla ───
+// Claude cobra las imágenes por píxeles (ancho×alto/750 ≈ tokens). Una foto de
+// celular sin achicar (12MP+) puede costar 5-10x más que una versión de 1024px,
+// que sigue siendo de sobra para leer texto y números de un comprobante.
+const ANCHO_MAXIMO = 1024;
+
+async function redimensionarImagen(buffer) {
+  try {
+    const salida = await sharp(buffer)
+      .resize({ width: ANCHO_MAXIMO, withoutEnlargement: true })
+      .jpeg({ quality: 82 })
+      .toBuffer();
+    console.log(`[OCR] Imagen redimensionada: ${buffer.length} → ${salida.length} bytes`);
+    return { buffer: salida, mediaType: 'image/jpeg' };
+  } catch (err) {
+    console.error('[OCR] Error redimensionando, se usa la imagen original:', err.message);
+    return { buffer, mediaType: 'image/jpeg' };
+  }
+}
+
+// ─── Obtener imagen en base64 (ya redimensionada) ────
 async function obtenerImagen(urlImagen, base64Data) {
+  let bufferOriginal;
+
   if (base64Data) {
     console.log('[OCR] Usando base64 del webhook, longitud:', base64Data.length);
-    return { imageBase64: base64Data, mediaType: 'image/jpeg' };
-  }
-
-  if (urlImagen) {
+    bufferOriginal = Buffer.from(base64Data, 'base64');
+  } else if (urlImagen) {
     console.log('[OCR] Descargando imagen desde URL:', urlImagen);
     const imgResponse = await fetch(urlImagen);
-    const buffer = await imgResponse.buffer();
-    const mediaType = imgResponse.headers.get('content-type') || 'image/jpeg';
-    console.log('[OCR] Imagen descargada, tamaño:', buffer.length);
-    return { imageBase64: buffer.toString('base64'), mediaType };
+    bufferOriginal = await imgResponse.buffer();
+    console.log('[OCR] Imagen descargada, tamaño:', bufferOriginal.length);
+  } else {
+    throw new Error('Sin imagen disponible');
   }
 
-  throw new Error('Sin imagen disponible');
+  const { buffer, mediaType } = await redimensionarImagen(bufferOriginal);
+  return { imageBase64: buffer.toString('base64'), mediaType };
 }
 
 // ─── Función principal ───────────────────────
 async function leerComprobante(urlImagen, base64Data) {
-  const geminiKey = process.env.GEMINI_API_KEY;
+  const claudeKey = process.env.CLAUDE_API_KEY;
 
-  if (!geminiKey) {
+  if (!claudeKey) {
     return {
       error: true,
       mensaje: '⚠️ Servicio de lectura no disponible. Contacta al administrador.',
@@ -98,47 +120,42 @@ async function leerComprobante(urlImagen, base64Data) {
   try {
     const { imageBase64, mediaType } = await obtenerImagen(urlImagen, base64Data);
 
-    console.log('[OCR] Enviando a Gemini Flash...');
+    console.log('[OCR] Enviando a Claude...');
 
-    const response = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${geminiKey}`,
-      {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          contents: [{
-            parts: [
-              {
-                inline_data: {
-                  mime_type: mediaType,
-                  data: imageBase64,
-                },
-              },
-              { text: PROMPT_OCR },
-            ],
-          }],
-          generationConfig: {
-            maxOutputTokens: 300,
-            temperature: 0.1,
-          },
-        }),
-      }
-    );
+    const response = await fetch('https://api.anthropic.com/v1/messages', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'x-api-key': claudeKey,
+        'anthropic-version': '2023-06-01',
+      },
+      body: JSON.stringify({
+        model: 'claude-haiku-4-5-20251001',
+        max_tokens: 300,
+        messages: [{
+          role: 'user',
+          content: [
+            { type: 'image', source: { type: 'base64', media_type: mediaType, data: imageBase64 } },
+            { type: 'text', text: PROMPT_OCR },
+          ],
+        }],
+      }),
+    });
 
     const data = await response.json();
 
     if (data.error) {
-      if (data.error.message?.includes('quota') || data.error.code === 429) {
+      if (data.error.message?.includes('credit') || data.error.type === 'insufficient_quota') {
         return {
           error: true,
-          mensaje: '⚠️ Se agotó la cuota del servicio de lectura. Contacta al administrador.',
+          mensaje: '⚠️ Se agotaron los créditos del servicio de lectura. Contacta al administrador para recargar.',
         };
       }
-      throw new Error(`Gemini error: ${data.error.message}`);
+      throw new Error(`Claude error: ${data.error.message}`);
     }
 
-    const texto = data.candidates?.[0]?.content?.parts?.[0]?.text || '';
-    console.log('[OCR] Gemini respuesta:', texto.substring(0, 300));
+    const texto = data.content?.[0]?.text || '';
+    console.log('[OCR] Claude respuesta:', texto.substring(0, 300));
 
     const resultado = extraerJsonDesdeTexto(texto);
     console.log('[OCR] ✅ Resultado:', JSON.stringify(resultado));
