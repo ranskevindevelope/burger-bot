@@ -97,10 +97,16 @@ app.get('/exportar', verificarToken, soloAdmin, async (req, res) => {
   try {
     const pagos = await obtenerPagosExportables(req.user.negocio_id);
 
+    const celdaCsv = (valor) => {
+      const s = String(valor == null ? '' : valor).replace(/[\r\n\t]/g, ' ');
+      const seguro = /^[=+\-@]/.test(s) ? "'" + s : s;
+      return seguro.replace(/"/g, '""');
+    };
+
     let csv = 'ID,Monto,Referencia,Banco,Fecha,Hora,Estado,Fuente,Cliente,Verificado Por,Creado\n';
 
     for (const p of pagos) {
-      csv += `${p.id},${p.monto},"${p.referencia || ''}","${p.banco || ''}","${p.fecha || ''}","${p.hora || ''}","${p.estado}","${p.fuente || ''}","${p.nombre_cliente || ''}","${p.verificado_por || ''}","${p.creado_en || ''}"\n`;
+      csv += `${p.id},${p.monto},"${celdaCsv(p.referencia)}","${celdaCsv(p.banco)}","${celdaCsv(p.fecha)}","${celdaCsv(p.hora)}","${celdaCsv(p.estado)}","${celdaCsv(p.fuente)}","${celdaCsv(p.nombre_cliente)}","${celdaCsv(p.verificado_por)}","${celdaCsv(p.creado_en)}"\n`;
     }
 
     const fecha = new Date().toLocaleDateString('es-CO').replace(/\//g, '-');

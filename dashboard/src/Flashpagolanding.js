@@ -1,9 +1,9 @@
 import { useState, useEffect } from "react";
 import {
   Zap, MessageCircle, Lock, Camera, Bot, CheckCircle2, Shield, BarChart3,
-  Search, RefreshCw, Clock, AlertTriangle, Building2, Wallet, Database,
+  Search, RefreshCw, Clock, AlertTriangle, Building2, Database,
   FileText, Landmark, Smartphone, TrendingUp, Users, FileSpreadsheet,
-  Headphones, Star, Check, Minus, Hourglass, ArrowRight, Volume2
+  Headphones, Star, Check, Minus, Hourglass, Volume2
 } from "lucide-react";
 
 const COLORS = {
@@ -255,16 +255,14 @@ export default function FlashPagoLanding({ onLogin, onRegistro, onTerminos, onPr
   const bancos = [
     { Icon: Landmark, label: "Bancolombia" },
     { Icon: Smartphone, label: "Nequi" },
-    { Icon: Wallet, label: "Daviplata" },
-    { Icon: Building2, label: "AV Villas" },
-    { Icon: ArrowRight, label: "Transfiya" },
+    { Icon: Building2, label: "BBVA" },
   ];
 
   const planes = [
     {
       name: "Básico", price: "$39.900",
-      features: ["Verificación de pagos por WhatsApp", "Lectura con IA (5 bancos)", "Detección de duplicados", "Registro de pagos", "Soporte por WhatsApp"],
-      disabled: ["Reportes automáticos", "Dashboard web"],
+      features: ["Verificación de pagos por WhatsApp", "Lectura con IA (3 bancos)", "Detección de duplicados", "Registro de pagos", "Dashboard web", "Soporte por WhatsApp"],
+      disabled: ["Reportes automáticos"],
     },
     {
       name: "Premium", price: "$79.900", popular: true,

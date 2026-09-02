@@ -67,10 +67,27 @@ router.post('/login', limitarLogin, (req, res) => {
 
   db.get('SELECT * FROM usuarios WHERE usuario = ? AND activo = 1', [usuario.trim().toLowerCase()], (err, user) => {
     if (err) return res.status(500).json({ ok: false, error: 'Error del servidor' });
-    if (!user) return res.status(401).json({ ok: false, error: 'Usuario o contraseña incorrectos' });
+    // Ejecutar el mismo cómputo PBKDF2 y comparar en tiempo constante en ambos
+    // casos (usuario existente o no) para no revelar la existencia por timing.
+    const DUMMY_SALT =
+      '0000000000000000000000000000000000000000000000000000000000000000';
 
-    const hash = crypto.pbkdf2Sync(password, user.salt, 10000, 64, 'sha512').toString('hex');
-    if (hash !== user.password_hash) {
+    let hashOk = false;
+    if (user) {
+      const provided = Buffer.from(
+        crypto.pbkdf2Sync(password, user.salt, 10000, 64, 'sha512').toString('hex'),
+        'hex'
+      );
+      const expected = Buffer.from(user.password_hash, 'hex');
+      hashOk =
+        provided.length === expected.length &&
+        crypto.timingSafeEqual(provided, expected);
+    } else {
+      // Igualar el costo computacional (10k iteraciones) con un salt fijo.
+      crypto.pbkdf2Sync(password, DUMMY_SALT, 10000, 64, 'sha512');
+    }
+
+    if (!hashOk) {
       const msg = res.locals.advertencia
         ? `Usuario o contraseña incorrectos. ${res.locals.advertencia}`
         : 'Usuario o contraseña incorrectos';
@@ -673,12 +690,22 @@ router.get('/dashboard/ventas-hoy-por-hora', verificarToken, (req, res) => {
 
 router.get('/comprobantes/:foto', verificarToken, (req, res) => {
   const foto = req.params.foto.replace(/[^a-zA-Z0-9._-]/g, '');
-  const ruta = path.join(__dirname, '..', 'comprobantes', foto);
-  if (fs.existsSync(ruta)) {
-    res.sendFile(ruta);
-  } else {
-    res.status(404).json({ ok: false, error: 'Foto no encontrada' });
-  }
+  if (!foto) return res.status(404).json({ ok: false, error: 'Foto no encontrada' });
+  const nid = req.user.negocio_id;
+  const esSuper = req.user.rol === 'superadmin';
+  const where = esSuper ? 'WHERE foto = ?' : 'WHERE foto = ? AND negocio_id = ?';
+  const params = esSuper ? [foto] : [foto, nid];
+  // Comprobante solo legible si una fila de pago de este mismo negocio lo referencia
+  db.get('SELECT id FROM pagos ' + where + ' ORDER BY id DESC LIMIT 1', params, (err, fila) => {
+    if (err) return res.status(500).json({ ok: false, error: err.message });
+    if (!fila) return res.status(403).json({ ok: false, error: 'No autorizado para ver este comprobante' });
+    const ruta = path.join(__dirname, '..', 'comprobantes', foto);
+    if (fs.existsSync(ruta)) {
+      res.sendFile(ruta);
+    } else {
+      res.status(404).json({ ok: false, error: 'Foto no encontrada' });
+    }
+  });
 });
 
 router.get('/dashboard/duplicados', verificarToken, async (req, res) => {
