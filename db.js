@@ -24,7 +24,7 @@ db.run(`
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     nombre TEXT NOT NULL,
     whatsapp TEXT,
-    plan TEXT DEFAULT 'basico' CHECK (plan IN ('basico', 'premium', 'empresarial')),
+    plan TEXT DEFAULT 'basico' CHECK (plan IN ('basico', 'premium', 'premium_plus', 'empresarial')),
     limite_comprobantes INTEGER DEFAULT 300,
     activo INTEGER DEFAULT 1,
     creado_en TEXT DEFAULT (datetime('now','localtime'))
@@ -60,6 +60,99 @@ db.run(`
       if (err && !err.message.includes('duplicate column')) {
         console.error('[DB] Error migrando dias_operacion:', err.message);
       }
+    });
+    // Migración: ciudad/banco (usadas por crearNegocio pero faltaban en el
+    // CREATE TABLE original — sin esto, una instalación nueva desde cero
+    // fallaría al registrar un negocio).
+    db.run(`ALTER TABLE negocios ADD COLUMN ciudad TEXT`, (err) => {
+      if (err && !err.message.includes('duplicate column')) {
+        console.error('[DB] Error migrando ciudad:', err.message);
+      }
+    });
+    db.run(`ALTER TABLE negocios ADD COLUMN banco TEXT`, (err) => {
+      if (err && !err.message.includes('duplicate column')) {
+        console.error('[DB] Error migrando banco:', err.message);
+      }
+    });
+
+    // Migración: la columna "plan" tiene un CHECK que en bases de datos ya
+    // creadas quedó grabado con la lista vieja de planes (sin "premium_plus").
+    // SQLite no permite alterar un CHECK existente con ALTER TABLE, así que
+    // hay que reconstruir la tabla completa. Se hace leyendo las columnas
+    // reales con PRAGMA (no una lista fija) para no perder ninguna columna
+    // que ya exista, y todo dentro de una transacción: si algo falla, se
+    // revierte y no se toca la tabla original.
+    db.get(`SELECT sql FROM sqlite_master WHERE type='table' AND name='negocios'`, (err, row) => {
+      if (err) {
+        console.error('[DB] Error leyendo definición de negocios:', err.message);
+        return;
+      }
+      if (!row || !row.sql || row.sql.includes('premium_plus')) return; // ya migrada o no existe
+
+      console.log('[DB] Migrando tabla "negocios" para permitir el plan "premium_plus"...');
+      db.get(`SELECT seq FROM sqlite_sequence WHERE name='negocios'`, (err, seqRow) => {
+      const seqOriginal = seqRow ? seqRow.seq : 0;
+      db.all(`PRAGMA table_info(negocios)`, (err, columnas) => {
+        if (err || !columnas || !columnas.length) {
+          console.error('[DB] Error leyendo columnas de negocios:', err && err.message);
+          return;
+        }
+
+        const nombresColumnas = columnas.map((c) => c.name);
+        const definiciones = columnas.map((c) => {
+          if (c.pk) return `${c.name} INTEGER PRIMARY KEY AUTOINCREMENT`;
+          if (c.name === 'plan') {
+            return `plan TEXT DEFAULT 'basico' CHECK (plan IN ('basico', 'premium', 'premium_plus', 'empresarial'))`;
+          }
+          let def = `${c.name} ${c.type}`;
+          if (c.notnull) def += ' NOT NULL';
+          if (c.dflt_value !== null && c.dflt_value !== undefined) {
+            const val = c.dflt_value;
+            // Un literal (número o string entre comillas) va tal cual; cualquier
+            // otra cosa es una expresión (ej. datetime('now','localtime')) y
+            // SQLite exige que vaya entre paréntesis en el DEFAULT.
+            const esLiteral = /^'.*'$/.test(val) || /^-?\d+(\.\d+)?$/.test(val) || /^null$/i.test(val);
+            def += ` DEFAULT ${esLiteral ? val : `(${val})`}`;
+          }
+          return def;
+        });
+        const listaColumnas = nombresColumnas.join(', ');
+
+        // Pasos secuenciales de verdad (con await): si uno falla, se corta
+        // ahí mismo y se revierte, en vez de seguir disparando los siguientes.
+        const runP = (sql) => new Promise((resolve, reject) => {
+          db.run(sql, (err) => (err ? reject(err) : resolve()));
+        });
+
+        (async () => {
+          try {
+            await runP('BEGIN TRANSACTION');
+            await runP(`ALTER TABLE negocios RENAME TO negocios_migracion_tmp`);
+            await runP(`CREATE TABLE negocios (${definiciones.join(', ')})`);
+            await runP(`INSERT INTO negocios (${listaColumnas}) SELECT ${listaColumnas} FROM negocios_migracion_tmp`);
+            // El contador de autoincrement nunca debe bajar: usa el mayor entre
+            // el que ya tenía la tabla vieja y el id más alto que quedó insertado,
+            // para no reutilizar nunca un id ya usado (aunque esa fila se haya borrado).
+            await runP(
+              `INSERT INTO sqlite_sequence (name, seq)
+               SELECT 'negocios', MAX(${seqOriginal}, (SELECT IFNULL(MAX(id), 0) FROM negocios))
+               WHERE NOT EXISTS (SELECT 1 FROM sqlite_sequence WHERE name = 'negocios')`
+            );
+            await runP(
+              `UPDATE sqlite_sequence SET seq = MAX(${seqOriginal}, (SELECT IFNULL(MAX(id), 0) FROM negocios)) WHERE name = 'negocios'`
+            );
+            await runP(`DROP TABLE negocios_migracion_tmp`);
+            await runP('COMMIT');
+            console.log('[DB] Migración de "negocios" completada — "premium_plus" ya es un plan válido.');
+          } catch (migErr) {
+            console.error('[DB] Migración de "negocios" falló, revirtiendo:', migErr.message);
+            db.run('ROLLBACK', (rollbackErr) => {
+              if (rollbackErr) console.error('[DB] Además falló el ROLLBACK:', rollbackErr.message);
+            });
+          }
+        })();
+      });
+      });
     });
   }
 });
@@ -186,6 +279,22 @@ db.run(`
 `, (err) => {
   if (!err) console.log('[DB] Tabla "codigos_verificacion" lista');
 });
+
+// ─── Registro histórico de pruebas gratis creadas ─────────
+// Se llena una sola vez, al crear la cuenta, y nunca se edita ni se borra.
+// Sirve para bloquear un email/WhatsApp que ya usó su prueba gratis aunque
+// después lo hayan cambiado en el perfil de usuario (que sí es editable).
+db.run(`
+  CREATE TABLE IF NOT EXISTS registros_trial (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    negocio_id INTEGER,
+    email TEXT NOT NULL,
+    whatsapp TEXT NOT NULL,
+    creado_en TEXT DEFAULT (datetime('now','localtime'))
+  )
+`, (err) => {
+  if (!err) console.log('[DB] Tabla "registros_trial" lista');
+});
 db.run(`
   CREATE TABLE IF NOT EXISTS duplicate_reviews (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -268,8 +377,8 @@ function actualizarHorarioNegocio(id, { hora_cierre, dias_operacion }) {
 //  FUNCIONES — PAGOS DE SUSCRIPCIÓN (Wompi)
 // ═══════════════════════════════════════════════════════════
 
-const LIMITES_PLAN = { basico: 300, premium: 1000, empresarial: 999999 };
-const PRECIOS_CENTAVOS = { basico: 3990000, premium: 7990000, empresarial: 14990000 };
+const LIMITES_PLAN = { basico: 300, premium: 1000, premium_plus: 999999, empresarial: 999999 };
+const PRECIOS_CENTAVOS = { basico: 3990000, premium: 7990000, premium_plus: 10990000, empresarial: 17990000 };
 
 function crearPagoPlataforma({ negocio_id, referencia, plan, monto }) {
   return new Promise((resolve, reject) => {
@@ -315,6 +424,62 @@ function marcarNegocioPagado(negocio_id, plan) {
       function (err) {
         if (err) reject(err);
         else resolve({ changes: this.changes });
+      }
+    );
+  });
+}
+
+function registrarTrialCreado({ negocio_id, email, whatsappDigitos }) {
+  return new Promise((resolve, reject) => {
+    db.run(
+      `INSERT INTO registros_trial (negocio_id, email, whatsapp) VALUES (?, ?, ?)`,
+      [negocio_id, email.trim().toLowerCase(), whatsappDigitos],
+      function (err) {
+        if (err) reject(err);
+        else resolve({ id: this.lastID });
+      }
+    );
+  });
+}
+
+// El bloqueo por historial dura 6 meses desde la prueba gratis anterior;
+// pasado ese tiempo, el mismo email/WhatsApp puede volver a registrarse.
+const MESES_BLOQUEO_TRIAL = 6;
+
+function emailYaUsoTrial(email) {
+  return new Promise((resolve, reject) => {
+    db.get(
+      `SELECT id FROM registros_trial WHERE email = ? AND creado_en >= datetime('now', '-${MESES_BLOQUEO_TRIAL} months', 'localtime')`,
+      [email.trim().toLowerCase()],
+      (err, row) => {
+        if (err) reject(err);
+        else resolve(!!row);
+      }
+    );
+  });
+}
+
+function whatsappYaUsoTrial(ultimosDiez) {
+  return new Promise((resolve, reject) => {
+    db.get(
+      `SELECT id FROM registros_trial WHERE whatsapp LIKE ? AND creado_en >= datetime('now', '-${MESES_BLOQUEO_TRIAL} months', 'localtime')`,
+      [`%${ultimosDiez}%`],
+      (err, row) => {
+        if (err) reject(err);
+        else resolve(!!row);
+      }
+    );
+  });
+}
+
+function obtenerAdminDeNegocio(negocio_id) {
+  return new Promise((resolve, reject) => {
+    db.get(
+      `SELECT email, nombre FROM usuarios WHERE negocio_id = ? AND rol = 'admin' AND email IS NOT NULL ORDER BY id ASC LIMIT 1`,
+      [negocio_id],
+      (err, row) => {
+        if (err) reject(err);
+        else resolve(row || null);
       }
     );
   });
@@ -827,6 +992,10 @@ module.exports = {
   obtenerPagoPlataforma,
   actualizarPagoPlataforma,
   marcarNegocioPagado,
+  obtenerAdminDeNegocio,
+  registrarTrialCreado,
+  emailYaUsoTrial,
+  whatsappYaUsoTrial,
   PRECIOS_CENTAVOS,
   LIMITES_PLAN,
   // Gmail tokens

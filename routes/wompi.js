@@ -10,8 +10,10 @@ const {
   obtenerPagoPlataforma,
   actualizarPagoPlataforma,
   marcarNegocioPagado,
+  obtenerAdminDeNegocio,
   PRECIOS_CENTAVOS,
 } = require('../db');
+const { enviarGraciasPago } = require('../mailer');
 
 // ─── Configuración pública para el widget ──────────────────
 router.get('/config', verificarToken, soloAdmin, (req, res) => {
@@ -106,6 +108,15 @@ router.post('/webhook', async (req, res) => {
         await actualizarPagoPlataforma(reference, { estado: 'APROBADO', wompi_transaction_id: wompiId });
         await marcarNegocioPagado(pago.negocio_id, pago.plan);
         console.log(`[Wompi] Pago aprobado: negocio ${pago.negocio_id}, plan ${pago.plan}, ref ${reference}`);
+
+        try {
+          const admin = await obtenerAdminDeNegocio(pago.negocio_id);
+          if (admin) {
+            await enviarGraciasPago(admin.email, admin.nombre, pago.plan, pago.monto);
+          }
+        } catch (e) {
+          console.error('[Wompi] Error enviando correo de agradecimiento:', e.message);
+        }
       } else if (['DECLINED', 'ERROR', 'VOIDED'].includes(status)) {
         await actualizarPagoPlataforma(reference, { estado: status === 'DECLINED' ? 'RECHAZADO' : 'ERROR', wompi_transaction_id: wompiId });
         console.log(`[Wompi] Pago ${status}: negocio ${pago.negocio_id}, ref ${reference}`);

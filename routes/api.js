@@ -124,7 +124,7 @@ function formatearWhatsapp(num) {
 // ═══════════════════════════════════════════════════════════
 
 const { enviarCodigoVerificacion, enviarBienvenida, enviarCodigoRecuperacion } = require('../mailer');
-const { generarCodigo, guardarCodigoVerificacion, verificarCodigo } = require('../db');
+const { generarCodigo, guardarCodigoVerificacion, verificarCodigo, registrarTrialCreado, emailYaUsoTrial, whatsappYaUsoTrial } = require('../db');
 
 // Paso 1: Enviar código de verificación
 router.post('/registro/enviar-codigo', limitarLogin, async (req, res) => {
@@ -132,13 +132,13 @@ router.post('/registro/enviar-codigo', limitarLogin, async (req, res) => {
     const { email, nombre_negocio, plan, ciudad, whatsapp_negocio, banco, nombre, usuario, password } = req.body;
 
     // Validaciones
-    if (!email || !nombre_negocio || !nombre || !usuario || !password) {
+    if (!email || !nombre_negocio || !nombre || !usuario || !password || !whatsapp_negocio) {
       return res.status(400).json({ ok: false, error: 'Faltan campos obligatorios' });
     }
     if (!PASSWORD_VALIDA.test(password)) {
       return res.status(400).json({ ok: false, error: PASSWORD_ERROR });
     }
-    if (!['basico', 'premium', 'empresarial'].includes(plan)) {
+    if (!['basico', 'premium', 'premium_plus', 'empresarial'].includes(plan)) {
       return res.status(400).json({ ok: false, error: 'Plan no válido' });
     }
 
@@ -164,10 +164,52 @@ router.post('/registro/enviar-codigo', limitarLogin, async (req, res) => {
       return res.status(409).json({ ok: false, error: 'Ese email ya está registrado. Usa "Recuperar contraseña" si es tu cuenta.' });
     }
 
+    // Verificar contra el historial permanente de pruebas gratis (registros_trial):
+    // a diferencia de "usuarios", esta tabla nunca se edita ni se borra, así que
+    // cambiar el email/WhatsApp desde "Usuarios" después de registrarse no libera
+    // ese dato para abrir una prueba gratis nueva.
+    if (await emailYaUsoTrial(email)) {
+      return res.status(409).json({ ok: false, error: 'Ese email ya usó su prueba gratis antes.' });
+    }
+
+    // El número debe haber pasado el OTP de WhatsApp (registro/verificar-whatsapp +
+    // registro/confirmar-whatsapp) hace menos de 30 minutos. Sin esto, cualquiera
+    // podía pegarle directo a esta API con un número inventado y saltarse la
+    // verificación real que sí exige la pantalla de registro.
+    const wppLimpioReg = whatsapp_negocio.replace(/\D/g, '');
+    const numeroReg = wppLimpioReg.startsWith('3') && wppLimpioReg.length === 10 ? '57' + wppLimpioReg : wppLimpioReg;
+    const expiraVerificado = whatsappVerificados.get(numeroReg);
+    if (!expiraVerificado || Date.now() > expiraVerificado) {
+      return res.status(400).json({ ok: false, error: 'Primero debes verificar tu número de WhatsApp.' });
+    }
+
+    // Verificar que el WhatsApp no tenga ya una cuenta/prueba gratis creada
+    // (evita que con el mismo número se abran varias cuentas de prueba).
+    // Se compara por los últimos 10 dígitos (número nacional, sin indicativo)
+    // porque en la tabla usuarios el campo whatsapp queda guardado en formatos
+    // distintos según de dónde venga (con/sin "57" adelante, con/sin "@c.us").
+    const whatsappFormateado = formatearWhatsapp(whatsapp_negocio);
+    const soloDigitos = whatsappFormateado.replace(/\D/g, '');
+    const ultimosDiez = soloDigitos.slice(-10);
+    const existeWhatsapp = await new Promise((resolve, reject) => {
+      db.get('SELECT id FROM usuarios WHERE whatsapp LIKE ?', [`%${ultimosDiez}%`], (err, row) => {
+        if (err) reject(err);
+        else resolve(row);
+      });
+    });
+    if (existeWhatsapp) {
+      return res.status(409).json({ ok: false, error: 'Ese número de WhatsApp ya tiene una cuenta registrada.' });
+    }
+    if (await whatsappYaUsoTrial(ultimosDiez)) {
+      return res.status(409).json({ ok: false, error: 'Ese número de WhatsApp ya usó su prueba gratis antes.' });
+    }
+
+    whatsappVerificados.delete(numeroReg); // un solo uso
+
     // Generar y guardar código
     const codigo = generarCodigo();
     await guardarCodigoVerificacion(email, codigo, {
-      email, nombre_negocio, plan, ciudad, whatsapp_negocio, banco, nombre, usuario, password,
+      email, nombre_negocio, plan, ciudad, whatsapp_negocio: whatsappFormateado, banco, nombre, usuario, password,
     });
 
     // Enviar correo
@@ -222,9 +264,21 @@ router.post('/registro/verificar', limitarLogin, async (req, res) => {
       );
     });
 
+    // Dejar constancia permanente de que este email/WhatsApp ya usaron su
+    // prueba gratis (a diferencia de "usuarios", esto no se borra ni se edita).
+    try {
+      await registrarTrialCreado({
+        negocio_id: negocio.id,
+        email: datos.email,
+        whatsappDigitos: (datos.whatsapp_negocio || '').replace(/\D/g, ''),
+      });
+    } catch (e) {
+      console.error('[Registro] Error guardando registro_trial:', e.message);
+    }
+
     // Enviar email de bienvenida
     try {
-      await enviarBienvenida(datos.email, datos.nombre, datos.usuario);
+      await enviarBienvenida(datos.email, datos.nombre, datos.usuario, negocio.plan, negocio.trial_fin);
     } catch (e) {
       console.error('[Registro] Error enviando bienvenida:', e.message);
     }
@@ -289,6 +343,7 @@ router.post('/registro/reenviar', limitarLogin, async (req, res) => {
 
 // ─── Verificación de WhatsApp ───────────────────────────
 const codigosWhatsapp = new Map(); // { numero: { codigo, expira, intentos } }
+const whatsappVerificados = new Map(); // { numero: expiraTimestamp } — números que ya pasaron el OTP
 
 router.post('/registro/verificar-whatsapp', limitarLogin, async (req, res) => {
   try {
@@ -349,6 +404,7 @@ router.post('/registro/confirmar-whatsapp', limitarLogin, (req, res) => {
   }
 
   codigosWhatsapp.delete(numero);
+  whatsappVerificados.set(numero, Date.now() + 30 * 60 * 1000); // válido 30 min para completar el registro
   console.log(`[Registro] WhatsApp verificado: ${numero}`);
   res.json({ ok: true, mensaje: 'WhatsApp verificado' });
 });

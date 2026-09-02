@@ -74,7 +74,7 @@ function Nav({ onLogin }) {
       </li>
     ))}
     <li className="nav-login-mobile-item">
-      <button onClick={() => { setMenuOpen(false); window.open('/panel', '_blank'); }} style={{ background: "none", border: "none", color: "#b0b0c8", fontSize: "0.9rem", fontWeight: 500, cursor: "pointer", display: "flex", alignItems: "center", gap: 6, padding: 0 }}>
+      <button onClick={() => { setMenuOpen(false); window.open('https://app.flashpago.co', '_blank'); }} style={{ background: "none", border: "none", color: "#b0b0c8", fontSize: "0.9rem", fontWeight: 500, cursor: "pointer", display: "flex", alignItems: "center", gap: 6, padding: 0 }}>
         <Lock size={15} /> Iniciar sesión
       </button>
     </li>
@@ -82,7 +82,7 @@ function Nav({ onLogin }) {
 
   {/* Derecha: botones */}
   <div style={{ display: "flex", gap: "0.5rem", alignItems: "center" }}>
-    <button className="nav-login-btn" onClick={() => window.open('/panel', '_blank')} style={{ background: "transparent", border: "2px solid rgba(255,255,255,0.2)", color: COLORS.blanco, padding: "0.45rem 1.1rem", borderRadius: 8, cursor: "pointer", fontWeight: 600, fontSize: "0.85rem", display: "flex", alignItems: "center", gap: 6, whiteSpace: "nowrap" }}>
+    <button className="nav-login-btn" onClick={() => window.open('https://app.flashpago.co', '_blank')} style={{ background: "transparent", border: "2px solid rgba(255,255,255,0.2)", color: COLORS.blanco, padding: "0.45rem 1.1rem", borderRadius: 8, cursor: "pointer", fontWeight: 600, fontSize: "0.85rem", display: "flex", alignItems: "center", gap: 6, whiteSpace: "nowrap" }}>
   <Lock size={15} /> Iniciar sesión
     </button>
     <a href="#contacto" style={{ background: COLORS.naranja, color: "white", padding: "0.5rem 1.1rem", borderRadius: 8, textDecoration: "none", fontWeight: 600, fontSize: "0.85rem", whiteSpace: "nowrap" }}>
@@ -261,17 +261,22 @@ export default function FlashPagoLanding({ onLogin, onRegistro, onTerminos, onPr
   const planes = [
     {
       name: "Básico", price: "$39.900",
-      features: ["Verificación de pagos por WhatsApp", "Lectura con IA (3 bancos)", "Detección de duplicados", "Registro de pagos", "Dashboard web", "Soporte por WhatsApp"],
+      features: ["Verificación de pagos por WhatsApp", "300 comprobantes/mes", "Lectura con IA (3 bancos)", "Detección de duplicados", "Registro de pagos", "Dashboard web", "Soporte por WhatsApp"],
       disabled: ["Reportes automáticos"],
     },
     {
       name: "Premium", price: "$79.900", popular: true,
-      features: ["Todo lo del plan Básico", "Reportes diarios automáticos", "Dashboard web", "Búsqueda de clientes", "Fotos de comprobantes", "Estadísticas del negocio", "Soporte prioritario"],
+      features: ["Todo lo del plan Básico", "1,000 comprobantes/mes", "Reportes diarios automáticos", "Búsqueda de clientes", "Fotos de comprobantes", "Estadísticas del negocio", "Soporte prioritario"],
       disabled: [],
     },
     {
-      name: "Empresarial", price: "$149.900",
-      features: ["Todo lo del plan Premium", "Multi-sucursal", "Exportar a Excel", "Usuarios ilimitados", "Soporte dedicado"],
+      name: "Premium Plus", price: "$109.900",
+      features: ["Todo lo del plan Premium", "Comprobantes ilimitados", "Soporte prioritario"],
+      disabled: [],
+    },
+    {
+      name: "Empresarial", price: "$179.900",
+      features: ["Todo lo del plan Premium Plus", "Multi-sucursal", "Exportar a Excel", "Usuarios ilimitados", "Soporte dedicado"],
       disabled: [], pronto: ["API bancaria directa (pronto)", "Integración contable (pronto)"],
     },
   ];
@@ -474,7 +479,7 @@ export default function FlashPagoLanding({ onLogin, onRegistro, onTerminos, onPr
           <h2 style={{ fontFamily: "'Space Grotesk',sans-serif", fontSize: "2.5rem", fontWeight: 700, marginBottom: "1.5rem", lineHeight: 1.2, marginTop: 0 }}>Elige el plan para tu negocio</h2>
           <p style={{ fontSize: "1.1rem", color: COLORS.grisTxt, maxWidth: 650, marginBottom: "3rem" }}>Sin contratos largos. Cancela cuando quieras.</p>
           <div className="planes-grid-wrap" style={{ display: "grid", gridTemplateColumns: "repeat(3,1fr)", gap: "2rem" }}>
-            {planes.map(plan => (
+            {planes.filter(plan => plan.name !== "Empresarial").map(plan => (
               <div key={plan.name} style={{ border: `2px solid ${plan.popular ? COLORS.naranja : "#e8e8f0"}`, borderRadius: 20, padding: "2.5rem 2rem", position: "relative", ...(plan.popular ? { background: "linear-gradient(180deg, rgba(245,124,0,0.03) 0%, transparent 100%)" } : {}) }}>
                 {plan.popular && (
                   <div style={{ position: "absolute", top: -14, left: "50%", transform: "translateX(-50%)", background: COLORS.naranja, color: "white", padding: "0.3rem 1.2rem", borderRadius: 50, fontSize: "0.75rem", fontWeight: 600, textTransform: "uppercase", letterSpacing: 1, display: "flex", alignItems: "center", gap: 5, whiteSpace: "nowrap" }}>
@@ -507,6 +512,16 @@ export default function FlashPagoLanding({ onLogin, onRegistro, onTerminos, onPr
               </div>
             ))}
           </div>
+
+          <div style={{ marginTop: "2rem", border: "1px solid #e8e8f0", borderRadius: 16, padding: "1.5rem 2rem", display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: "1rem", background: COLORS.grisClaro }}>
+            <div>
+              <div style={{ fontFamily: "'Space Grotesk',sans-serif", fontSize: "1.05rem", fontWeight: 700, marginBottom: "0.25rem" }}>¿Tienes varias sucursales?</div>
+              <div style={{ fontSize: "0.9rem", color: COLORS.grisTxt }}>El plan Empresarial (multi-sucursal, usuarios ilimitados) se arma a la medida de tu negocio.</div>
+            </div>
+            <a href={`https://wa.me/573167064671?text=${encodeURIComponent('Hola, quiero conocer el plan Empresarial de FlashPago')}`} target="_blank" rel="noopener noreferrer" style={{ background: COLORS.naranja, color: "white", padding: "0.8rem 1.5rem", borderRadius: 10, textDecoration: "none", fontWeight: 600, fontSize: "0.9rem", display: "inline-flex", alignItems: "center", gap: 8, whiteSpace: "nowrap" }}>
+              <MessageCircle size={16} /> Hablar con ventas
+            </a>
+          </div>
         </div>
       </section>
 
@@ -520,7 +535,7 @@ export default function FlashPagoLanding({ onLogin, onRegistro, onTerminos, onPr
             <a href={`https://wa.me/573167064671?text=${encodeURIComponent('Hola, quiero conocer más sobre FlashPago')}`} target="_blank" rel="noopener noreferrer" style={{ background: COLORS.naranja, color: "white", padding: "1rem 2rem", borderRadius: 12, textDecoration: "none", fontWeight: 600, fontSize: "1.05rem", display: "inline-flex", alignItems: "center", gap: 8 }}>
               <MessageCircle size={18} /> Escribir por WhatsApp
             </a>
-            <button onClick={() => window.open('/panel', '_blank')} style={{ background: "transparent", color: COLORS.blanco, padding: "1rem 2rem", borderRadius: 12, fontWeight: 600, fontSize: "1.05rem", border: "2px solid rgba(255,255,255,0.2)", cursor: "pointer", display: "inline-flex", alignItems: "center", gap: 8, fontFamily: "'Inter',sans-serif" }}>
+            <button onClick={() => window.open('https://app.flashpago.co', '_blank')} style={{ background: "transparent", color: COLORS.blanco, padding: "1rem 2rem", borderRadius: 12, fontWeight: 600, fontSize: "1.05rem", border: "2px solid rgba(255,255,255,0.2)", cursor: "pointer", display: "inline-flex", alignItems: "center", gap: 8, fontFamily: "'Inter',sans-serif" }}>
              <Lock size={17} /> Ir al Panel
 
             </button>

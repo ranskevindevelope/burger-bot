@@ -13,8 +13,28 @@ import './App.css';
 const queryClient = new QueryClient();
 
 function App() {
-  const esPanel = window.location.pathname.startsWith('/panel');
-  const vistaSolicitada = new URLSearchParams(window.location.search).get('vista');
+  const paramsUrl = new URLSearchParams(window.location.search);
+
+  // El registro se puede completar en flashpago.co (landing), pero el
+  // dashboard vive en app.flashpago.co — es otro origen y no comparte
+  // localStorage, así que el token de auto-login llega por la URL en ese
+  // salto entre dominios. Se guarda acá y se limpia la URL de inmediato.
+  const tokenDeUrl = paramsUrl.get('token');
+  const userDeUrl = paramsUrl.get('user');
+  if (tokenDeUrl && userDeUrl) {
+    localStorage.setItem('fp_token', tokenDeUrl);
+    localStorage.setItem('fp_user', userDeUrl);
+    const url = new URL(window.location.href);
+    url.searchParams.delete('token');
+    url.searchParams.delete('user');
+    window.history.replaceState({}, '', url.toString());
+  }
+
+  // app.flashpago.co siempre es el dashboard; flashpago.co es la landing.
+  // Se deja el chequeo de /panel como respaldo (bookmarks viejos, o si algún
+  // día vuelven a compartir dominio).
+  const esPanel = window.location.hostname.startsWith('app.') || window.location.pathname.startsWith('/panel');
+  const vistaSolicitada = paramsUrl.get('vista');
   const [vista, setVista] = useState(
     ['terminos', 'privacidad'].includes(vistaSolicitada)
       ? vistaSolicitada

@@ -53,7 +53,8 @@ function Registro({ onBack }) {
   const planes = [
     { id: 'basico', nombre: 'Básico', precio: '$39.900', comprobantes: '300 comprobantes/mes', corto: '300/mes', popular: false, Icono: Package },
     { id: 'premium', nombre: 'Premium', precio: '$79.900', comprobantes: '1,000 comprobantes/mes', corto: '1,000/mes', popular: true, Icono: Rocket },
-    { id: 'empresarial', nombre: 'Empresarial', precio: '$149.900', comprobantes: 'Ilimitado', corto: 'Ilimitado', popular: false, Icono: Building2 },
+    { id: 'premium_plus', nombre: 'Premium Plus', precio: '$109.900', comprobantes: 'Ilimitado', corto: 'Ilimitado', popular: false, Icono: Zap },
+    { id: 'empresarial', nombre: 'Empresarial', precio: '$179.900', comprobantes: 'Ilimitado', corto: 'Ilimitado', popular: false, Icono: Building2 },
   ];
 
   const planActual = planes.find(p => p.id === plan);
@@ -212,9 +213,14 @@ function Registro({ onBack }) {
   // ─── Ir al dashboard ──────────────────────────────────
   const irAlDashboard = () => {
     if (registroExitoso) {
-      localStorage.setItem('fp_token', registroExitoso.token);
-      localStorage.setItem('fp_user', JSON.stringify(registroExitoso.user));
-      window.location.href = '/panel?seccion=panel';
+      // El registro puede completarse en flashpago.co (landing), pero el
+      // dashboard vive en app.flashpago.co — es otro origen y no comparte
+      // localStorage, así que el token se pasa por la URL para el salto.
+      const params = new URLSearchParams({
+        token: registroExitoso.token,
+        user: JSON.stringify(registroExitoso.user),
+      });
+      window.location.href = `https://app.flashpago.co/?${params.toString()}`;
     }
   };
 
@@ -376,7 +382,7 @@ function Registro({ onBack }) {
           <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: '1rem', paddingBottom: '0.75rem', borderBottom: '1px solid rgba(255,255,255,0.08)' }}>
             <div style={{
               width: 36, height: 36, borderRadius: 10,
-              background: plan === 'empresarial' ? 'linear-gradient(135deg, #F57C00, #FF9800)' : plan === 'premium' ? 'linear-gradient(135deg, #F57C00, #FFB74D)' : 'rgba(245,124,0,0.2)',
+              background: plan === 'empresarial' ? 'linear-gradient(135deg, #F57C00, #FF9800)' : plan === 'premium_plus' ? 'linear-gradient(135deg, #F57C00, #FFA726)' : plan === 'premium' ? 'linear-gradient(135deg, #F57C00, #FFB74D)' : 'rgba(245,124,0,0.2)',
               display: 'flex', alignItems: 'center', justifyContent: 'center',
               transition: 'all 0.4s ease',
             }}>
@@ -403,7 +409,7 @@ function Registro({ onBack }) {
               <span style={{ fontSize: 12, color: 'rgba(255,255,255,0.5)' }}>Plan</span>
               <span style={{
                 fontSize: 12, fontWeight: 600, padding: '3px 10px', borderRadius: 50,
-                background: plan === 'empresarial' ? 'rgba(245,124,0,0.3)' : plan === 'premium' ? 'rgba(245,124,0,0.2)' : 'rgba(255,255,255,0.08)',
+                background: plan === 'empresarial' ? 'rgba(245,124,0,0.3)' : plan === 'premium_plus' ? 'rgba(245,124,0,0.25)' : plan === 'premium' ? 'rgba(245,124,0,0.2)' : 'rgba(255,255,255,0.08)',
                 color: plan ? '#F57C00' : 'rgba(255,255,255,0.3)',
                 transition: 'all 0.3s ease',
               }}>

@@ -828,7 +828,7 @@ function Dashboard({ onLogout }) {
   };
 
   const getPlanLabel = (plan) => {
-    const labels = { basico: 'Básico', premium: 'Premium', empresarial: 'Empresarial' };
+    const labels = { basico: 'Básico', premium: 'Premium', premium_plus: 'Premium Plus', empresarial: 'Empresarial' };
     return labels[plan] || plan;
   };
 
@@ -935,7 +935,7 @@ function Dashboard({ onLogout }) {
 
               {/* Cards de planes */}
               <div className="planes-bloqueo-grid" style={{
-                display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 18,
+                display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 18,
                 maxWidth: 780, width: '100%', marginBottom: '2rem', alignItems: 'stretch',
               }}>
                 {[
@@ -943,8 +943,10 @@ function Dashboard({ onLogout }) {
                     features: ['Verificación por WhatsApp', 'IA para lectura de bancos', '300 comprobantes/mes'] },
                   { id: 'premium', nombre: 'Premium', precio: '$79.900', comprobantes: '1,000 comprobantes/mes', Icono: Rocket, popular: true,
                     features: ['Todo lo de Básico', 'Reportes diarios automáticos', 'Dashboard completo'] },
-                  { id: 'empresarial', nombre: 'Empresarial', precio: '$149.900', comprobantes: 'Comprobantes ilimitados', Icono: Building2,
-                    features: ['Todo lo de Premium', 'Multi-sucursal', 'Soporte dedicado'] },
+                  { id: 'premium_plus', nombre: 'Premium Plus', precio: '$109.900', comprobantes: 'Comprobantes ilimitados', Icono: Zap,
+                    features: ['Todo lo de Premium', 'Comprobantes ilimitados', 'Soporte prioritario'] },
+                  { id: 'empresarial', nombre: 'Empresarial', precio: '$179.900', comprobantes: 'Comprobantes ilimitados', Icono: Building2,
+                    features: ['Todo lo de Premium Plus', 'Multi-sucursal', 'Soporte dedicado'] },
                 ].map((p) => (
                   <div key={p.nombre} style={{
                     display: 'flex', flexDirection: 'column',
@@ -1265,7 +1267,7 @@ function Dashboard({ onLogout }) {
                   </div>
                   {(planInfo.trial.dias <= 3 || !planInfo.trial.activo) && (
                     <button
-                      onClick={() => window.open('https://flashpago.co/panel', '_self')}
+                      onClick={() => window.open('https://app.flashpago.co', '_self')}
                       style={{
                         padding: '0.6rem 1.25rem', borderRadius: 10, border: 'none',
                         background: !planInfo.trial.activo ? '#E53935' : '#F57C00',
@@ -2831,6 +2833,7 @@ function Dashboard({ onLogout }) {
                         <select value={formNegocio.plan} onChange={(e) => setFormNegocio({ ...formNegocio, plan: e.target.value })}>
                           <option value="basico">Básico (300/mes)</option>
                           <option value="premium">Premium (1,000/mes)</option>
+                          <option value="premium_plus">Premium Plus (ilimitado)</option>
                           <option value="empresarial">Empresarial (ilimitado)</option>
                         </select>
                       </div>
