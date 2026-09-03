@@ -4,7 +4,7 @@ Guía rápida para trabajar en este repo con Claude Code. La documentación comp
 
 ## Qué es
 
-Bot de WhatsApp (OpenWA) para Vinson Burgers que recibe comprobantes de pago, los procesa con Claude (OCR), los verifica contra Gmail/Prometeo y los registra en SQLite (`vinsonbot.db`). Incluye un dashboard React servido por el mismo backend Express.
+**FlashPago**: plataforma de verificación automática de pagos, no un bot — usa WhatsApp (vía OpenWA) como canal de entrada de comprobantes. Esta instancia está desplegada para Vinson Burgers: recibe comprobantes de pago, los procesa con Claude (OCR), los verifica contra Gmail/Prometeo y los registra en SQLite (`vinsonbot.db`). Incluye un dashboard React servido por el mismo backend Express.
 
 ## Dónde vive el código
 

@@ -1,9 +1,12 @@
-# Burger Bot OpenWA
+# FlashPago
 
-Sistema de verificacion de pagos para Vinson Burgers. El proyecto recibe
-comprobantes por WhatsApp mediante OpenWA, extrae sus datos con Claude,
-comprueba el pago mediante Gmail y registra el resultado en SQLite. Tambien
-incluye un dashboard web con login, reportes y administracion de usuarios.
+Sistema de verificacion automatica de pagos. No es un bot: es una plataforma
+de verificacion de pagos que usa WhatsApp (mediante OpenWA) como canal de
+entrada. El proyecto recibe comprobantes por WhatsApp, extrae sus datos con
+Claude, comprueba el pago mediante Gmail y registra el resultado en SQLite.
+Tambien incluye un dashboard web con login, reportes y administracion de
+usuarios. Esta instancia esta configurada para Vinson Burgers, pero la
+suscripcion y el cobro son a FlashPago (ver seccion Wompi).
 
 El codigo esta organizado en modulos separados por responsabilidad, de modo
 que `index.js` actua solo como punto de entrada del servidor y el resto de la
@@ -44,7 +47,7 @@ Prometeo puede usar coincidencia por referencia o una diferencia maxima de
 ## Estructura
 
 ```text
-burger-bot-openwa/
+flashpago-backend/
 ├── index.js              # Arranca el servidor, monta rutas y programa reportes
 ├── config.js             # Variables de entorno centralizadas
 ├── auth.js               # Middlewares de autenticacion: JWT, roles, login
