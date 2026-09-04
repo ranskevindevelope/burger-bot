@@ -121,6 +121,19 @@ export default function Privacidad({ onVolver }) {
               Todos los encargados están obligados contractualmente o por sus propios términos de servicio a
               proteger la información y a no usarla para fines distintos a los aquí descritos.
             </p>
+            <p style={{ marginTop: "0.75rem" }}>
+              <strong>Uso de datos de Google (Gmail):</strong> el acceso a Gmail que el negocio autoriza mediante
+              Google OAuth se usa exclusivamente para comparar automáticamente el monto de un comprobante de pago
+              con las notificaciones bancarias que el negocio recibe por correo, con el fin de confirmar
+              transacciones de forma automática. No se usa para ningún otro propósito — no se usa para publicidad,
+              no se usa para entrenar modelos de inteligencia artificial ni sistemas de aprendizaje automático, y
+              no se transfiere a terceros salvo lo estrictamente necesario para prestar esta funcionalidad de
+              verificación. El uso y la transferencia por parte de FlashPago de la información recibida de las
+              APIs de Google cumplen con la{' '}
+              <a href="https://developers.google.com/terms/api-services-user-data-policy" target="_blank" rel="noreferrer" style={{ color: "#F57C00" }}>
+                Google API Services User Data Policy
+              </a>, incluyendo los requisitos de Uso Limitado ("Limited Use").
+            </p>
           </section>
 
           <section>
