@@ -7,11 +7,84 @@ const config = require('../config');
 const { leerComprobante } = require('../ocr');
 const { verificarPorGmail } = require('../gmail');
 const { verificarPago } = require('../verificador');
-const { db, guardarPago, buscarDuplicadoReciente, contarComprobantesDelMes, obtenerNegocio, verificarTrialActivo } = require('../db');
-const { enviarMensaje } = require('../bot/openwa');
+const {
+  db, guardarPago, buscarDuplicadoReciente, contarComprobantesDelMes, obtenerNegocio, verificarTrialActivo,
+  marcarNegocioPagado, actualizarPagoPlataforma, obtenerAdminDeNegocio,
+} = require('../db');
+const { enviarMensaje, descargarMediaMeta } = require('../bot/openwa');
 const { formatearResultado, guardarFoto } = require('../bot/utils');
 const { pagosPendientes, historialPagos } = require('../bot/state');
 const comandos = require('../bot/comandos');
+const { obtenerTransferenciaEsperada, limpiarTransferenciaEsperada } = require('./wompi');
+const { enviarGraciasPago } = require('../mailer');
+
+// ─── Pago de la suscripción de FlashPago por transferencia manual ──
+// Se dispara cuando el admin manda una foto y su negocio está "esperando"
+// un comprobante de pago de plataforma (ver routes/wompi.js /transferencia/iniciar).
+// Usa el mismo OCR que los comprobantes de clientes, y además cruza contra
+// el Gmail conectado en config.NEGOCIO_ID_SUSCRIPCION (la cuenta bancaria
+// real de FlashPago) — igual de confiable que la verificación de clientes,
+// no le cree ciegamente a la imagen.
+async function procesarPagoPlataforma(from, transferencia, mediaUrl, mediaBase64) {
+  const { negocio_id } = transferencia;
+  await enviarMensaje(from, '⏳ Verificando tu pago de suscripción...');
+  try {
+    const datos = await leerComprobante(mediaUrl, mediaBase64);
+    if (datos.error || !datos.monto || isNaN(parseFloat(datos.monto))) {
+      await enviarMensaje(from, '⚠️ No pude leer ese comprobante. Asegúrate de que la imagen sea clara, o contacta soporte para activar tu plan manualmente.');
+      return;
+    }
+
+    const montoLeido = parseInt(datos.monto);
+    if (montoLeido !== transferencia.montoPesos) {
+      await actualizarPagoPlataforma(transferencia.referencia, { estado: 'RECHAZADO' });
+      await enviarMensaje(from,
+        `⚠️ El monto del comprobante ($${montoLeido.toLocaleString('es-CO')}) no coincide con el valor de tu plan ($${transferencia.montoPesos.toLocaleString('es-CO')}). ` +
+        `Contacta soporte para activarlo manualmente.`
+      );
+      return;
+    }
+
+    // El monto de la imagen coincide — ahora se confirma contra la notificación
+    // real del banco antes de activar nada. 5 intentos cada 30s ≈ 2 minutos
+    // de margen (más que los 10s/4 intentos del flujo de clientes, porque acá
+    // no hay nadie esperando en el chat con el "verificando..." a la vista).
+    const confirmadoPorBanco = await verificarPorGmail(montoLeido, config.NEGOCIO_ID_SUSCRIPCION, {
+      intentos: 5,
+      esperaMs: 30000,
+    });
+
+    if (confirmadoPorBanco) {
+      await marcarNegocioPagado(negocio_id, transferencia.plan);
+      await actualizarPagoPlataforma(transferencia.referencia, { estado: 'APROBADO' });
+      limpiarTransferenciaEsperada(from);
+      await enviarMensaje(from, `✅ ¡Pago confirmado! Tu plan quedó activo. Gracias por confiar en FlashPago. 🚀`);
+
+      try {
+        const admin = await obtenerAdminDeNegocio(negocio_id);
+        if (admin) await enviarGraciasPago(admin.email, admin.nombre, transferencia.plan, transferencia.montoPesos * 100);
+      } catch (e) {
+        console.error('[PagoPlataforma] Error enviando correo de agradecimiento:', e.message);
+      }
+    } else {
+      // El monto de la foto coincide, pero el banco todavía no confirma la
+      // transferencia — queda en revisión manual, no se activa solo.
+      await enviarMensaje(from,
+        `⏳ Recibí tu comprobante, pero todavía no veo la confirmación del banco. Tu pago queda en revisión — te avisamos apenas se confirme, o contactanos si pasa mucho tiempo.`
+      );
+      try {
+        await enviarMensaje(`${config.ADMIN_SUSCRIPCION_WHATSAPP}@c.us`,
+          `🚨 *Pago de suscripción sin confirmar por banco*\n\nNegocio: ${negocio_id}\nPlan: ${transferencia.plan}\nMonto leído: $${montoLeido.toLocaleString('es-CO')}\nReferencia: ${transferencia.referencia}\n\nRevisar manualmente.`
+        );
+      } catch (e) {
+        console.error('[PagoPlataforma] Error alertando al admin:', e.message);
+      }
+    }
+  } catch (err) {
+    console.error('[PagoPlataforma] Error:', err.message);
+    await enviarMensaje(from, '⚠️ Error verificando tu pago. Contacta soporte.');
+  }
+}
 
 const MENSAJES = {
   procesando: `⏳ Verificando el pago... un momento.`,
@@ -70,8 +143,35 @@ setTimeout(() => {
   cargarEmpleados().catch(e => console.error('[Cache] Error inicial:', e.message));
 }, 2000);
 
-// ─── Middleware: validar secreto del webhook ─────────────
+// ─── Verificación del webhook (handshake de Meta) ────────
+// Meta llama a esta ruta con GET al configurar el webhook en su panel.
+// Solo aplica si WA_PROVIDER=meta; con open-wa no se usa.
+router.get('/', (req, res) => {
+  const mode = req.query['hub.mode'];
+  const token = req.query['hub.verify_token'];
+  const challenge = req.query['hub.challenge'];
+  if (mode === 'subscribe' && config.META_VERIFY_TOKEN && token === config.META_VERIFY_TOKEN) {
+    return res.status(200).send(challenge);
+  }
+  return res.sendStatus(403);
+});
+
+// ─── Middleware: validar autenticidad del webhook ────────
+// open-wa: secreto plano en header. meta: firma HMAC del body crudo.
 router.use((req, res, next) => {
+  if (config.WA_PROVIDER === 'meta') {
+    const appSecret = config.META_APP_SECRET;
+    if (!appSecret) return res.status(503).json({ ok: false, error: 'Integración no configurada' });
+    const firmaRecibida = req.get('X-Hub-Signature-256') || '';
+    const firmaEsperada = 'sha256=' + crypto.createHmac('sha256', appSecret).update(req.rawBody || Buffer.alloc(0)).digest('hex');
+    const bufRecibido = Buffer.from(firmaRecibida);
+    const bufEsperado = Buffer.from(firmaEsperada);
+    if (bufRecibido.length !== bufEsperado.length || !crypto.timingSafeEqual(bufRecibido, bufEsperado)) {
+      return res.status(401).json({ ok: false, error: 'Firma inválida' });
+    }
+    return next();
+  }
+
   const recibido = req.get('X-Webhook-Secret');
   const INBOUND_WEBHOOK_SECRET = config.INBOUND_WEBHOOK_SECRET;
   if (!INBOUND_WEBHOOK_SECRET) return res.status(503).json({ ok: false, error: 'Integración no configurada' });
@@ -101,21 +201,51 @@ router.post('/', async (req, res) => {
     return;
   }
 
-  const data = evento.data || evento;
+  let from, body, isMedia, mediaUrl = '', mediaBase64 = '', mediaType = '';
 
-  const rawId = data.chatId || data.from || '';
-  const from = lidMap[rawId] || rawId;
+  if (config.WA_PROVIDER === 'meta') {
+    // ─── Formato de la API oficial de Meta ────────────────
+    const value = evento.entry?.[0]?.changes?.[0]?.value;
+    const msg = value?.messages?.[0];
+    if (!msg) {
+      console.log('[Webhook] Evento de Meta sin mensaje (status/delivery), ignorado');
+      return;
+    }
 
-  const body = (data.body || data.text || data.content || data.message?.conversation || '').trim().toLowerCase();
-  const mediaUrl = data.mediaUrl || data.media?.url || data.message?.imageMessage?.url || '';
-  const mediaBase64 = data.media?.data || '';
-  const mediaType = data.mimetype || data.media?.mimetype || data.message?.imageMessage?.mimetype || '';
-  const isMedia = data.hasMedia || data.type === 'image' || mediaUrl !== '';
+    from = `${msg.from}@c.us`;
+    body = (msg.type === 'text' ? (msg.text?.body || '') : '').trim().toLowerCase();
+    isMedia = msg.type === 'image';
+
+    if (isMedia) {
+      try {
+        const media = await descargarMediaMeta(msg.image.id);
+        mediaBase64 = media.base64;
+        mediaType = media.mimetype;
+      } catch (err) {
+        console.error('[Webhook][Meta] Error descargando imagen:', err.message);
+        await enviarMensaje(from, MENSAJES.errorLectura);
+        return;
+      }
+    }
+  } else {
+    // ─── Formato de OpenWA (no oficial) ───────────────────
+    const data = evento.data || evento;
+
+    const rawId = data.chatId || data.from || '';
+    from = lidMap[rawId] || rawId;
+
+    body = (data.body || data.text || data.content || data.message?.conversation || '').trim().toLowerCase();
+    mediaUrl = data.mediaUrl || data.media?.url || data.message?.imageMessage?.url || '';
+    mediaBase64 = data.media?.data || '';
+    mediaType = data.mimetype || data.media?.mimetype || data.message?.imageMessage?.mimetype || '';
+    isMedia = data.hasMedia || data.type === 'image' || mediaUrl !== '';
+
+    if (data.fromMe || data.key?.fromMe) return;
+  }
 
   console.log('[Webhook] from:', from, '| body:', body, '| isMedia:', isMedia);
 
   if (!from) return;
-  if (data.fromMe || data.key?.fromMe) return;
 
   // ─── Buscar empleado y su negocio ─────────────────────
   const empleado = await getEmpleadoInfo(from);
@@ -153,6 +283,18 @@ router.post('/', async (req, res) => {
   // ─── Es media (imagen) ────────────────────────────────
   if (mediaType && !mediaType.startsWith('image/')) {
     await enviarMensaje(from, '⚠️ Solo acepto imágenes de comprobantes. Envía una foto.');
+    return;
+  }
+
+  // ─── ¿Es un comprobante de pago de la suscripción a FlashPago? ──
+  // Va antes del trial/límite: si el negocio está intentando pagar
+  // justo porque venció el trial, no lo bloqueamos acá. Se busca por el
+  // WhatsApp exacto del remitente (no por negocio_id), para que un
+  // empleado mandando un comprobante real de cliente en la misma ventana
+  // no se confunda con el pago de suscripción del admin.
+  const transferenciaEsperada = obtenerTransferenciaEsperada(from);
+  if (transferenciaEsperada) {
+    await procesarPagoPlataforma(from, transferenciaEsperada, mediaUrl, mediaBase64);
     return;
   }
 

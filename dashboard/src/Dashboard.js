@@ -98,6 +98,9 @@ function Dashboard({ onLogout }) {
   const [pagandoPlan, setPagandoPlan] = useState(null);
   const [gmailEstado, setGmailEstado] = useState(null);
   const [gmailCargando, setGmailCargando] = useState(false);
+  const [modalPagoPlan, setModalPagoPlan] = useState(null);
+  const [transferenciaInfo, setTransferenciaInfo] = useState(null);
+  const [cargandoTransferencia, setCargandoTransferencia] = useState(false);
 
   // Detectar redirect de Gmail OAuth
   useEffect(() => {
@@ -679,6 +682,30 @@ function Dashboard({ onLogout }) {
     }
   };
 
+  const iniciarTransferencia = async (planId) => {
+    setCargandoTransferencia(true);
+    try {
+      const data = await api.request('/api/wompi/transferencia/iniciar', {
+        method: 'POST',
+        body: JSON.stringify({ plan: planId }),
+      });
+      if (!data.ok) {
+        toast.error(data.error || 'No se pudo iniciar la transferencia');
+        setCargandoTransferencia(false);
+        return;
+      }
+      setTransferenciaInfo(data);
+    } catch (err) {
+      toast.error(err.message || 'Error de conexión al iniciar la transferencia');
+    }
+    setCargandoTransferencia(false);
+  };
+
+  const cerrarModalPago = () => {
+    setModalPagoPlan(null);
+    setTransferenciaInfo(null);
+  };
+
   // ─── Funciones de Periodo ────────────────────────────────
   const cargarPeriodo = async () => {
     setCargandoPeriodo(true);
@@ -935,8 +962,8 @@ function Dashboard({ onLogout }) {
 
               {/* Cards de planes */}
               <div className="planes-bloqueo-grid" style={{
-                display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 18,
-                maxWidth: 780, width: '100%', marginBottom: '2rem', alignItems: 'stretch',
+                display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 18,
+                maxWidth: 900, width: '100%', marginBottom: '2rem', alignItems: 'stretch',
               }}>
                 {[
                   { id: 'basico', nombre: 'Básico', precio: '$39.900', comprobantes: '300 comprobantes/mes', Icono: Package,
@@ -945,8 +972,6 @@ function Dashboard({ onLogout }) {
                     features: ['Todo lo de Básico', 'Reportes diarios automáticos', 'Dashboard completo'] },
                   { id: 'premium_plus', nombre: 'Premium Plus', precio: '$109.900', comprobantes: 'Comprobantes ilimitados', Icono: Zap,
                     features: ['Todo lo de Premium', 'Comprobantes ilimitados', 'Soporte prioritario'] },
-                  { id: 'empresarial', nombre: 'Empresarial', precio: '$179.900', comprobantes: 'Comprobantes ilimitados', Icono: Building2,
-                    features: ['Todo lo de Premium Plus', 'Multi-sucursal', 'Soporte dedicado'] },
                 ].map((p) => (
                   <div key={p.nombre} style={{
                     display: 'flex', flexDirection: 'column',
@@ -982,16 +1007,14 @@ function Dashboard({ onLogout }) {
                       ))}
                     </div>
                     <button
-                      onClick={() => pagarConWompi(p.id, p.nombre)}
-                      disabled={pagandoPlan === p.id}
+                      onClick={() => setModalPagoPlan(p)}
                       style={{
                         width: '100%', padding: '0.75rem', borderRadius: 10, border: 'none',
                         background: p.popular ? '#F57C00' : '#1a1a2e', color: '#fff',
                         fontWeight: 600, fontSize: '0.88rem', cursor: 'pointer',
-                        opacity: pagandoPlan === p.id ? 0.7 : 1, transition: 'opacity 0.15s',
                       }}
                     >
-                      {pagandoPlan === p.id ? 'Abriendo pago...' : `Activar ${p.nombre}`}
+                      Activar {p.nombre}
                     </button>
                   </div>
                 ))}
@@ -1006,6 +1029,117 @@ function Dashboard({ onLogout }) {
                   Pago seguro procesado por Wompi. Tus datos están protegidos.
                 </span>
               </div>
+
+              {modalPagoPlan && (
+            <div onClick={cerrarModalPago} style={{
+              position: 'fixed', inset: 0, background: 'rgba(20,20,40,0.55)', zIndex: 1000,
+              display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '1rem',
+            }}>
+              <div onClick={(e) => e.stopPropagation()} style={{
+                background: 'var(--dash-surface)', borderRadius: 18, padding: '1.75rem',
+                width: '100%', maxWidth: 420, boxShadow: '0 20px 60px rgba(0,0,0,0.3)',
+              }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '1.25rem' }}>
+                  <div>
+                    <div style={{ fontFamily: "'Space Grotesk',sans-serif", fontWeight: 700, fontSize: 18, color: 'var(--dash-text)' }}>
+                      Activar {modalPagoPlan.nombre}
+                    </div>
+                    <div style={{ fontSize: 13, color: 'var(--dash-text-faint)' }}>{modalPagoPlan.precio} / mes</div>
+                  </div>
+                  <button onClick={cerrarModalPago} style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 4 }}>
+                    <X size={20} color="var(--dash-text-faint)" />
+                  </button>
+                </div>
+
+                {!transferenciaInfo ? (
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+                    <button
+                      onClick={() => { cerrarModalPago(); pagarConWompi(modalPagoPlan.id, modalPagoPlan.nombre); }}
+                      disabled={pagandoPlan === modalPagoPlan.id}
+                      style={{
+                        display: 'flex', alignItems: 'center', gap: 10, padding: '0.9rem 1rem',
+                        borderRadius: 12, border: '1px solid var(--dash-border)', background: 'var(--dash-surface-2)',
+                        cursor: 'pointer', textAlign: 'left',
+                      }}
+                    >
+                      <CreditCard size={20} color="#F57C00" />
+                      <div>
+                        <div style={{ fontWeight: 600, fontSize: 14, color: 'var(--dash-text)' }}>PSE / Tarjeta</div>
+                        <div style={{ fontSize: 12, color: 'var(--dash-text-faint)' }}>Pago inmediato con Wompi</div>
+                      </div>
+                    </button>
+
+                    <button
+                      onClick={() => iniciarTransferencia(modalPagoPlan.id)}
+                      disabled={cargandoTransferencia}
+                      style={{
+                        display: 'flex', alignItems: 'center', gap: 10, padding: '0.9rem 1rem',
+                        borderRadius: 12, border: '2px solid #F57C00',
+                        background: 'linear-gradient(135deg, rgba(245,124,0,0.08), rgba(245,124,0,0.02))',
+                        cursor: 'pointer', textAlign: 'left', opacity: cargandoTransferencia ? 0.7 : 1,
+                        position: 'relative', boxShadow: '0 4px 16px rgba(245,124,0,0.12)',
+                      }}
+                    >
+                      <div style={{
+                        position: 'absolute', top: -10, right: 14, background: '#F57C00', color: '#fff',
+                        fontSize: 10, fontWeight: 700, letterSpacing: 0.4, textTransform: 'uppercase',
+                        padding: '2px 10px', borderRadius: 50,
+                      }}>
+                        Recomendado
+                      </div>
+                      <Building2 size={20} color="#F57C00" />
+                      <div>
+                        <div style={{ fontWeight: 700, fontSize: 14, color: 'var(--dash-text)' }}>Transferencia bancaria</div>
+                        <div style={{ fontSize: 12, color: 'var(--dash-text-faint)' }}>
+                          {cargandoTransferencia ? 'Generando datos...' : 'Nequi, Bancolombia u otro banco'}
+                        </div>
+                        <div style={{ fontSize: 11.5, color: '#F57C00', fontWeight: 600, marginTop: 3 }}>
+                          Sin comisiones · Confirmación automática
+                        </div>
+                      </div>
+                    </button>
+                  </div>
+                ) : (
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+                    <div style={{ fontSize: 13, color: 'var(--dash-text-muted)' }}>
+                      Transfiere <strong>${transferenciaInfo.montoPesos.toLocaleString('es-CO')}</strong> a esta cuenta:
+                    </div>
+
+                    <img
+                      src="/qr-flashpago.jpeg"
+                      alt="QR para pagar con Bre-B / Bancolombia"
+                      style={{ width: '100%', maxWidth: 260, alignSelf: 'center', borderRadius: 12, display: 'block' }}
+                      onError={(e) => { e.target.style.display = 'none'; }}
+                    />
+
+                    <div style={{
+                      background: 'var(--dash-surface-2)', borderRadius: 12, padding: '1rem',
+                      display: 'flex', flexDirection: 'column', gap: 4, fontSize: 13.5,
+                    }}>
+                      {transferenciaInfo.cuenta.banco && <div><strong>Banco:</strong> {transferenciaInfo.cuenta.banco}</div>}
+                      {transferenciaInfo.cuenta.tipo && <div><strong>Tipo:</strong> {transferenciaInfo.cuenta.tipo}</div>}
+                      {transferenciaInfo.cuenta.numero && <div><strong>Número:</strong> {transferenciaInfo.cuenta.numero}</div>}
+                      {transferenciaInfo.cuenta.titular && <div><strong>Titular:</strong> {transferenciaInfo.cuenta.titular}</div>}
+                      {transferenciaInfo.cuenta.nit && <div><strong>NIT:</strong> {transferenciaInfo.cuenta.nit}</div>}
+                    </div>
+                    <div style={{
+                      background: 'var(--tint-orange-bg)', borderRadius: 12, padding: '0.9rem 1rem', fontSize: 13, color: 'var(--dash-text)',
+                    }}>
+                      Después de transferir, envía la <strong>foto del comprobante</strong> por WhatsApp al{' '}
+                      <strong>+{transferenciaInfo.whatsapp}</strong>. El sistema lo lee y activa tu plan automáticamente —
+                      tenés 30 minutos.
+                    </div>
+                    <button onClick={() => setTransferenciaInfo(null)} style={{
+                      alignSelf: 'flex-start', background: 'none', border: 'none', color: 'var(--dash-text-faint)',
+                      fontSize: 12.5, cursor: 'pointer', textDecoration: 'underline', padding: 0,
+                    }}>
+                      ← Volver a las opciones de pago
+                    </button>
+                  </div>
+                )}
+              </div>
+            </div>
+              )}
             </div>
           ) : (
           <>
@@ -2834,7 +2968,6 @@ function Dashboard({ onLogout }) {
                           <option value="basico">Básico (300/mes)</option>
                           <option value="premium">Premium (1,000/mes)</option>
                           <option value="premium_plus">Premium Plus (ilimitado)</option>
-                          <option value="empresarial">Empresarial (ilimitado)</option>
                         </select>
                       </div>
                     </div>

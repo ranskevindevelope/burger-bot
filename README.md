@@ -186,6 +186,45 @@ Se usa para cobrar automáticamente la suscripción de cada negocio a FlashPago 
 
 El monto de cada plan lo decide el servidor (`db.js`, `PRECIOS_CENTAVOS`), nunca el navegador — así nadie puede manipular el precio antes de pagar. La verificación del webhook usa un checksum SHA256 con el secreto de eventos; una petición sin ese secreto correcto se rechaza.
 
+## Respaldo: migrar a la API oficial de Meta
+
+El envío/recepción de WhatsApp está detrás de un switch (`WA_PROVIDER`) para
+poder migrar rápido de open-wa a la API oficial de Meta si banean el número.
+Con `WA_PROVIDER` sin definir o en `openwa` (el default), el comportamiento
+es exactamente el de siempre — el código de Meta queda inerte.
+
+Para activarlo el día que haga falta:
+
+1. Verificar el negocio en [Meta Business Portfolio](https://business.facebook.com)
+   (Cámara de Comercio + RUT), crear una WhatsApp Business Account (WABA) y
+   registrar el número de teléfono ahí (tiene que estar libre de WhatsApp
+   normal y de la app de WhatsApp Business).
+2. Pedir la aprobación de las plantillas que se usan fuera de la ventana de
+   24h: reporte diario, verificación nocturna y alerta de pago sospechoso
+   (`bot/reportes.js`, y la alerta en `routes/webhook.js`). Esto puede tardar
+   días — conviene dejarlo pedido de antemano, no reactivamente tras un ban.
+3. En `.env`, agregar:
+
+   ```env
+   WA_PROVIDER=meta
+   META_API_VERSION=v20.0
+   META_PHONE_NUMBER_ID=tu_phone_number_id
+   META_ACCESS_TOKEN=tu_access_token_permanente
+   META_APP_SECRET=tu_app_secret
+   META_VERIFY_TOKEN=un_token_que_vos_inventes
+   ```
+
+4. En el panel de Meta, registrar el webhook apuntando a
+   `https://tu-dominio.com/webhook`, usando el mismo valor de
+   `META_VERIFY_TOKEN` para el handshake de verificación.
+5. Reiniciar el servidor. `bot/openwa.js` y `routes/webhook.js` cambian de
+   proveedor automáticamente según `WA_PROVIDER`, sin tocar código.
+
+Con la oficial, los mensajes que son *respuesta directa* al empleado (OCR,
+duplicado, límite, trial vencido) llegan siempre. Los que el bot *inicia* sin
+que le hayan escrito antes (reporte diario, verificación nocturna, alerta al
+admin) solo llegan si la plantilla correspondiente ya está aprobada por Meta.
+
 ## Configurar OpenWA
 
 Configura OpenWA para enviar los eventos a:

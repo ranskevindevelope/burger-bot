@@ -71,7 +71,9 @@ app.use((req, res, next) => {
 });
 
 // ─── Body parsers ─────────────────────────────────────────
-app.use(express.json({ limit: '50mb' }));
+// verify: guarda el body crudo en req.rawBody, lo usa el webhook de Meta
+// para validar la firma X-Hub-Signature-256 (WA_PROVIDER=meta).
+app.use(express.json({ limit: '50mb', verify: (req, res, buf) => { req.rawBody = buf; } }));
 app.use(express.urlencoded({ limit: '50mb', extended: false }));
 
 // ─── Carpeta de comprobantes ──────────────────────────────

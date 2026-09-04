@@ -274,11 +274,6 @@ export default function FlashPagoLanding({ onLogin, onRegistro, onTerminos, onPr
       features: ["Todo lo del plan Premium", "Comprobantes ilimitados", "Soporte prioritario"],
       disabled: [],
     },
-    {
-      name: "Empresarial", price: "$179.900",
-      features: ["Todo lo del plan Premium Plus", "Multi-sucursal", "Exportar a Excel", "Usuarios ilimitados", "Soporte dedicado"],
-      disabled: [], pronto: ["API bancaria directa (pronto)", "Integración contable (pronto)"],
-    },
   ];
 
   return (
@@ -479,7 +474,7 @@ export default function FlashPagoLanding({ onLogin, onRegistro, onTerminos, onPr
           <h2 style={{ fontFamily: "'Space Grotesk',sans-serif", fontSize: "2.5rem", fontWeight: 700, marginBottom: "1.5rem", lineHeight: 1.2, marginTop: 0 }}>Elige el plan para tu negocio</h2>
           <p style={{ fontSize: "1.1rem", color: COLORS.grisTxt, maxWidth: 650, marginBottom: "3rem" }}>Sin contratos largos. Cancela cuando quieras.</p>
           <div className="planes-grid-wrap" style={{ display: "grid", gridTemplateColumns: "repeat(3,1fr)", gap: "2rem" }}>
-            {planes.filter(plan => plan.name !== "Empresarial").map(plan => (
+            {planes.map(plan => (
               <div key={plan.name} style={{ border: `2px solid ${plan.popular ? COLORS.naranja : "#e8e8f0"}`, borderRadius: 20, padding: "2.5rem 2rem", position: "relative", ...(plan.popular ? { background: "linear-gradient(180deg, rgba(245,124,0,0.03) 0%, transparent 100%)" } : {}) }}>
                 {plan.popular && (
                   <div style={{ position: "absolute", top: -14, left: "50%", transform: "translateX(-50%)", background: COLORS.naranja, color: "white", padding: "0.3rem 1.2rem", borderRadius: 50, fontSize: "0.75rem", fontWeight: 600, textTransform: "uppercase", letterSpacing: 1, display: "flex", alignItems: "center", gap: 5, whiteSpace: "nowrap" }}>

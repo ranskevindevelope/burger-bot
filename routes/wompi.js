@@ -6,6 +6,7 @@ const crypto = require('crypto');
 const config = require('../config');
 const { verificarToken, soloAdmin } = require('../auth');
 const {
+  db,
   crearPagoPlataforma,
   obtenerPagoPlataforma,
   actualizarPagoPlataforma,
@@ -55,6 +56,84 @@ router.post('/iniciar', verificarToken, soloAdmin, async (req, res) => {
   } catch (err) {
     console.error('[Wompi] Error iniciando pago:', err.message);
     res.status(500).json({ ok: false, error: 'Error iniciando el pago' });
+  }
+});
+
+// ─── Transferencia bancaria manual (alternativa a Wompi) ────
+// Guarda en memoria qué ADMIN (por su WhatsApp, no todo el negocio) está
+// esperando mandar un comprobante de pago de suscripción, para que el
+// webhook de WhatsApp sepa distinguirlo de un comprobante normal de
+// cliente. Acotado a la persona (no al negocio) para que un empleado
+// mandando un comprobante real de cliente en esa misma ventana no se
+// confunda con el pago de plataforma. Expira a los 30 minutos.
+const transferenciasEsperadas = new Map(); // whatsapp del admin -> { negocio_id, referencia, plan, montoPesos, expira }
+
+function obtenerTransferenciaEsperada(whatsappRemitente) {
+  const t = transferenciasEsperadas.get(whatsappRemitente);
+  if (!t) return null;
+  if (Date.now() > t.expira) {
+    transferenciasEsperadas.delete(whatsappRemitente);
+    return null;
+  }
+  return t;
+}
+
+function limpiarTransferenciaEsperada(whatsappRemitente) {
+  transferenciasEsperadas.delete(whatsappRemitente);
+}
+
+router.post('/transferencia/iniciar', verificarToken, soloAdmin, async (req, res) => {
+  try {
+    const { plan } = req.body;
+    if (!PRECIOS_CENTAVOS[plan]) {
+      return res.status(400).json({ ok: false, error: 'Plan no válido' });
+    }
+    if (!config.CUENTA_NUMERO) {
+      return res.status(503).json({ ok: false, error: 'La transferencia bancaria no está configurada todavía' });
+    }
+
+    const negocio_id = req.user.negocio_id;
+
+    const usuario = await new Promise((resolve, reject) => {
+      db.get('SELECT whatsapp FROM usuarios WHERE id = ?', [req.user.id], (err, row) => {
+        if (err) reject(err); else resolve(row);
+      });
+    });
+    if (!usuario?.whatsapp) {
+      return res.status(400).json({ ok: false, error: 'Tu usuario no tiene un WhatsApp registrado. Contacta soporte para activarlo manualmente.' });
+    }
+    const whatsappAdmin = usuario.whatsapp.includes('@') ? usuario.whatsapp : `${usuario.whatsapp}@c.us`;
+
+    const monto = PRECIOS_CENTAVOS[plan]; // en centavos, igual que en Wompi
+    const montoPesos = Math.round(monto / 100);
+    const referencia = `FP-${negocio_id}-${Date.now()}`;
+
+    await crearPagoPlataforma({ negocio_id, referencia, plan, monto });
+
+    transferenciasEsperadas.set(whatsappAdmin, {
+      negocio_id,
+      referencia,
+      plan,
+      montoPesos,
+      expira: Date.now() + 30 * 60 * 1000, // 30 minutos para mandar el comprobante
+    });
+
+    res.json({
+      ok: true,
+      referencia,
+      montoPesos,
+      whatsapp: config.FLASHPAGO_WHATSAPP,
+      cuenta: {
+        banco: config.CUENTA_BANCO,
+        tipo: config.CUENTA_TIPO,
+        numero: config.CUENTA_NUMERO,
+        titular: config.CUENTA_TITULAR,
+        nit: config.CUENTA_NIT,
+      },
+    });
+  } catch (err) {
+    console.error('[Transferencia] Error iniciando:', err.message);
+    res.status(500).json({ ok: false, error: 'Error iniciando la transferencia' });
   }
 });
 
@@ -131,3 +210,5 @@ router.post('/webhook', async (req, res) => {
 });
 
 module.exports = router;
+module.exports.obtenerTransferenciaEsperada = obtenerTransferenciaEsperada;
+module.exports.limpiarTransferenciaEsperada = limpiarTransferenciaEsperada;

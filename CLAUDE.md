@@ -30,6 +30,7 @@ No hay suite de pruebas automatizada configurada.
 - **Festivos/fines de semana**: `bot/festivos.js` aplica la Ley Emiliani colombiana; `index.js` decide si corren verificaciones nocturnas (21:00/22:00) y el reporte diario según las variables `HABILITAR_*` del `.env`.
 - **Endpoint legado**: `/pago-recibido` está retirado (responde 410); no reintroducir lógica de MacroDroid/SMS/Android.
 - **Lista de autorizados**: el webhook solo procesa remitentes definidos en `bot/comandos.js`.
+- **Proveedor de WhatsApp**: `WA_PROVIDER` (`.env`) switchea entre `openwa` (default, no oficial) y `meta` (API oficial, de respaldo por si banean el número). El switch vive en `bot/openwa.js` (envío) y `routes/webhook.js` (recepción + verificación de firma/handshake). Detalle completo en el README, sección "Respaldo: migrar a la API oficial de Meta".
 
 ## Seguridad y datos sensibles
 
