@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { DollarSign, ArrowRight, ArrowLeft, Check, Mail, Users, ShoppingBag, Shield, Zap, Sparkles, Gift, Package, Rocket } from 'lucide-react';
 
-const API_BASE = process.env.REACT_APP_API_URL || '';
+const API_BASE = import.meta.env.VITE_API_URL || '';
 const PASSWORD_VALIDA = /^(?=.*[a-z])(?=.*[A-Z]).{8,}$/;
 const PASSWORD_ERROR = 'La contraseña debe tener mínimo 8 caracteres, con mayúsculas y minúsculas';
 
